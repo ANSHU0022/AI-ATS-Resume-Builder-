@@ -1,0 +1,27 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #f5f7fa;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: #1a2332;
+}
+
+/* Ensure svgs inside buttons don't get squished by default paddings */
+button {
+  padding: 0;
+}
+
+/* Prevent html2pdf from slicing individual bullet points in half at page boundaries */
+.resume-container li {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}

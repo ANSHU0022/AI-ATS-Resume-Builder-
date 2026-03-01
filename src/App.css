@@ -1,0 +1,27 @@
+.resume-container {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    background: white;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.13);
+}
+
+@page {
+    size: A4;
+    margin: 0;
+}
+
+@media print {
+    body {
+        background: white !important;
+    }
+
+    .resume-container {
+        box-shadow: none !important;
+        padding-top: 10mm;
+        padding-bottom: 10mm;
+        box-sizing: border-box;
+        width: 210mm !important;
+        margin: 0 !important;
+    }
+}
