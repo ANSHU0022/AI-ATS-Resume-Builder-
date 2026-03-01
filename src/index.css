@@ -4,6 +4,32 @@
   box-sizing: border-box;
 }
 
+/* Thin scrollbars everywhere */
+* {
+  scrollbar-width: thin;
+  /* Firefox */
+  scrollbar-color: #c4c9d2 transparent;
+  /* Firefox */
+}
+
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #c4c9d2;
+  border-radius: 10px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
 body,
 html {
   margin: 0;

@@ -118,6 +118,18 @@ async function exportPDF(ref, name) {
     pagebreak: { mode: ['css', 'legacy'] }
   };
 
+  // Inject Google Font links for PDF export
+  const fontLinksForPdf = [window.__resumeHeadingFont, window.__resumeBodyFont]
+    .filter(f => f && f.googleUrl)
+    .map(f => f.googleUrl);
+  fontLinksForPdf.forEach(url => {
+    const existing = document.querySelector(`link[href="${url}"]`);
+    if (!existing) {
+      const l = document.createElement("link");
+      l.rel = "stylesheet"; l.href = url;
+      document.head.appendChild(l);
+    }
+  });
   await html2pdf().set(opt).from(node).save();
 }
 
@@ -125,7 +137,40 @@ async function exportPDF(ref, name) {
 const PAGE_W = 794;  // 210mm
 const PAGE_H = 1123; // 297mm A4 pixel height
 
-function PaginatedResume({ data, template, exportRef }) {
+// ── ATS-Friendly Font Definitions ─────────────────────────────────────────────
+const ATS_FONTS = [
+  { id:"inter",name:"Inter",family:"'Inter', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",category:"Sans-Serif",atsScore:"Excellent",bestFor:"Tech & Startups" },
+  { id:"roboto",name:"Roboto",family:"'Roboto', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap",category:"Sans-Serif",atsScore:"Excellent",bestFor:"General Purpose" },
+  { id:"open-sans",name:"Open Sans",family:"'Open Sans', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap",category:"Sans-Serif",atsScore:"Excellent",bestFor:"Corporate" },
+  { id:"lato",name:"Lato",family:"'Lato', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap",category:"Sans-Serif",atsScore:"Excellent",bestFor:"Modern & Clean" },
+  { id:"source-sans",name:"Source Sans 3",family:"'Source Sans 3', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap",category:"Sans-Serif",atsScore:"Excellent",bestFor:"Readability" },
+  { id:"nunito-sans",name:"Nunito Sans",family:"'Nunito Sans', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&display=swap",category:"Sans-Serif",atsScore:"Good",bestFor:"Friendly & Modern" },
+  { id:"merriweather",name:"Merriweather",family:"'Merriweather', serif",googleUrl:"https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&display=swap",category:"Serif",atsScore:"Excellent",bestFor:"Academic & Finance" },
+  { id:"lora",name:"Lora",family:"'Lora', serif",googleUrl:"https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap",category:"Serif",atsScore:"Excellent",bestFor:"Elegant & Classic" },
+  { id:"playfair",name:"Playfair Display",family:"'Playfair Display', serif",googleUrl:"https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&display=swap",category:"Serif",atsScore:"Good",bestFor:"Executive & Creative" },
+  { id:"eb-garamond",name:"EB Garamond",family:"'EB Garamond', serif",googleUrl:"https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap",category:"Serif",atsScore:"Good",bestFor:"Traditional & Legal" },
+  { id:"georgia",name:"Georgia",family:"Georgia, serif",googleUrl:null,category:"Serif",atsScore:"Excellent",bestFor:"Safe & Universal" },
+  { id:"arial",name:"Arial",family:"Arial, sans-serif",googleUrl:null,category:"Sans-Serif",atsScore:"Excellent",bestFor:"Maximum ATS Safety" },
+  { id:"jetbrains-mono",name:"JetBrains Mono",family:"'JetBrains Mono', monospace",googleUrl:"https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap",category:"Monospace",atsScore:"Fair",bestFor:"Developer Resumes" },
+];
+
+const loadFont = (font) => {
+  if (!font || !font.googleUrl) return;
+  const id = `font-${font.id}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement("link");
+  link.id = id; link.rel = "stylesheet"; link.href = font.googleUrl;
+  document.head.appendChild(link);
+};
+
+const FONT_PAIRS = [
+  { label: "Professional", headId: "merriweather", bodyId: "source-sans" },
+  { label: "Modern Tech", headId: "inter", bodyId: "inter" },
+  { label: "Executive", headId: "playfair", bodyId: "lato" },
+  { label: "Classic ATS", headId: "georgia", bodyId: "arial" },
+];
+
+function PaginatedResume({ data, template, exportRef, headingFont, bodyFont }) {
   const TemplateComp = template === "A" ? TemplateA : template === "B" ? TemplateB : TemplateC;
 
   const measureRef = useRef(null);
@@ -197,14 +242,14 @@ function PaginatedResume({ data, template, exportRef }) {
       {/* Hidden continuous container for html2pdf */}
       <div style={{ position: "fixed", top: 0, left: -9999, width: PAGE_W, pointerEvents: "none", zIndex: -1 }}>
         <div ref={exportRef} className="resume-container">
-          <TemplateComp data={data} />
+          <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} />
         </div>
       </div>
 
       {/* Hidden measuring container */}
       <div style={{ position: "fixed", top: 0, left: -9999, width: PAGE_W, pointerEvents: "none", zIndex: -1 }}>
         <div ref={measureRef} className="resume-container">
-          <TemplateComp data={data} />
+          <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} />
         </div>
       </div>
 
@@ -231,7 +276,7 @@ function PaginatedResume({ data, template, exportRef }) {
               <div style={{ position: "absolute", top: vTop, left: 0, width: PAGE_W, height: vHeight, overflow: "hidden" }}>
                 <div style={{ position: "absolute", top: cTop, left: 0, width: PAGE_W }}>
                   <div className="resume-container" style={{ boxShadow: "none", minHeight: vHeight }}>
-                    <TemplateComp data={data} />
+                    <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} />
                   </div>
                 </div>
               </div>
@@ -247,12 +292,14 @@ function PaginatedResume({ data, template, exportRef }) {
 }
 
 // ── Template A (Classic) ──────────────────────────────────────────────────────
-function TemplateA({ data }) {
+function TemplateA({ data, headingFont, bodyFont }) {
+  const hf = headingFont?.family || "'Segoe UI', sans-serif";
+  const bf = bodyFont?.family || "'Segoe UI', sans-serif";
   const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
   return (
-    <div style={{ fontFamily: "'Calibri', sans-serif", fontSize: "10pt", color: "#1a1a1a", padding: "28px 32px", lineHeight: 1.45, background: "#fff" }}>
+    <div style={{ fontFamily: "'Calibri', sans-serif", fontSize: "10pt", color: "#1a1a1a", padding: "28px 32px", lineHeight: 1.45, fontFamily: bf, background: "#fff" }}>
       <div style={{ textAlign: "center", marginBottom: 10 }}>
-        {p.name && <div style={{ fontSize: "22pt", fontWeight: 700, letterSpacing: 1, marginBottom: 2 }}>{p.name}</div>}
+        {p.name && <div style={{ fontSize: "22pt", fontWeight: 700, fontFamily: hf, letterSpacing: 1, marginBottom: 2 }}>{p.name}</div>}
         {p.title && <div style={{ fontSize: "11pt", color: "#444", marginBottom: 7 }}>{p.title}</div>}
         <div style={{ fontSize: "9pt", color: "#333", display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "10px", alignItems: "center" }}>
           {p.phone && <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><BIcon path={icons.phone} />{p.phone}</span>}
@@ -337,12 +384,14 @@ function TemplateA({ data }) {
 }
 
 // ── Template B (Modern Sidebar) ───────────────────────────────────────────────
-function TemplateB({ data }) {
+function TemplateB({ data, headingFont, bodyFont }) {
+  const hf = headingFont?.family || "'Segoe UI', sans-serif";
+  const bf = bodyFont?.family || "'Segoe UI', sans-serif";
   const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
   return (
     <div style={{ fontFamily: "'Georgia', serif", fontSize: "10pt", color: "#1a1a1a", background: "#fff", display: "flex", minHeight: "100%" }}>
       <div style={{ width: "32%", background: "#2c3e50", color: "#ecf0f1", padding: "28px 16px" }}>
-        {p.name && <div style={{ fontSize: "15pt", fontWeight: 700, color: "#fff", marginBottom: 4 }}>{p.name}</div>}
+        {p.name && <div style={{ fontSize: "15pt", fontWeight: 700, fontFamily: hf, color: "#fff", marginBottom: 4 }}>{p.name}</div>}
         {p.title && <div style={{ fontSize: "9pt", color: "#bdc3c7", marginBottom: 16 }}>{p.title}</div>}
         <SS title="CONTACT">
           {p.email && <div style={{ fontSize: "8.5pt", marginBottom: 4, wordBreak: "break-all" }}>{p.email}</div>}
@@ -426,11 +475,13 @@ function TemplateB({ data }) {
 }
 
 // ── Template C (Minimal) ──────────────────────────────────────────────────────
-function TemplateC({ data }) {
+function TemplateC({ data, headingFont, bodyFont }) {
+  const hf = headingFont?.family || "'Segoe UI', sans-serif";
+  const bf = bodyFont?.family || "'Segoe UI', sans-serif";
   const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
   return (
     <div style={{ fontFamily: "'Arial Narrow', Arial, sans-serif", fontSize: "9.5pt", color: "#111", padding: "24px 36px", background: "#fff" }}>
-      {p.name && <div style={{ fontSize: "24pt", fontWeight: 900, borderBottom: "3px solid #111", paddingBottom: 6, marginBottom: 4 }}>{p.name}</div>}
+      {p.name && <div style={{ fontSize: "24pt", fontWeight: 900, fontFamily: hf, borderBottom: "3px solid #111", paddingBottom: 6, marginBottom: 4 }}>{p.name}</div>}
       {p.title && <div style={{ fontSize: "11pt", color: "#555", marginBottom: 8 }}>{p.title}</div>}
       <div style={{ fontSize: "8.5pt", color: "#444", marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
         {[p.email, p.phone, p.location].filter(Boolean).map((v, i) => <span key={i}>{v}</span>)}
@@ -715,6 +766,318 @@ RESUME TEXT:
 }
 
 
+
+// ── FONT PICKER PANEL ─────────────────────────────────────────────────────────
+function FontPickerPanel({ headingFont, setHeadingFont, bodyFont, setBodyFont, onClose }) {
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (panelRef.current && !panelRef.current.contains(e.target)) onClose(); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  const atsBadge = (score) => {
+    const colors = score === "Excellent" ? { c: "#15803d", bg: "#f0fdf4" } : score === "Good" ? { c: "#2563eb", bg: "#eff6ff" } : { c: "#b45309", bg: "#fffbeb" };
+    return { fontSize: 8, fontWeight: 700, color: colors.c, background: colors.bg, padding: "2px 6px", borderRadius: 4 };
+  };
+
+  const renderFontList = (selected, onSelect, role) => {
+    const cats = ["Sans-Serif", "Serif", "Monospace"];
+    return cats.map(cat => {
+      const fonts = ATS_FONTS.filter(f => f.category === cat);
+      if (fonts.length === 0) return null;
+      return (
+        <div key={cat}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", margin: "10px 0 4px", letterSpacing: 1 }}>{cat.toUpperCase()}</div>
+          {fonts.map(f => (
+            <div key={f.id} onClick={() => { loadFont(f); onSelect(f); }}
+              style={{ padding: "7px 10px", borderRadius: 8, cursor: "pointer", marginBottom: 3,
+                background: selected.id === f.id ? "#eff6ff" : "#fff",
+                border: selected.id === f.id ? "1.5px solid #2563eb" : "1px solid #e5e7eb",
+                transition: "all 0.15s" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontFamily: f.family, fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{f.name}</span>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <span style={atsBadge(f.atsScore)}>{f.atsScore}</span>
+                  {f.category === "Monospace" && <span style={{ fontSize: 7, fontWeight: 700, color: "#b45309", background: "#fffbeb", padding: "2px 5px", borderRadius: 4 }}>⚠️ ATS</span>}
+                </div>
+              </div>
+              <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 2 }}>{f.bestFor}</div>
+            </div>
+          ))}
+        </div>
+      );
+    });
+  };
+
+  return (
+    <div ref={panelRef} style={{ position: "absolute", top: "100%", right: 0, marginTop: 6, width: 560, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, boxShadow: "0 12px 40px rgba(0,0,0,0.15)", zIndex: 9000, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", gap: 16 }}>
+        {/* Heading Font Column */}
+        <div style={{ flex: 1, maxHeight: 340, overflowY: "auto" }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#374151", letterSpacing: 1, marginBottom: 2 }}>HEADING FONT</div>
+          <div style={{ fontSize: 9, color: "#94a3b8", marginBottom: 8 }}>Name · Section titles · Company names</div>
+          {renderFontList(headingFont, setHeadingFont, "heading")}
+        </div>
+        {/* Divider */}
+        <div style={{ width: 1, background: "#e5e7eb" }} />
+        {/* Body Font Column */}
+        <div style={{ flex: 1, maxHeight: 340, overflowY: "auto" }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#374151", letterSpacing: 1, marginBottom: 2 }}>BODY FONT</div>
+          <div style={{ fontSize: 9, color: "#94a3b8", marginBottom: 8 }}>Bullets · Descriptions · Dates</div>
+          {renderFontList(bodyFont, setBodyFont, "body")}
+        </div>
+      </div>
+      {/* Pair Suggestions */}
+      <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", marginBottom: 6, letterSpacing: 1 }}>PAIR SUGGESTIONS</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {FONT_PAIRS.map(p => (
+            <button key={p.label} onClick={() => {
+              const h = ATS_FONTS.find(f => f.id === p.headId);
+              const b = ATS_FONTS.find(f => f.id === p.bodyId);
+              if (h) { loadFont(h); setHeadingFont(h); }
+              if (b) { loadFont(b); setBodyFont(b); }
+            }} style={{ flex: 1, padding: "6px 8px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fafbfc", cursor: "pointer", fontSize: 10, fontWeight: 600, color: "#475569", transition: "all 0.15s" }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── JD KEYWORD ANALYZER MODAL ─────────────────────────────────────────────────
+function JDAnalyzerModal({ onClose, data, setData }) {
+  const [jdText, setJdText] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | analyzing | done | error
+  const [analysis, setAnalysis] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [added, setAdded] = useState({});
+
+  const buildResumeText = () => {
+    const p = data.personal;
+    const parts = [
+      p.name, p.title, data.summary,
+      data.skills.map(s => s.items).join(", "),
+      data.experience.map(e => [e.role, e.company, ...(e.bullets || [])].join(" ")).join(" "),
+      data.projects.map(pr => [pr.name, pr.tech, ...(pr.bullets || [])].join(" ")).join(" "),
+      data.education.map(e => [e.degree, e.institution].join(" ")).join(" "),
+      data.certifications.map(c => c.name).join(", "),
+    ];
+    return parts.filter(Boolean).join("\n");
+  };
+
+  const analyze = async () => {
+    if (!jdText.trim()) { setErrorMsg("Please paste a job description first."); return; }
+    setStatus("analyzing"); setErrorMsg(""); setAnalysis(null); setAdded({});
+    try {
+      const resumeText = buildResumeText();
+      const resp = await fetch("/api/groq", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile", temperature: 0.1, max_tokens: 4000,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: "You are an ATS expert. Always respond with only valid JSON." },
+            { role: "user", content: `You are an ATS (Applicant Tracking System) expert. Analyze the job description and resume.\n\nJOB DESCRIPTION:\n${jdText}\n\nRESUME CONTENT:\n${resumeText}\n\nReturn ONLY valid JSON with this exact structure:\n{\n  "matchScore": 72,\n  "jobTitle": "Job title detected from JD",\n  "matchedCount": 18,\n  "matched": [\n    { "keyword": "Python", "importance": "high", "category": "Programming Languages" }\n  ],\n  "missing": [\n    { "keyword": "Docker", "importance": "high", "category": "Tools & Technologies", "suggestion": "Add to Tools & Technologies" }\n  ],\n  "softSkills": ["communication", "teamwork"],\n  "topTip": "One sentence tip to improve resume for this specific job"\n}\n\nRules:\n- importance levels: high (required or appears 3+ times), medium (preferred), low (nice to have)\n- category must be one of: Programming Languages, Frameworks, Tools & Technologies, Soft Skills, Cloud & DevOps, Databases\n- Extract EVERY SINGLE technical keyword from the JD � typically 15 to 40 keywords. Do NOT limit to 5 or 10. The missing list must include ALL keywords from JD not found in resume. Be EXHAUSTIVE\n- Return ONLY the JSON, no explanation, no markdown` }
+          ]
+        })
+      });
+      if (!resp.ok) throw new Error(`Groq API error: ${resp.status}`);
+      const json = await resp.json();
+      const text = json.choices?.[0]?.message?.content || "";
+      const parsed = JSON.parse(text);
+      // Recalculate match score from actual counts — never trust AI's number
+      const mc = parsed.matched?.length || 0;
+      const ms = parsed.missing?.length || 0;
+      const total = mc + ms;
+      parsed.matchScore = total > 0 ? Math.round((mc / total) * 100) : 0;
+      setAnalysis(parsed);
+      setStatus("done");
+    } catch (err) { setErrorMsg(err.message || "Analysis failed."); setStatus("error"); }
+  };
+
+  const addKeyword = (keyword, category) => {
+    if (added[keyword]) return;
+    setData(prev => {
+      const skills = [...prev.skills];
+      const catLower = (category || "").toLowerCase();
+      let idx = skills.findIndex(s => {
+        const sl = (s.category || "").toLowerCase();
+        return sl === catLower || catLower.includes(sl.split(" ")[0]) || sl.includes(catLower.split(" ")[0]);
+      });
+      if (idx === -1 && skills.length > 0) idx = 0;
+      if (idx === -1) { skills.push({ category: "Job-Matched Skills", items: keyword }); }
+      else {
+        const existing = skills[idx].items.split(",").map(s => s.trim().toLowerCase());
+        if (existing.includes(keyword.toLowerCase())) return prev;
+        skills[idx] = { ...skills[idx], items: skills[idx].items ? `${skills[idx].items}, ${keyword}` : keyword };
+      }
+      return { ...prev, skills };
+    });
+    setAdded(prev => ({ ...prev, [keyword]: category || "Skills" }));
+  };
+
+  const addAll = () => {
+    if (!analysis?.missing) return;
+    analysis.missing.forEach(m => addKeyword(m.keyword, m.category));
+  };
+
+  const allAdded = analysis?.missing?.length > 0 && analysis.missing.every(m => added[m.keyword]);
+  const wordCount = jdText.trim().split(/\s+/).filter(Boolean).length;
+
+  const impColor = (imp) => imp === "high" ? { c: "#dc2626", bg: "#fef2f2" } : imp === "medium" ? { c: "#b45309", bg: "#fffbeb" } : { c: "#6b7688", bg: "#f3f4f6" };
+  const scoreColor = (s) => s >= 75 ? { c: "#15803d", bg: "#f0fdf4", bar: "#22c55e" } : s >= 50 ? { c: "#b45309", bg: "#fffbeb", bar: "#f59e0b" } : { c: "#dc2626", bg: "#fef2f2", bar: "#ef4444" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }} onClick={onClose}>
+      <div style={{ width: 900, maxWidth: "95vw", maxHeight: "90vh", background: "#fff", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", overflow: "hidden" }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: "16px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 22 }}>🎯</span>
+            <div><div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>Job Description Analyzer</div><div style={{ fontSize: 11, color: "#94a3b8" }}>Paste a JD to find missing keywords and boost your ATS score</div></div>
+          </div>
+          <button onClick={onClose} style={{ width: 32, height: 32, border: "none", background: "#f3f4f6", borderRadius: 8, cursor: "pointer", fontSize: 16, color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+        </div>
+
+        {/* Body — Two Panels */}
+        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+          {/* LEFT — JD Input */}
+          <div style={{ width: 300, flexShrink: 0, borderRight: "1px solid #e5e7eb", padding: 20, display: "flex", flexDirection: "column", gap: 12, background: "#fafbfc" }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>Paste Job Description</label>
+            <textarea value={jdText} onChange={e => setJdText(e.target.value)} placeholder="Paste the full job description here..." style={{ flex: 1, minHeight: 260, padding: 12, border: "1.5px solid #e5e7eb", borderRadius: 10, resize: "none", fontSize: 12, lineHeight: 1.6, fontFamily: "'Segoe UI', sans-serif", outline: "none", color: "#1a1a1a" }} />
+            <div style={{ fontSize: 10, color: "#94a3b8" }}>{wordCount} words</div>
+            <button onClick={analyze} disabled={status === "analyzing"} style={{ padding: "11px 0", background: status === "analyzing" ? "#fdba74" : "#f55036", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: status === "analyzing" ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.2s" }}>
+              {status === "analyzing" ? <><span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⚙️</span> Analyzing...</> : <>⚡ Analyze Keywords</>}
+            </button>
+            {errorMsg && <div style={{ fontSize: 11, color: "#dc2626", background: "#fef2f2", padding: "8px 12px", borderRadius: 8 }}>❌ {errorMsg}</div>}
+          </div>
+
+          {/* RIGHT — Results */}
+          <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+            {status === "idle" && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", gap: 12, textAlign: "center", padding: 40 }}>
+                <span style={{ fontSize: 48 }}>🔍</span>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>No analysis yet</div>
+                <div style={{ fontSize: 12, maxWidth: 280 }}>Paste a job description on the left and click "Analyze Keywords" to find missing skills</div>
+              </div>
+            )}
+
+            {status === "analyzing" && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 16 }}>
+                <div style={{ width: 48, height: 48, border: "4px solid #e5e7eb", borderTopColor: "#f55036", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#475569" }}>Analyzing with AI...</div>
+                <div style={{ fontSize: 11, color: "#94a3b8" }}>Groq LLaMA 3.3 70B is extracting keywords</div>
+                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+              </div>
+            )}
+
+            {status === "done" && analysis && (() => {
+              const sc = scoreColor(analysis.matchScore);
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                  {/* Score Card */}
+                  <div style={{ background: sc.bg, border: `1.5px solid ${sc.bar}33`, borderRadius: 12, padding: 18, display: "flex", alignItems: "center", gap: 20 }}>
+                    <div style={{ width: 72, height: 72, borderRadius: "50%", border: `4px solid ${sc.bar}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+                      <span style={{ fontSize: 24, fontWeight: 900, color: sc.c }}>{analysis.matchScore}</span>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: sc.c }}>MATCH</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: sc.c }}>{analysis.matchScore >= 75 ? "Great Match!" : analysis.matchScore >= 50 ? "Decent Match" : "Needs Work"}</div>
+                      {analysis.jobTitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>JD: {analysis.jobTitle}</div>}
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{analysis.matched?.length || 0} matched · {analysis.missing?.length || 0} missing keywords</div>
+                    </div>
+                  </div>
+
+                  {/* Tip Banner */}
+                  {analysis.topTip && (
+                    <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#1e40af", display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <span>💡</span><span>{analysis.topTip}</span>
+                    </div>
+                  )}
+
+                  {/* Missing Keywords */}
+                  {analysis.missing?.length > 0 && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>❌ Missing Keywords ({analysis.missing.length})</div>
+                        <button onClick={addAll} style={{ padding: "6px 14px", fontSize: 11, fontWeight: 700, border: "none", borderRadius: 8, cursor: allAdded ? "default" : "pointer", background: allAdded ? "#dcfce7" : "#16a34a", color: allAdded ? "#15803d" : "#fff", transition: "all 0.2s" }}>
+                          {allAdded ? "✅ All Added!" : "➕ Add All to Skills"}
+                        </button>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {analysis.missing.map((m, i) => {
+                          const ic = impColor(m.importance);
+                          const isAdded = added[m.keyword];
+                          return (
+                            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", background: isAdded ? "#f0fdf4" : "#fff", border: "1px solid #e5e7eb", borderLeft: `4px solid ${isAdded ? "#22c55e" : ic.c}`, borderRadius: 8, transition: "all 0.2s" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{m.keyword}</span>
+                                <span style={{ fontSize: 9, fontWeight: 700, color: ic.c, background: ic.bg, padding: "2px 8px", borderRadius: 20 }}>{m.importance}</span>
+                                <span style={{ fontSize: 9, color: "#94a3b8" }}>{m.category}</span>
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                                <button onClick={() => addKeyword(m.keyword, m.category)} disabled={!!isAdded} style={{ padding: "4px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: isAdded ? "default" : "pointer", background: isAdded ? "#dcfce7" : "#16a34a", color: isAdded ? "#15803d" : "#fff", transition: "all 0.2s" }}>
+                                  {isAdded ? "✓ Added" : "+ Add"}
+                                </button>
+                                {isAdded && <span style={{ fontSize: 9, color: "#15803d" }}>✅ Added to Skills → {isAdded}</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Matched Keywords */}
+                  {analysis.matched?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>✅ Matched Keywords ({analysis.matched.length})</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {analysis.matched.map((m, i) => (
+                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: "#15803d", background: "#f0fdf4", border: "1px solid #86efac", padding: "4px 12px", borderRadius: 20 }}>{m.keyword}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Soft Skills */}
+                  {analysis.softSkills?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>💬 Soft Skills Found</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {analysis.softSkills.map((s, i) => (
+                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", padding: "4px 12px", borderRadius: 20, textTransform: "capitalize" }}>{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {status === "error" && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, color: "#dc2626" }}>
+                <span style={{ fontSize: 48 }}>⚠️</span>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>Analysis Failed</div>
+                <div style={{ fontSize: 12, textAlign: "center", maxWidth: 280 }}>{errorMsg}</div>
+                <button onClick={analyze} style={{ padding: "8px 20px", background: "#f55036", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>🔄 Retry</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // ── Routing Wrapper ───────────────────────────────────────────────────────────
 import HomePage from './HomePage.jsx';
 
@@ -737,11 +1100,30 @@ function ResumeBuilder() {
   const [aiError, setAiError] = useState("");
   const [showTips, setShowTips] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [headingFont, setHeadingFont] = useState(() => {
+    const saved = localStorage.getItem("resume-heading-font");
+    const found = saved ? ATS_FONTS.find(f => f.id === saved) : null;
+    return found || ATS_FONTS.find(f => f.id === "inter");
+  });
+  const [bodyFont, setBodyFont] = useState(() => {
+    const saved = localStorage.getItem("resume-body-font");
+    const found = saved ? ATS_FONTS.find(f => f.id === saved) : null;
+    return found || ATS_FONTS.find(f => f.id === "inter");
+  });
+  const [showFontPanel, setShowFontPanel] = useState(false);
+
+  // Load fonts on mount and when changed
+  useEffect(() => { loadFont(headingFont); loadFont(bodyFont); }, []);
+  useEffect(() => { loadFont(headingFont); localStorage.setItem("resume-heading-font", headingFont.id); }, [headingFont]);
+  useEffect(() => { loadFont(bodyFont); localStorage.setItem("resume-body-font", bodyFont.id); }, [bodyFont]);
+  useEffect(() => { window.__resumeHeadingFont = headingFont; window.__resumeBodyFont = bodyFont; }, [headingFont, bodyFont]);
+
+  const [showJD, setShowJD] = useState(false);
   const previewRef = useRef(null);
   const [numPages, setNumPages] = useState(1);
   const [zoom, setZoom] = useState(80);
 
-  const [formWidth, setFormWidth] = useState(330);
+  const [formWidth, setFormWidth] = useState(400);
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
@@ -799,16 +1181,16 @@ function ResumeBuilder() {
     try {
       const expText = data.experience.filter(e => e.role).map(e => `${e.role} at ${e.company}: ${e.bullets?.join(", ")}`).join("; ");
       const skillText = data.skills.filter(s => s.items).map(s => `${s.category}: ${s.items}`).join("; ");
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      const resp = await fetch("/api/groq", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 1000,
-          messages: [{ role: "user", content: `Write a professional resume summary (2-3 sentences, ATS-friendly) for:\nName: ${data.personal.name || "Professional"}\nTitle: ${data.personal.title || ""}\nExperience: ${expText || "fresher"}\nSkills: ${skillText}\nKeep it concise, impactful, avoid first-person. Output only the summary text.` }]
+          model: "llama-3.3-70b-versatile", max_tokens: 1000,
+          messages: [{ role: "system", content: "You are a professional resume writer. Write concise, ATS-friendly summaries." }, { role: "user", content: `Write a professional resume summary (2-3 sentences, ATS-friendly) for:\nName: ${data.personal.name || "Professional"}\nTitle: ${data.personal.title || ""}\nExperience: ${expText || "fresher"}\nSkills: ${skillText}\nKeep it concise, impactful, avoid first-person. Output only the summary text.` }]
         })
       });
       const json = await resp.json();
-      const text = json.content?.[0]?.text || "";
+      const text = json.choices?.[0]?.message?.content || "";
       if (text) update("summary", text); else setAiError("Could not generate. Try again.");
     } catch { setAiError("AI request failed."); }
     setAiLoading(false);
@@ -835,6 +1217,7 @@ function ResumeBuilder() {
     <div style={{ display: "flex", height: "100vh", background: C.appBg, fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: "hidden" }}>
 
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} onParsed={handleParsed} />}
+      {showJD && <JDAnalyzerModal onClose={() => setShowJD(false)} data={data} setData={setData} />}
 
       {/* ── Sidebar with Icons + Labels ── */}
       <div style={{ width: 140, background: C.sidebarBg, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 12, gap: 2, boxShadow: "1px 0 4px rgba(0,0,0,0.05)" }}>
@@ -848,6 +1231,13 @@ function ResumeBuilder() {
             {s.label}
           </button>
         ))}
+      
+        <div style={{ flex: 1 }} />
+        <button onClick={() => window.location.href = "/"} title="Home"
+          style={{ width: "90%", height: 38, border: "1.5px solid transparent", cursor: "pointer", borderRadius: 9, display: "flex", alignItems: "center", gap: 8, paddingLeft: 12, background: "transparent", color: C.textLight, transition: "all 0.15s", fontSize: 12, fontWeight: 500, marginBottom: 12 }}>
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+          Home
+        </button>
       </div>
 
       {/* ── Form Panel ── */}
@@ -860,12 +1250,19 @@ function ResumeBuilder() {
               <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Resume Builder</div>
               <div style={{ fontSize: 10, color: C.textMuted }}>AI-powered · ATS optimized</div>
             </div>
-            {/* Upload Resume button */}
-            <button onClick={() => setShowUpload(true)}
-              style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.upload} /></svg>
-              Upload CV
-            </button>
+            <div style={{ display: "flex", gap: 6 }}>
+              {/* Match JD button */}
+              <button onClick={() => setShowJD(true)}
+                style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", background: "#fff", border: "1.5px solid #f55036", borderRadius: 8, color: "#f55036", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                🎯 Match JD
+              </button>
+              {/* Upload Resume button */}
+              <button onClick={() => setShowUpload(true)}
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.upload} /></svg>
+                Upload CV
+              </button>
+            </div>
           </div>
           {/* Upload hint */}
           <div style={{ marginTop: 8, background: C.accentLight, border: `1px solid ${C.accentBorder}`, borderRadius: 7, padding: "6px 10px", display: "flex", alignItems: "center", gap: 7 }}>
@@ -935,6 +1332,15 @@ function ResumeBuilder() {
           ))}
           <div style={{ flex: 1 }} />
 
+          {/* Font Picker */}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setShowFontPanel(!showFontPanel)}
+              style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: showFontPanel ? C.accentLight : "#fff", border: showFontPanel ? `1.5px solid ${C.accentBorder}` : `1.5px solid ${C.border}`, borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 600, color: showFontPanel ? C.accent : C.textLight, transition: "all 0.15s" }}>
+              🔤 {headingFont.name}
+            </button>
+            {showFontPanel && <FontPickerPanel headingFont={headingFont} setHeadingFont={setHeadingFont} bodyFont={bodyFont} setBodyFont={setBodyFont} onClose={() => setShowFontPanel(false)} />}
+          </div>
+
           {/* Zoom Controls */}
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginRight: 12 }}>
             <button onClick={() => setZoom(z => Math.max(30, z - 10))}
@@ -961,6 +1367,8 @@ function ResumeBuilder() {
               data={data}
               template={activeTemplate}
               exportRef={previewRef}
+              headingFont={headingFont}
+              bodyFont={bodyFont}
             />
           </div>
         </div>
