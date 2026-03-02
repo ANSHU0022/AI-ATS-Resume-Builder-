@@ -11,7 +11,8 @@ const path = require("path");
 const app = express();
 const PORT = 3001;
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GROQ_API_KEY = (process.env.GROQ_API_KEY || "").trim();
+console.log("GROQ_API_KEY status:", GROQ_API_KEY ? `Loaded (starts with ${GROQ_API_KEY.slice(0, 7)}...)` : "Missing");
 
 app.use(cors()); // Allow all origins — browser can now call this server
 app.use(express.json({ limit: "10mb" })); // Allow large resume payloads

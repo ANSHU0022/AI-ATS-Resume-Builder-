@@ -667,7 +667,6 @@ RESUME TEXT:
 
   const parseResume = async () => {
     if (!file) return;
-    const key = GROQ_API_KEY;
     setErrorMsg(""); setStatus("extracting"); setStep("Reading file…");
     try {
       let resumeText = "";
