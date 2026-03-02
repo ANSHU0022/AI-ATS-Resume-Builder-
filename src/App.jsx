@@ -28,6 +28,7 @@ const icons = {
   x: "M18 6L6 18M6 6l12 12",
   check: "M20 6L9 17l-5-5",
   file: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6",
+  coverLetter: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8",
 };
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
@@ -83,25 +84,25 @@ function RLink({ href, label }) {
   const url = !href ? "#" : href.startsWith("http") ? href : `https://${href}`;
   return <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "underline", fontSize: "9pt" }}>{label}</a>;
 }
-function RS({ title, children, accent = "#1a1a1a" }) {
+function RS({ title, children, accent = "#1a1a1a", headingFontFamily }) {
   return (
     <div style={{ marginBottom: 10 }}>
       {/* Ensure the heading doesn't stick to the bottom of the page if the content moves to next page */}
-      <div style={{ fontSize: "10pt", fontWeight: 700, letterSpacing: 0.5, borderBottom: `1.5px solid ${accent}`, paddingBottom: 2, marginBottom: 5, pageBreakAfter: "avoid", breakAfter: "avoid" }}>{title}</div>
+      <div style={{ fontSize: "10pt", fontWeight: 700, letterSpacing: 0.5, borderBottom: `1.5px solid ${accent}`, paddingBottom: 2, marginBottom: 5, pageBreakAfter: "avoid", breakAfter: "avoid", ...(headingFontFamily ? { fontFamily: headingFontFamily } : {}) }}>{title}</div>
       <div style={{ fontSize: "9.5pt" }}>{children}</div>
     </div>
   );
 }
-function SS({ title, children }) {
+function SS({ title, children, headingFontFamily }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: "8pt", letterSpacing: 2, color: "#64748b", marginBottom: 6, fontWeight: 700, pageBreakAfter: "avoid", breakAfter: "avoid" }}>{title}</div>
+      <div style={{ fontSize: "8pt", letterSpacing: 2, color: "#64748b", marginBottom: 6, fontWeight: 700, pageBreakAfter: "avoid", breakAfter: "avoid", ...(headingFontFamily ? { fontFamily: headingFontFamily } : {}) }}>{title}</div>
       {children}
     </div>
   );
 }
-function MH({ title }) {
-  return <div style={{ fontSize: "8pt", fontWeight: 700, letterSpacing: 2, color: "#888", marginBottom: 4, marginTop: 10, borderBottom: "1px solid #ddd", paddingBottom: 3 }}>{title}</div>;
+function MH({ title, headingFontFamily }) {
+  return <div style={{ fontSize: "8pt", fontWeight: 700, letterSpacing: 2, color: "#888", marginBottom: 4, marginTop: 10, borderBottom: "1px solid #ddd", paddingBottom: 3, ...(headingFontFamily ? { fontFamily: headingFontFamily } : {}) }}>{title}</div>;
 }
 
 // ── PDF Export ────────────────────────────────────────────────────────────────
@@ -139,19 +140,22 @@ const PAGE_H = 1123; // 297mm A4 pixel height
 
 // ── ATS-Friendly Font Definitions ─────────────────────────────────────────────
 const ATS_FONTS = [
-  { id:"inter",name:"Inter",family:"'Inter', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",category:"Sans-Serif",atsScore:"Excellent",bestFor:"Tech & Startups" },
-  { id:"roboto",name:"Roboto",family:"'Roboto', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap",category:"Sans-Serif",atsScore:"Excellent",bestFor:"General Purpose" },
-  { id:"open-sans",name:"Open Sans",family:"'Open Sans', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap",category:"Sans-Serif",atsScore:"Excellent",bestFor:"Corporate" },
-  { id:"lato",name:"Lato",family:"'Lato', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap",category:"Sans-Serif",atsScore:"Excellent",bestFor:"Modern & Clean" },
-  { id:"source-sans",name:"Source Sans 3",family:"'Source Sans 3', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap",category:"Sans-Serif",atsScore:"Excellent",bestFor:"Readability" },
-  { id:"nunito-sans",name:"Nunito Sans",family:"'Nunito Sans', sans-serif",googleUrl:"https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&display=swap",category:"Sans-Serif",atsScore:"Good",bestFor:"Friendly & Modern" },
-  { id:"merriweather",name:"Merriweather",family:"'Merriweather', serif",googleUrl:"https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&display=swap",category:"Serif",atsScore:"Excellent",bestFor:"Academic & Finance" },
-  { id:"lora",name:"Lora",family:"'Lora', serif",googleUrl:"https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap",category:"Serif",atsScore:"Excellent",bestFor:"Elegant & Classic" },
-  { id:"playfair",name:"Playfair Display",family:"'Playfair Display', serif",googleUrl:"https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&display=swap",category:"Serif",atsScore:"Good",bestFor:"Executive & Creative" },
-  { id:"eb-garamond",name:"EB Garamond",family:"'EB Garamond', serif",googleUrl:"https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap",category:"Serif",atsScore:"Good",bestFor:"Traditional & Legal" },
-  { id:"georgia",name:"Georgia",family:"Georgia, serif",googleUrl:null,category:"Serif",atsScore:"Excellent",bestFor:"Safe & Universal" },
-  { id:"arial",name:"Arial",family:"Arial, sans-serif",googleUrl:null,category:"Sans-Serif",atsScore:"Excellent",bestFor:"Maximum ATS Safety" },
-  { id:"jetbrains-mono",name:"JetBrains Mono",family:"'JetBrains Mono', monospace",googleUrl:"https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap",category:"Monospace",atsScore:"Fair",bestFor:"Developer Resumes" },
+  { id: "inter", name: "Inter", family: "'Inter', sans-serif", googleUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap", category: "Sans-Serif", atsScore: "Excellent", bestFor: "Tech & Startups" },
+  { id: "roboto", name: "Roboto", family: "'Roboto', sans-serif", googleUrl: "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap", category: "Sans-Serif", atsScore: "Excellent", bestFor: "General Purpose" },
+  { id: "open-sans", name: "Open Sans", family: "'Open Sans', sans-serif", googleUrl: "https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap", category: "Sans-Serif", atsScore: "Excellent", bestFor: "Corporate" },
+  { id: "lato", name: "Lato", family: "'Lato', sans-serif", googleUrl: "https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap", category: "Sans-Serif", atsScore: "Excellent", bestFor: "Modern & Clean" },
+  { id: "source-sans", name: "Source Sans 3", family: "'Source Sans 3', sans-serif", googleUrl: "https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap", category: "Sans-Serif", atsScore: "Excellent", bestFor: "Readability" },
+  { id: "nunito-sans", name: "Nunito Sans", family: "'Nunito Sans', sans-serif", googleUrl: "https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&display=swap", category: "Sans-Serif", atsScore: "Good", bestFor: "Friendly & Modern" },
+  { id: "merriweather", name: "Merriweather", family: "'Merriweather', serif", googleUrl: "https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&display=swap", category: "Serif", atsScore: "Excellent", bestFor: "Academic & Finance" },
+  { id: "lora", name: "Lora", family: "'Lora', serif", googleUrl: "https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap", category: "Serif", atsScore: "Excellent", bestFor: "Elegant & Classic" },
+  { id: "playfair", name: "Playfair Display", family: "'Playfair Display', serif", googleUrl: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&display=swap", category: "Serif", atsScore: "Good", bestFor: "Executive & Creative" },
+  { id: "eb-garamond", name: "EB Garamond", family: "'EB Garamond', serif", googleUrl: "https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap", category: "Serif", atsScore: "Good", bestFor: "Traditional & Legal" },
+  { id: "georgia", name: "Georgia", family: "Georgia, serif", googleUrl: null, category: "Serif", atsScore: "Excellent", bestFor: "Safe & Universal" },
+  { id: "arial", name: "Arial", family: "Arial, sans-serif", googleUrl: null, category: "Sans-Serif", atsScore: "Excellent", bestFor: "Maximum ATS Safety" },
+  { id: "carlito", name: "Carlito", family: "'Carlito', 'Calibri', sans-serif", googleUrl: "https://fonts.googleapis.com/css2?family=Carlito:wght@400;700&display=swap", category: "Sans-Serif", atsScore: "Good", bestFor: "Calibri Alternative" },
+  { id: "courier-new", name: "Courier New", family: "'Courier New', Courier, monospace", googleUrl: null, category: "Monospace", atsScore: "Fair", bestFor: "Classic Monospace" },
+  { id: "jetbrains-mono", name: "JetBrains Mono", family: "'JetBrains Mono', monospace", googleUrl: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap", category: "Monospace", atsScore: "Fair", bestFor: "Developer Resumes" },
+  { id: "ibm-plex-mono", name: "IBM Plex Mono", family: "'IBM Plex Mono', monospace", googleUrl: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap", category: "Monospace", atsScore: "Fair", bestFor: "Developer & Tech" },
 ];
 
 const loadFont = (font) => {
@@ -169,6 +173,72 @@ const FONT_PAIRS = [
   { label: "Executive", headId: "playfair", bodyId: "lato" },
   { label: "Classic ATS", headId: "georgia", bodyId: "arial" },
 ];
+
+// ── Cover Letter Font Definitions ─────────────────────────────────────────────
+const CL_FONTS = [
+  { name: "Georgia", family: "Georgia, serif", url: null, category: "Serif" },
+  { name: "EB Garamond", family: "'EB Garamond', serif", url: "https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap", category: "Serif" },
+  { name: "Lora", family: "'Lora', serif", url: "https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap", category: "Serif" },
+  { name: "Merriweather", family: "'Merriweather', serif", url: "https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap", category: "Serif" },
+  { name: "Playfair Display", family: "'Playfair Display', serif", url: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap", category: "Serif" },
+  { name: "Inter", family: "'Inter', sans-serif", url: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap", category: "Sans-Serif" },
+  { name: "Roboto", family: "'Roboto', sans-serif", url: "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap", category: "Sans-Serif" },
+  { name: "Open Sans", family: "'Open Sans', sans-serif", url: "https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap", category: "Sans-Serif" },
+  { name: "Lato", family: "'Lato', sans-serif", url: "https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap", category: "Sans-Serif" },
+  { name: "Source Sans 3", family: "'Source Sans 3', sans-serif", url: "https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap", category: "Sans-Serif" },
+  { name: "Nunito Sans", family: "'Nunito Sans', sans-serif", url: "https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap", category: "Sans-Serif" },
+];
+const loadCLFont = (url) => {
+  if (!url) return;
+  const id = "clf-" + btoa(url).slice(0, 12);
+  if (!document.getElementById(id)) {
+    const l = document.createElement("link");
+    l.id = id; l.rel = "stylesheet"; l.href = url;
+    document.head.appendChild(l);
+  }
+};
+
+const detectJobTitle = (jdText) => {
+  if (!jdText) return "";
+  const patterns = [
+    /job title[:\s]+([^\n]+)/i,
+    /position[:\s]+([^\n]+)/i,
+    /role[:\s]+([^\n]+)/i,
+    /we are (?:looking for|hiring)(?: a| an)?\s+([^\n,.]+)/i,
+    /hiring(?: a| an)?\s+([^\n,.]+)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = jdText.match(pattern);
+    if (match) return match[1].trim().replace(/[–—-].*$/, "").trim();
+  }
+  const lines = jdText.split("\n").map(l => l.trim()).filter(Boolean);
+  for (const line of lines.slice(0, 5)) {
+    if (line.length > 5 && line.length < 80 && !line.includes("@")) {
+      return line.replace(/[–—-].*$/, "").trim();
+    }
+  }
+  return "the position";
+};
+
+const loadHtml2Pdf = () => new Promise((resolve, reject) => {
+  if (window.html2pdf) { resolve(); return; }
+  const script = document.createElement("script");
+  script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+  script.onload = resolve;
+  script.onerror = reject;
+  document.head.appendChild(script);
+});
+
+// Strip greeting + signoff from AI text since templates render those separately
+const cleanCoverLetter = (text, name) => {
+  if (!text) return "";
+  let cleaned = text.trim();
+  // Remove greeting line (Dear ... ,)
+  cleaned = cleaned.replace(/^Dear\s+[^,\n]+,?\s*\n?/i, "").trim();
+  // Remove trailing signoff: Sincerely, / candidate name
+  cleaned = cleaned.replace(/\n*Sincerely,?\s*\n.*/si, "").trim();
+  return cleaned;
+};
 
 function PaginatedResume({ data, template, exportRef, headingFont, bodyFont }) {
   const TemplateComp = template === "A" ? TemplateA : template === "B" ? TemplateB : TemplateC;
@@ -297,7 +367,7 @@ function TemplateA({ data, headingFont, bodyFont }) {
   const bf = bodyFont?.family || "'Segoe UI', sans-serif";
   const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
   return (
-    <div style={{ fontFamily: "'Calibri', sans-serif", fontSize: "10pt", color: "#1a1a1a", padding: "28px 32px", lineHeight: 1.45, fontFamily: bf, background: "#fff" }}>
+    <div style={{ fontSize: "10pt", color: "#1a1a1a", padding: "28px 32px", lineHeight: 1.45, fontFamily: bf, background: "#fff" }}>
       <div style={{ textAlign: "center", marginBottom: 10 }}>
         {p.name && <div style={{ fontSize: "22pt", fontWeight: 700, fontFamily: hf, letterSpacing: 1, marginBottom: 2 }}>{p.name}</div>}
         {p.title && <div style={{ fontSize: "11pt", color: "#444", marginBottom: 7 }}>{p.title}</div>}
@@ -311,30 +381,30 @@ function TemplateA({ data, headingFont, bodyFont }) {
         </div>
       </div>
       <hr style={{ border: "none", borderTop: "2px solid #1a1a1a", margin: "8px 0" }} />
-      {summary && <RS title="SUMMARY"><p style={{ margin: 0 }}>{summary}</p></RS>}
+      {summary && <RS title="SUMMARY" headingFontFamily={hf}><p style={{ margin: 0 }}>{summary}</p></RS>}
       {education.some(e => e.degree) && (
-        <RS title="EDUCATION">
+        <RS title="EDUCATION" headingFontFamily={hf}>
           {education.filter(e => e.degree).map((e, i) => (
             <div key={i} style={{ marginBottom: 6 }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}><strong>{e.institution}</strong><span style={{ color: "#555", fontSize: "9pt" }}>{e.location}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}><strong style={{ fontFamily: hf }}>{e.institution}</strong><span style={{ color: "#555", fontSize: "9pt" }}>{e.location}</span></div>
               <div style={{ display: "flex", justifyContent: "space-between" }}><em>{e.degree}{e.cgpa ? ` - CGPA: ${e.cgpa}` : ""}</em><span style={{ color: "#555", fontSize: "9pt" }}>{e.year}</span></div>
             </div>
           ))}
         </RS>
       )}
       {skills.some(s => s.items) && (
-        <RS title="TECHNICAL SKILLS">
+        <RS title="TECHNICAL SKILLS" headingFontFamily={hf}>
           {skills.filter(s => s.items).map((s, i) => (
             <div key={i} style={{ marginBottom: 3 }}><strong>{s.category}:</strong> {s.items}</div>
           ))}
         </RS>
       )}
       {experience.some(e => e.role) && (
-        <RS title="EXPERIENCE">
+        <RS title="EXPERIENCE" headingFontFamily={hf}>
           {experience.filter(e => e.role).map((e, i) => (
             <div key={i} style={{ marginBottom: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}><strong>{e.company}</strong><span style={{ fontSize: "9pt", color: "#555" }}>{e.duration}</span></div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}><em>Role - {e.role}</em><span style={{ fontSize: "9pt", color: "#555" }}>{e.location}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}><strong style={{ fontFamily: hf }}>{e.company}</strong><span style={{ fontSize: "9pt", color: "#555" }}>{e.duration}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}><em style={{ fontFamily: hf }}>Role - {e.role}</em><span style={{ fontSize: "9pt", color: "#555" }}>{e.location}</span></div>
               {e.bullets?.filter(b => b?.trim()).length > 0 && (
                 <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
                   {e.bullets.filter(b => b?.trim()).map((b, j) => <li key={j} style={{ marginBottom: 2 }}>{b}</li>)}
@@ -345,11 +415,11 @@ function TemplateA({ data, headingFont, bodyFont }) {
         </RS>
       )}
       {projects.some(p => p.name) && (
-        <RS title="PROJECTS">
+        <RS title="PROJECTS" headingFontFamily={hf}>
           {projects.filter(p => p.name).map((proj, i) => (
             <div key={i} style={{ marginBottom: 7 }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <strong>{proj.link ? <a href={proj.link.startsWith("http") ? proj.link : `https://${proj.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "none" }}>{proj.name}</a> : proj.name}</strong>
+                <strong style={{ fontFamily: hf }}>{proj.link ? <a href={proj.link.startsWith("http") ? proj.link : `https://${proj.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "none" }}>{proj.name}</a> : proj.name}</strong>
               </div>
               {proj.tech && <div style={{ fontSize: "9pt", color: "#555" }}>Tech: {proj.tech}</div>}
               {proj.bullets?.filter(b => b?.trim()).length > 0 && (
@@ -362,7 +432,7 @@ function TemplateA({ data, headingFont, bodyFont }) {
         </RS>
       )}
       {certifications.some(c => c.name) && (
-        <RS title="CERTIFICATIONS">
+        <RS title="CERTIFICATIONS" headingFontFamily={hf}>
           <ul style={{ margin: 0, paddingLeft: 16 }}>
             {certifications.filter(c => c.name).map((c, i) => (
               <li key={i} style={{ marginBottom: 2 }}>
@@ -378,7 +448,7 @@ function TemplateA({ data, headingFont, bodyFont }) {
           </ul>
         </RS>
       )}
-      {hobbies && <RS title="HOBBIES & INTERESTS"><p style={{ margin: 0 }}>{hobbies}</p></RS>}
+      {hobbies && <RS title="HOBBIES & INTERESTS" headingFontFamily={hf}><p style={{ margin: 0 }}>{hobbies}</p></RS>}
     </div>
   );
 }
@@ -389,11 +459,11 @@ function TemplateB({ data, headingFont, bodyFont }) {
   const bf = bodyFont?.family || "'Segoe UI', sans-serif";
   const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
   return (
-    <div style={{ fontFamily: "'Georgia', serif", fontSize: "10pt", color: "#1a1a1a", background: "#fff", display: "flex", minHeight: "100%" }}>
+    <div style={{ fontFamily: bf, fontSize: "10pt", color: "#1a1a1a", background: "#fff", display: "flex", minHeight: "100%" }}>
       <div style={{ width: "32%", background: "#2c3e50", color: "#ecf0f1", padding: "28px 16px" }}>
         {p.name && <div style={{ fontSize: "15pt", fontWeight: 700, fontFamily: hf, color: "#fff", marginBottom: 4 }}>{p.name}</div>}
         {p.title && <div style={{ fontSize: "9pt", color: "#bdc3c7", marginBottom: 16 }}>{p.title}</div>}
-        <SS title="CONTACT">
+        <SS title="CONTACT" headingFontFamily={hf}>
           {p.email && <div style={{ fontSize: "8.5pt", marginBottom: 4, wordBreak: "break-all" }}>{p.email}</div>}
           {p.phone && <div style={{ fontSize: "8.5pt", marginBottom: 4 }}>{p.phone}</div>}
           {p.location && <div style={{ fontSize: "8.5pt", marginBottom: 4 }}>{p.location}</div>}
@@ -402,7 +472,7 @@ function TemplateB({ data, headingFont, bodyFont }) {
           {p.portfolio && <div style={{ fontSize: "8.5pt", marginBottom: 4 }}><a href={p.portfolio.startsWith("http") ? p.portfolio : `https://${p.portfolio}`} target="_blank" rel="noopener noreferrer" style={{ color: "#7fb3d3", textDecoration: "underline" }}>Portfolio</a></div>}
         </SS>
         {skills.some(s => s.items) && (
-          <SS title="SKILLS">
+          <SS title="SKILLS" headingFontFamily={hf}>
             {skills.filter(s => s.items).map((s, i) => (
               <div key={i} style={{ marginBottom: 6 }}>
                 <div style={{ fontSize: "8pt", color: "#bdc3c7", marginBottom: 2 }}>{s.category.toUpperCase()}</div>
@@ -412,7 +482,7 @@ function TemplateB({ data, headingFont, bodyFont }) {
           </SS>
         )}
         {certifications.some(c => c.name) && (
-          <SS title="CERTIFICATIONS">
+          <SS title="CERTIFICATIONS" headingFontFamily={hf}>
             {certifications.filter(c => c.name).map((c, i) => (
               <div key={i} style={{ marginBottom: 5, fontSize: "9pt", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
@@ -426,26 +496,26 @@ function TemplateB({ data, headingFont, bodyFont }) {
             ))}
           </SS>
         )}
-        {hobbies && <SS title="HOBBIES"><div style={{ fontSize: "9pt", lineHeight: 1.6 }}>{hobbies}</div></SS>}
+        {hobbies && <SS title="HOBBIES" headingFontFamily={hf}><div style={{ fontSize: "9pt", lineHeight: 1.6 }}>{hobbies}</div></SS>}
       </div>
       <div style={{ flex: 1, padding: "28px 24px" }}>
-        {summary && <RS title="PROFILE" accent="#2c3e50">{summary}</RS>}
+        {summary && <RS title="PROFILE" accent="#2c3e50" headingFontFamily={hf}>{summary}</RS>}
         {education.some(e => e.degree) && (
-          <RS title="EDUCATION" accent="#2c3e50">
+          <RS title="EDUCATION" accent="#2c3e50" headingFontFamily={hf}>
             {education.filter(e => e.degree).map((e, i) => (
               <div key={i} style={{ marginBottom: 6 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}><strong>{e.institution}</strong><span style={{ fontSize: "9pt", color: "#555" }}>{e.year}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><strong style={{ fontFamily: hf }}>{e.institution}</strong><span style={{ fontSize: "9pt", color: "#555" }}>{e.year}</span></div>
                 <div>{e.degree}{e.cgpa ? ` • CGPA: ${e.cgpa}` : ""}</div>
               </div>
             ))}
           </RS>
         )}
         {experience.some(e => e.role) && (
-          <RS title="EXPERIENCE" accent="#2c3e50">
+          <RS title="EXPERIENCE" accent="#2c3e50" headingFontFamily={hf}>
             {experience.filter(e => e.role).map((e, i) => (
               <div key={i} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}><strong>{e.role}</strong><span style={{ fontSize: "9pt", color: "#555" }}>{e.duration}</span></div>
-                <div style={{ color: "#2c3e50", fontStyle: "italic" }}>{e.company}{e.location ? ` · ${e.location}` : ""}</div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><strong style={{ fontFamily: hf }}>{e.role}</strong><span style={{ fontSize: "9pt", color: "#555" }}>{e.duration}</span></div>
+                <div style={{ color: "#2c3e50", fontStyle: "italic", fontFamily: hf }}>{e.company}{e.location ? ` · ${e.location}` : ""}</div>
                 {e.bullets?.filter(b => b?.trim()).length > 0 && (
                   <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
                     {e.bullets.filter(b => b?.trim()).map((b, j) => <li key={j} style={{ marginBottom: 2 }}>{b}</li>)}
@@ -456,10 +526,10 @@ function TemplateB({ data, headingFont, bodyFont }) {
           </RS>
         )}
         {projects.some(p => p.name) && (
-          <RS title="PROJECTS" accent="#2c3e50">
+          <RS title="PROJECTS" accent="#2c3e50" headingFontFamily={hf}>
             {projects.filter(p => p.name).map((proj, i) => (
               <div key={i} style={{ marginBottom: 7 }}>
-                <strong>{proj.link ? <a href={proj.link.startsWith("http") ? proj.link : `https://${proj.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "none" }}>{proj.name}</a> : proj.name}</strong>{proj.tech && <span style={{ fontSize: "9pt", color: "#555" }}> · {proj.tech}</span>}
+                <strong style={{ fontFamily: hf }}>{proj.link ? <a href={proj.link.startsWith("http") ? proj.link : `https://${proj.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "none" }}>{proj.name}</a> : proj.name}</strong>{proj.tech && <span style={{ fontSize: "9pt", color: "#555" }}> · {proj.tech}</span>}
                 {proj.bullets?.filter(b => b?.trim()).length > 0 && (
                   <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
                     {proj.bullets.filter(b => b?.trim()).map((b, j) => <li key={j} style={{ marginBottom: 2 }}>{b}</li>)}
@@ -480,7 +550,7 @@ function TemplateC({ data, headingFont, bodyFont }) {
   const bf = bodyFont?.family || "'Segoe UI', sans-serif";
   const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
   return (
-    <div style={{ fontFamily: "'Arial Narrow', Arial, sans-serif", fontSize: "9.5pt", color: "#111", padding: "24px 36px", background: "#fff" }}>
+    <div style={{ fontFamily: bf, fontSize: "9.5pt", color: "#111", padding: "24px 36px", background: "#fff" }}>
       {p.name && <div style={{ fontSize: "24pt", fontWeight: 900, fontFamily: hf, borderBottom: "3px solid #111", paddingBottom: 6, marginBottom: 4 }}>{p.name}</div>}
       {p.title && <div style={{ fontSize: "11pt", color: "#555", marginBottom: 8 }}>{p.title}</div>}
       <div style={{ fontSize: "8.5pt", color: "#444", marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
@@ -489,27 +559,27 @@ function TemplateC({ data, headingFont, bodyFont }) {
         {p.github && <a href={p.github.startsWith("http") ? p.github : `https://${p.github}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", textDecoration: "underline" }}>Github</a>}
         {p.portfolio && <a href={p.portfolio.startsWith("http") ? p.portfolio : `https://${p.portfolio}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", textDecoration: "underline" }}>Portfolio</a>}
       </div>
-      {summary && <><MH title="SUMMARY" /><p style={{ margin: "0 0 10px 0", borderLeft: "3px solid #111", paddingLeft: 10 }}>{summary}</p></>}
-      {skills.some(s => s.items) && (<><MH title="SKILLS" />{skills.filter(s => s.items).map((s, i) => <div key={i} style={{ marginBottom: 3 }}><strong>{s.category}:</strong> {s.items}</div>)}<div style={{ marginBottom: 10 }} /></>)}
-      {experience.some(e => e.role) && (<><MH title="EXPERIENCE" />{experience.filter(e => e.role).map((e, i) => (
+      {summary && <><MH title="SUMMARY" headingFontFamily={hf} /><p style={{ margin: "0 0 10px 0", borderLeft: "3px solid #111", paddingLeft: 10 }}>{summary}</p></>}
+      {skills.some(s => s.items) && (<><MH title="SKILLS" headingFontFamily={hf} />{skills.filter(s => s.items).map((s, i) => <div key={i} style={{ marginBottom: 3 }}><strong>{s.category}:</strong> {s.items}</div>)}<div style={{ marginBottom: 10 }} /></>)}
+      {experience.some(e => e.role) && (<><MH title="EXPERIENCE" headingFontFamily={hf} />{experience.filter(e => e.role).map((e, i) => (
         <div key={i} style={{ marginBottom: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}><span><strong>{e.role}</strong> @ {e.company}</span><strong>{e.duration}</strong></div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}><span><strong style={{ fontFamily: hf }}>{e.role}</strong> @ <span style={{ fontFamily: hf }}>{e.company}</span></span><strong>{e.duration}</strong></div>
           {e.bullets?.filter(b => b?.trim()).map((b, j) => <div key={j} style={{ paddingLeft: 12 }}>• {b}</div>)}
         </div>
       ))}</>)}
-      {education.some(e => e.degree) && (<><MH title="EDUCATION" />{education.filter(e => e.degree).map((e, i) => (
+      {education.some(e => e.degree) && (<><MH title="EDUCATION" headingFontFamily={hf} />{education.filter(e => e.degree).map((e, i) => (
         <div key={i} style={{ marginBottom: 6 }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}><strong>{e.institution}</strong><span>{e.year}</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}><strong style={{ fontFamily: hf }}>{e.institution}</strong><span>{e.year}</span></div>
           <div>{e.degree}{e.cgpa ? ` — CGPA: ${e.cgpa}` : ""}</div>
         </div>
       ))}</>)}
-      {projects.some(p => p.name) && (<><MH title="PROJECTS" />{projects.filter(p => p.name).map((proj, i) => (
+      {projects.some(p => p.name) && (<><MH title="PROJECTS" headingFontFamily={hf} />{projects.filter(p => p.name).map((proj, i) => (
         <div key={i} style={{ marginBottom: 6 }}>
-          <strong>{proj.link ? <a href={proj.link.startsWith("http") ? proj.link : `https://${proj.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", textDecoration: "none" }}>{proj.name}</a> : proj.name}</strong>{proj.tech ? ` [${proj.tech}]` : ""}
+          <strong style={{ fontFamily: hf }}>{proj.link ? <a href={proj.link.startsWith("http") ? proj.link : `https://${proj.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", textDecoration: "none" }}>{proj.name}</a> : proj.name}</strong>{proj.tech ? ` [${proj.tech}]` : ""}
           {proj.bullets?.filter(b => b?.trim()).map((b, j) => <div key={j} style={{ paddingLeft: 12 }}>• {b}</div>)}
         </div>
       ))}</>)}
-      {certifications.some(c => c.name) && (<><MH title="CERTIFICATIONS" />{certifications.filter(c => c.name).map((c, i) => (
+      {certifications.some(c => c.name) && (<><MH title="CERTIFICATIONS" headingFontFamily={hf} />{certifications.filter(c => c.name).map((c, i) => (
         <div key={i} style={{ marginBottom: 3, display: "flex", justifyContent: "space-between" }}>
           <span>
             {c.link ? <a href={c.link.startsWith("http") ? c.link : `https://${c.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", textDecoration: "underline" }}>{c.name}</a> : c.name}
@@ -518,14 +588,14 @@ function TemplateC({ data, headingFont, bodyFont }) {
           {c.year && <span>{c.year}</span>}
         </div>
       ))}</>)}
-      {hobbies && <><MH title="HOBBIES" /><div>{hobbies}</div></>}
+      {hobbies && <><MH title="HOBBIES" headingFontFamily={hf} /><div>{hobbies}</div></>}
     </div>
   );
 }
 
 // ── UPLOAD MODAL ──────────────────────────────────────────────────────────────
 // ── Groq API key (persisted in memory for session) ────────────────────────────
-const GROQ_API_KEY = ""; // Set via environment variable on server-side
+const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
 
 function UploadModal({ onClose, onParsed }) {
   const [dragging, setDragging] = useState(false);
@@ -792,10 +862,12 @@ function FontPickerPanel({ headingFont, setHeadingFont, bodyFont, setBodyFont, o
           <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", margin: "10px 0 4px", letterSpacing: 1 }}>{cat.toUpperCase()}</div>
           {fonts.map(f => (
             <div key={f.id} onClick={() => { loadFont(f); onSelect(f); }}
-              style={{ padding: "7px 10px", borderRadius: 8, cursor: "pointer", marginBottom: 3,
+              style={{
+                padding: "7px 10px", borderRadius: 8, cursor: "pointer", marginBottom: 3,
                 background: selected.id === f.id ? "#eff6ff" : "#fff",
                 border: selected.id === f.id ? "1.5px solid #2563eb" : "1px solid #e5e7eb",
-                transition: "all 0.15s" }}>
+                transition: "all 0.15s"
+              }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontFamily: f.family, fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{f.name}</span>
                 <div style={{ display: "flex", gap: 4 }}>
@@ -1112,11 +1184,38 @@ function ResumeBuilder() {
   });
   const [showFontPanel, setShowFontPanel] = useState(false);
 
+  // Cover letter state
+  const [coverLetter, setCoverLetter] = useState("");
+  const [clJD, setClJD] = useState("");
+  const [clTone, setClTone] = useState("Professional");
+  const [clLength, setClLength] = useState("Medium");
+  const [clHiringManager, setClHiringManager] = useState("");
+  const [clCompany, setClCompany] = useState("");
+  const [clLoading, setClLoading] = useState(false);
+  const [clError, setClError] = useState("");
+  const [clEditMode, setClEditMode] = useState(false);
+  const [clCopied, setClCopied] = useState(false);
+  const [clHeadingFont, setClHeadingFont] = useState("'EB Garamond', serif");
+  const [clBodyFont, setClBodyFont] = useState("'Source Sans 3', sans-serif");
+  const [clFontSize, setClFontSize] = useState(11);
+  const [clLineHeight, setClLineHeight] = useState(1.85);
+  const [showClFontPanel, setShowClFontPanel] = useState(false);
+  const [clTemplate, setClTemplate] = useState(() => localStorage.getItem("cl_template") || "executive");
+  const [clDownloading, setClDownloading] = useState(false);
+  const [detectedJobTitle, setDetectedJobTitle] = useState("");
+  const [clJobTitle, setClJobTitle] = useState("");
+
   // Load fonts on mount and when changed
   useEffect(() => { loadFont(headingFont); loadFont(bodyFont); }, []);
   useEffect(() => { loadFont(headingFont); localStorage.setItem("resume-heading-font", headingFont.id); }, [headingFont]);
   useEffect(() => { loadFont(bodyFont); localStorage.setItem("resume-body-font", bodyFont.id); }, [bodyFont]);
   useEffect(() => { window.__resumeHeadingFont = headingFont; window.__resumeBodyFont = bodyFont; }, [headingFont, bodyFont]);
+  useEffect(() => { setDetectedJobTitle(detectJobTitle(clJD)); }, [clJD]);
+  useEffect(() => { localStorage.setItem("cl_template", clTemplate); }, [clTemplate]);
+  useEffect(() => {
+    loadCLFont(CL_FONTS.find(f => f.name === "EB Garamond")?.url);
+    loadCLFont(CL_FONTS.find(f => f.name === "Source Sans 3")?.url);
+  }, []);
 
   const [showJD, setShowJD] = useState(false);
   const previewRef = useRef(null);
@@ -1199,6 +1298,137 @@ function ResumeBuilder() {
   const atsColor = ats.score >= 75 ? "#15803d" : ats.score >= 50 ? "#b45309" : "#b91c1c";
   const atsBar = ats.score >= 75 ? "#22c55e" : ats.score >= 50 ? "#f59e0b" : "#ef4444";
 
+  // ── Cover Letter functions ──
+  const generateCoverLetter = async () => {
+    if (!clJD.trim()) { setClError("Please paste a job description first."); return; }
+    setClLoading(true); setClError(""); setCoverLetter("");
+    const lengthMap = { "Short": "around 150 words", "Medium": "around 250 words", "Long": "around 400 words" };
+    const toneMap = { "Professional": "formal, polished, results-focused", "Confident": "assertive, achievement-driven, bold", "Enthusiastic": "energetic, passionate, warm", "Formal": "very formal, structured, traditional", "Creative": "memorable opening, storytelling, unique", "Concise": "brief, punchy, every sentence earns its place" };
+    const skills = data.skills.filter(s => s.items).map(s => s.category + ": " + s.items).join(" | ");
+    const exp = data.experience.filter(e => e.role).map(e => e.role + " at " + e.company + " (" + e.duration + "): " + (e.bullets || []).filter(b => b).join(", ")).join(" | ");
+    const projects = data.projects.filter(p => p.name).map(p => p.name + " [" + p.tech + "]").join(", ");
+    const edu = data.education.filter(e => e.degree).map(e => e.degree + " from " + e.institution).join(", ");
+    const certs = data.certifications.filter(c => c.name).map(c => c.name).join(", ");
+    const prompt = `Write a ${toneMap[clTone]} professional cover letter that is ${lengthMap[clLength]}.\n\nCANDIDATE RESUME:\nName: ${data.personal.name || "Candidate"}\nTitle: ${data.personal.title || ""}\nLocation: ${data.personal.location || ""}\nSummary: ${data.summary || ""}\nSkills: ${skills}\nExperience: ${exp}\nProjects: ${projects}\nEducation: ${edu}\nCertifications: ${certs}\n\nJOB DESCRIPTION:\n${clJD}\n\nHIRING MANAGER: ${clHiringManager || "Hiring Manager"}\nCOMPANY: ${clCompany || "the company"}\n\nSTRICT RULES:\n1. Start DIRECTLY with: Dear ${clHiringManager || "Hiring Team"},\n2. Opening paragraph: Powerful hook — specific value you bring to THIS role\n3. Second paragraph: Most relevant experience + measurable achievements that match the JD requirements exactly\n4. Third paragraph: 3-4 key skills from resume that match JD keywords\n5. Closing paragraph: Strong call to action, express genuine interest\n6. Sign off: Sincerely,\\n${data.personal.name || "Candidate"}\n7. Naturally mirror keywords from the job description\n8. Use REAL details — actual company name, role title, real skills\n9. NEVER write: "I am writing to express", "Please find attached", "To whom it may concern", "I believe I would be a great fit", "I am excited to apply for", "passionate about"\n10. Output ONLY letter body — start from Dear, end after sign-off. Do NOT include name/address/date header — UI adds those separately`;
+    try {
+      const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile", temperature: 0.72, max_tokens: 1500, messages: [
+            { role: "system", content: "You are a world-class career coach and cover letter writer with 20 years experience. You write specific, compelling, ATS-optimized cover letters that get interviews. You never use cliche phrases. Every sentence must add value." },
+            { role: "user", content: prompt }
+          ]
+        })
+      });
+      const json = await resp.json();
+      const text = json.choices?.[0]?.message?.content?.trim() || "";
+      if (text) { setCoverLetter(text); setClEditMode(false); }
+      else setClError("Generation failed. Please try again.");
+    } catch (e) { setClError("API error: " + e.message); }
+    setClLoading(false);
+  };
+
+  const handleCopyCL = () => {
+    const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const full = [data.personal.name, [data.personal.email, data.personal.phone, data.personal.location].filter(Boolean).join(" · "), date, "", clHiringManager, clCompany, "", coverLetter].filter(l => l !== undefined && l !== null).join("\n");
+    navigator.clipboard.writeText(full);
+    setClCopied(true); setTimeout(() => setClCopied(false), 2500);
+  };
+
+  const downloadCoverLetterPDF = async () => {
+    if (!coverLetter) return;
+    setClDownloading(true);
+    try {
+      await loadHtml2Pdf();
+      const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+      const fontLinks = [clHeadingFont, clBodyFont].map(f => CL_FONTS.find(x => x.family === f)).filter(f => f?.url).map(f => `<link rel="stylesheet" href="${f.url}">`).join("\n");
+      const jt = clJobTitle.trim() || detectedJobTitle || "the position";
+      const name = data.personal.name || "";
+      const contact = [data.personal.email, data.personal.phone, data.personal.location].filter(Boolean).join(" · ");
+      const links = [data.personal.linkedin, data.personal.github].filter(Boolean);
+      let bodyHtml = "";
+      if (clTemplate === "executive") {
+        bodyHtml = `<div style="font-family:${clBodyFont};padding:56px 64px;background:#fff;color:#1e293b;">
+          <div style="font-family:${clHeadingFont};font-size:26pt;font-weight:700;color:#0f172a;margin-bottom:5px;">${name}</div>
+          <div style="font-size:10.5pt;font-weight:600;color:#2563eb;margin-bottom:8px;">Applying for: ${jt}</div>
+          <div style="font-size:9pt;color:#64748b;">${contact}${links.length ? ' · ' + links.map(l => '<span style="color:#2563eb;">' + l + '</span>').join(' · ') : ''}</div>
+          <div style="height:2px;background:linear-gradient(to right,#0f172a 55%,#e2e8f0 100%);margin:20px 0 24px;"></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:26px;">
+            <div style="font-size:9.5pt;color:#64748b;font-style:italic;">${date}</div>
+            <div style="text-align:right;"><div style="font-family:${clHeadingFont};font-size:12pt;font-weight:700;color:#0f172a;">${clHiringManager || ""}</div><div style="font-size:10pt;font-weight:600;color:#475569;">${clCompany || ""}</div></div>
+          </div>
+          <div style="font-family:${clHeadingFont};font-size:12pt;font-weight:600;color:#0f172a;margin-bottom:20px;">Dear ${clHiringManager || "Hiring Team"},</div>
+          <div style="font-size:${clFontSize}pt;line-height:${clLineHeight};text-align:justify;white-space:pre-wrap;">${cleanCoverLetter(coverLetter, name)}</div>
+          <div style="margin-top:28px;"><div style="font-size:11pt;margin-bottom:30px;">Sincerely,</div><div style="width:160px;height:1px;background:#cbd5e1;margin-bottom:6px;"></div><div style="font-family:${clHeadingFont};font-size:13pt;font-weight:700;color:#0f172a;margin-bottom:2px;">${name}</div><div style="font-size:9pt;color:#64748b;">Applying for: ${jt}</div></div>
+        </div>`;
+      } else if (clTemplate === "modern") {
+        bodyHtml = `<div style="display:flex;font-family:${clBodyFont};">
+          <div style="width:30%;background:#0f172a;color:#fff;padding:40px 20px;">
+            <div style="font-family:${clHeadingFont};font-size:16pt;font-weight:700;color:#fff;margin-bottom:4px;">${name}</div>
+            <div style="font-size:8pt;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px;">Applying for</div>
+            <div style="font-size:9.5pt;color:#60a5fa;font-weight:600;margin-bottom:18px;line-height:1.4;">${jt}</div>
+            <div style="height:1px;background:#334155;margin-bottom:16px;"></div>
+            <div style="font-size:8pt;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Contact</div>
+            ${[data.personal.email, data.personal.phone, data.personal.location, ...links].filter(Boolean).map(c => `<div style="font-size:8.5pt;color:#cbd5e1;margin-bottom:5px;word-break:break-all;">${c}</div>`).join("")}
+            <div style="height:1px;background:#334155;margin:16px 0;"></div>
+            <div style="font-size:8pt;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Date</div>
+            <div style="font-size:8.5pt;color:#cbd5e1;margin-bottom:16px;">${date}</div>
+            <div style="font-size:8pt;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">To</div>
+            <div style="font-size:10pt;font-weight:700;color:#fff;margin-bottom:2px;">${clHiringManager || ""}</div>
+            <div style="font-size:9pt;color:#94a3b8;">${clCompany || ""}</div>
+          </div>
+          <div style="flex:1;padding:44px 40px;background:#fff;">
+            <div style="font-family:${clHeadingFont};font-size:13pt;font-weight:600;color:#0f172a;margin-bottom:22px;">Dear ${clHiringManager || "Hiring Team"},</div>
+            <div style="font-size:${clFontSize}pt;line-height:${clLineHeight};color:#1e293b;text-align:justify;white-space:pre-wrap;">${cleanCoverLetter(coverLetter, name)}</div>
+            <div style="margin-top:28px;"><div style="font-size:11pt;margin-bottom:26px;">Sincerely,</div><div style="width:40px;height:3px;background:#2563eb;margin-bottom:10px;"></div><div style="font-family:${clHeadingFont};font-size:13pt;font-weight:700;color:#0f172a;margin-bottom:3px;">${name}</div><div style="font-size:9pt;color:#64748b;">Applying for: ${jt}</div></div>
+          </div>
+        </div>`;
+      } else {
+        bodyHtml = `<div style="font-family:${clBodyFont};padding:64px 80px;background:#fff;color:#374151;">
+          <div style="font-family:${clHeadingFont};font-size:22pt;font-weight:700;color:#111827;letter-spacing:-0.5px;margin-bottom:3px;">${name}</div>
+          <div style="font-size:10pt;color:#6b7280;font-weight:500;margin-bottom:10px;">Applying for: ${jt}</div>
+          <div style="font-size:8.5pt;color:#9ca3af;">${[data.personal.email, data.personal.phone, data.personal.location].filter(Boolean).join("  |  ")}</div>
+          <div style="width:32px;height:3px;background:#111827;margin:18px 0 20px;"></div>
+          <div style="font-size:9pt;color:#9ca3af;margin-bottom:16px;">${date}</div>
+          <div style="margin-bottom:22px;"><div style="font-size:10.5pt;font-weight:700;color:#111827;margin-bottom:1px;">${clHiringManager || ""}</div><div style="font-size:10pt;color:#6b7280;">${clCompany || ""}</div></div>
+          <div style="font-size:11pt;font-weight:600;color:#111827;margin-bottom:18px;">Dear ${clHiringManager || "Hiring Team"},</div>
+          <div style="font-size:${clFontSize}pt;line-height:${clLineHeight};white-space:pre-wrap;color:#374151;">${cleanCoverLetter(coverLetter, name)}</div>
+          <div style="margin-top:28px;"><div style="font-size:10.5pt;margin-bottom:22px;color:#374151;">Sincerely,</div><div style="font-family:${clHeadingFont};font-size:12pt;font-weight:700;color:#111827;margin-bottom:2px;">${name}</div><div style="font-size:9pt;color:#9ca3af;">Applying for: ${jt}</div></div>
+        </div>`;
+      }
+      const container = document.createElement("div");
+      container.style.position = "absolute";
+      container.style.left = "0";
+      container.style.top = "0";
+      container.style.width = "210mm";
+      container.style.zIndex = "-9999";
+      container.style.overflow = "hidden";
+      container.style.opacity = "0";
+      container.innerHTML = bodyHtml;
+      document.body.appendChild(container);
+      const fontEls = [clHeadingFont, clBodyFont].map(f => CL_FONTS.find(x => x.family === f)).filter(f => f?.url);
+      fontEls.forEach(f => loadCLFont(f.url));
+      // Wait for fonts to load
+      await new Promise(r => setTimeout(r, 800));
+      const jtClean = (detectedJobTitle || "").replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
+      const nameClean = (data.personal.name || "").replace(/\s+/g, "_");
+      const el = container.firstElementChild || container;
+      await window.html2pdf().set({
+        margin: 0,
+        filename: `Cover_Letter_${nameClean}${jtClean ? "_" + jtClean : ""}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, width: el.scrollWidth, height: el.scrollHeight },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["avoid-all", "css", "legacy"] }
+      }).from(el).save();
+      document.body.removeChild(container);
+    } catch (e) {
+      console.error("PDF download error:", e);
+      alert("PDF download failed: " + e.message);
+    }
+    setClDownloading(false);
+  };
+
   const sideNav = [
     { id: "personal", label: "Personal", icon: icons.user },
     { id: "summary", label: "Summary", icon: icons.layers },
@@ -1208,6 +1438,7 @@ function ResumeBuilder() {
     { id: "projects", label: "Projects", icon: icons.globe },
     { id: "certifications", label: "Certs", icon: icons.award },
     { id: "hobbies", label: "Hobbies", icon: icons.heart },
+    { id: "coverLetter", label: "Cover Letter", icon: icons.coverLetter },
   ];
 
   const IS = { width: "100%", padding: "7px 10px", background: C.inputBg, border: `1px solid ${C.inputBorder}`, borderRadius: 7, color: C.text, fontSize: 12, outline: "none", boxSizing: "border-box" };
@@ -1231,7 +1462,7 @@ function ResumeBuilder() {
             {s.label}
           </button>
         ))}
-      
+
         <div style={{ flex: 1 }} />
         <button onClick={() => window.location.href = "/"} title="Home"
           style={{ width: "90%", height: 38, border: "1.5px solid transparent", cursor: "pointer", borderRadius: 9, display: "flex", alignItems: "center", gap: 8, paddingLeft: 12, background: "transparent", color: C.textLight, transition: "all 0.15s", fontSize: 12, fontWeight: 500, marginBottom: 12 }}>
@@ -1307,6 +1538,7 @@ function ResumeBuilder() {
           {activeSection === "projects" && <ProjectsForm projects={data.projects} setData={setData} IS={IS} CS={CS} />}
           {activeSection === "certifications" && <CertsForm certifications={data.certifications} setData={setData} IS={IS} CS={CS} />}
           {activeSection === "hobbies" && <HobbiesForm hobbies={data.hobbies} update={update} IS={IS} />}
+          {activeSection === "coverLetter" && <CoverLetterForm clJD={clJD} setClJD={setClJD} clTone={clTone} setClTone={setClTone} clLength={clLength} setClLength={setClLength} clHiringManager={clHiringManager} setClHiringManager={setClHiringManager} clCompany={clCompany} setClCompany={setClCompany} clJobTitle={clJobTitle} setClJobTitle={setClJobTitle} detectedJobTitle={detectedJobTitle} clLoading={clLoading} clError={clError} onGenerate={generateCoverLetter} IS={IS} />}
         </div>
       </div>
 
@@ -1321,57 +1553,134 @@ function ResumeBuilder() {
       {/* ── Preview Panel ── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {/* Toolbar */}
-        <div style={{ padding: "9px 18px", background: C.toolbarBg, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginRight: 4 }}>Template:</span>
-          {["A", "B", "C"].map(t => (
-            <button key={t} onClick={() => setActiveTemplate(t)}
-              style={{ padding: "5px 14px", border: `1.5px solid ${activeTemplate === t ? C.accent : C.border}`, borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, background: activeTemplate === t ? C.accentLight : "#fff", color: activeTemplate === t ? C.accent : C.textMuted, transition: "all 0.15s" }}>
-              {t === "A" ? "Classic" : t === "B" ? "Modern" : "Minimal"}
-            </button>
-          ))}
-          <div style={{ flex: 1 }} />
+        {activeSection === "coverLetter" ? (
+          <>
+            {/* Cover Letter Toolbar */}
+            <div style={{ padding: "9px 18px", background: "#fff", borderBottom: "1px solid #e3e8ef", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              {/* Template selector */}
+              <div style={{ display: "flex", gap: 5, marginRight: 8 }}>
+                {[
+                  { id: "executive", label: "Executive", icon: <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="15" y2="18" /></svg> },
+                  { id: "modern", label: "Modern", icon: <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="6" height="18" rx="1" /><line x1="13" y1="7" x2="21" y2="7" /><line x1="13" y1="12" x2="21" y2="12" /><line x1="13" y1="17" x2="21" y2="17" /></svg> },
+                  { id: "minimal", label: "Minimal", icon: <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="8" x2="21" y2="8" /><line x1="3" y1="16" x2="13" y2="16" /></svg> }
+                ].map(t => (
+                  <button key={t.id} onClick={() => setClTemplate(t.id)} title={t.label}
+                    style={{ width: 70, height: 42, border: `1.5px solid ${clTemplate === t.id ? "#2563eb" : "#e3e8ef"}`, borderRadius: 8, background: clTemplate === t.id ? "#eff6ff" : "#fff", color: clTemplate === t.id ? "#2563eb" : "#6b7688", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3 }}>
+                    {t.icon}
+                    <span style={{ fontSize: 9, fontWeight: 700 }}>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setShowClFontPanel(v => !v)} style={{ padding: "5px 12px", background: showClFontPanel ? "#eff6ff" : "#fff", border: `1.5px solid ${showClFontPanel ? "#2563eb" : "#e3e8ef"}`, borderRadius: 7, color: showClFontPanel ? "#2563eb" : "#6b7688", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔤 Fonts</button>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <button onClick={() => setClFontSize(v => Math.max(9, v - 0.5))} style={{ width: 26, height: 26, border: "1px solid #e3e8ef", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: "#6b7688", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                <span style={{ fontSize: 12, color: "#1a2332", fontWeight: 600, minWidth: 32, textAlign: "center" }}>{clFontSize}pt</span>
+                <button onClick={() => setClFontSize(v => Math.min(14, v + 0.5))} style={{ width: 26, height: 26, border: "1px solid #e3e8ef", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: "#6b7688", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{ fontSize: 11, color: "#9aa3af" }}>Spacing</span>
+                {[1.5, 1.8, 2.0].map(lh => (
+                  <button key={lh} onClick={() => setClLineHeight(lh)} style={{ padding: "4px 8px", background: clLineHeight === lh ? "#eff6ff" : "#fff", border: `1px solid ${clLineHeight === lh ? "#2563eb" : "#e3e8ef"}`, borderRadius: 5, color: clLineHeight === lh ? "#2563eb" : "#6b7688", fontSize: 11, cursor: "pointer" }}>{lh}</button>
+                ))}
+              </div>
+              <button onClick={() => setClEditMode(v => !v)} style={{ padding: "5px 12px", background: clEditMode ? "#eff6ff" : "#fff", border: `1.5px solid ${clEditMode ? "#2563eb" : "#e3e8ef"}`, borderRadius: 7, color: clEditMode ? "#2563eb" : "#6b7688", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{clEditMode ? "👁 View Mode" : "✏️ Edit Letter"}</button>
+              <div style={{ flex: 1 }} />
+              <button onClick={handleCopyCL} style={{ padding: "5px 13px", background: "#fff", border: "1.5px solid #e3e8ef", borderRadius: 7, color: clCopied ? "#15803d" : "#6b7688", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{clCopied ? "✅ Copied!" : "📋 Copy"}</button>
+              <button onClick={downloadCoverLetterPDF} disabled={!coverLetter || clDownloading} style={{ padding: "5px 16px", background: coverLetter && !clDownloading ? "#fff" : "#f3f4f6", border: `1.5px solid ${coverLetter && !clDownloading ? "#2563eb" : "#e3e8ef"}`, borderRadius: 7, color: coverLetter && !clDownloading ? "#2563eb" : "#9ca3af", fontSize: 12, fontWeight: 700, cursor: coverLetter && !clDownloading ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 5, opacity: clDownloading ? 0.7 : 1 }}>
+                {clDownloading ? "⏳ Generating PDF..." : <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg> Download PDF</>}
+              </button>
+            </div>
+            {showClFontPanel && (
+              <div style={{ position: "relative", zIndex: 100 }}>
+                <div style={{ position: "absolute", top: 0, left: 18, background: "#fff", border: "1px solid #e3e8ef", borderRadius: 12, padding: 16, boxShadow: "0 8px 32px rgba(0,0,0,0.12)", width: 480, display: "flex", gap: 16 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "#6b7688", letterSpacing: 1, marginBottom: 8 }}>HEADING FONT</div>
+                    <div style={{ fontSize: 10, color: "#9aa3af", marginBottom: 10 }}>Name · Date · Signature</div>
+                    {["Serif", "Sans-Serif"].map(cat => (
+                      <div key={cat}>
+                        <div style={{ fontSize: 9, color: "#c0c8d2", fontWeight: 700, letterSpacing: 1, marginBottom: 5, marginTop: 8 }}>{cat.toUpperCase()}</div>
+                        {CL_FONTS.filter(f => f.category === cat).map(f => (
+                          <div key={f.name} onClick={() => { setClHeadingFont(f.family); loadCLFont(f.url); }} style={{ padding: "7px 10px", borderRadius: 8, cursor: "pointer", marginBottom: 3, background: clHeadingFont === f.family ? "#eff6ff" : "transparent", border: `1.5px solid ${clHeadingFont === f.family ? "#2563eb" : "transparent"}` }}>
+                            <span style={{ fontFamily: f.family, fontSize: 14, color: "#1a2332" }}>{f.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "#6b7688", letterSpacing: 1, marginBottom: 8 }}>BODY FONT</div>
+                    <div style={{ fontSize: 10, color: "#9aa3af", marginBottom: 10 }}>Paragraphs · All body text</div>
+                    {["Serif", "Sans-Serif"].map(cat => (
+                      <div key={cat}>
+                        <div style={{ fontSize: 9, color: "#c0c8d2", fontWeight: 700, letterSpacing: 1, marginBottom: 5, marginTop: 8 }}>{cat.toUpperCase()}</div>
+                        {CL_FONTS.filter(f => f.category === cat).map(f => (
+                          <div key={f.name} onClick={() => { setClBodyFont(f.family); loadCLFont(f.url); }} style={{ padding: "7px 10px", borderRadius: 8, cursor: "pointer", marginBottom: 3, background: clBodyFont === f.family ? "#eff6ff" : "transparent", border: `1.5px solid ${clBodyFont === f.family ? "#2563eb" : "transparent"}` }}>
+                            <span style={{ fontFamily: f.family, fontSize: 14, color: "#1a2332" }}>{f.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            <CoverLetterPreview coverLetter={coverLetter} setCoverLetter={setCoverLetter} personal={data.personal} clHiringManager={clHiringManager} clCompany={clCompany} clLoading={clLoading} clEditMode={clEditMode} clHeadingFont={clHeadingFont} clBodyFont={clBodyFont} clFontSize={clFontSize} clLineHeight={clLineHeight} detectedJobTitle={detectedJobTitle} clTemplate={clTemplate} clJobTitle={clJobTitle} />
+          </>
+        ) : (
+          <>
+            {/* Toolbar */}
+            <div style={{ padding: "9px 18px", background: C.toolbarBg, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginRight: 4 }}>Template:</span>
+              {["A", "B", "C"].map(t => (
+                <button key={t} onClick={() => setActiveTemplate(t)}
+                  style={{ padding: "5px 14px", border: `1.5px solid ${activeTemplate === t ? C.accent : C.border}`, borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, background: activeTemplate === t ? C.accentLight : "#fff", color: activeTemplate === t ? C.accent : C.textMuted, transition: "all 0.15s" }}>
+                  {t === "A" ? "Classic" : t === "B" ? "Modern" : "Minimal"}
+                </button>
+              ))}
+              <div style={{ flex: 1 }} />
 
-          {/* Font Picker */}
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setShowFontPanel(!showFontPanel)}
-              style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: showFontPanel ? C.accentLight : "#fff", border: showFontPanel ? `1.5px solid ${C.accentBorder}` : `1.5px solid ${C.border}`, borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 600, color: showFontPanel ? C.accent : C.textLight, transition: "all 0.15s" }}>
-              🔤 {headingFont.name}
-            </button>
-            {showFontPanel && <FontPickerPanel headingFont={headingFont} setHeadingFont={setHeadingFont} bodyFont={bodyFont} setBodyFont={setBodyFont} onClose={() => setShowFontPanel(false)} />}
-          </div>
+              {/* Font Picker */}
+              <div style={{ position: "relative" }}>
+                <button onClick={() => setShowFontPanel(!showFontPanel)}
+                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: showFontPanel ? C.accentLight : "#fff", border: showFontPanel ? `1.5px solid ${C.accentBorder}` : `1.5px solid ${C.border}`, borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 600, color: showFontPanel ? C.accent : C.textLight, transition: "all 0.15s" }}>
+                  🔤 {headingFont.name}
+                </button>
+                {showFontPanel && <FontPickerPanel headingFont={headingFont} setHeadingFont={setHeadingFont} bodyFont={bodyFont} setBodyFont={setBodyFont} onClose={() => setShowFontPanel(false)} />}
+              </div>
 
-          {/* Zoom Controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginRight: 12 }}>
-            <button onClick={() => setZoom(z => Math.max(30, z - 10))}
-              style={{ width: 28, height: 28, border: `1.5px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              −
-            </button>
-            <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, minWidth: 40, textAlign: "center", userSelect: "none" }}>{zoom}%</span>
-            <button onClick={() => setZoom(z => Math.min(150, z + 10))}
-              style={{ width: 28, height: 28, border: `1.5px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              +
-            </button>
-          </div>
+              {/* Zoom Controls */}
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginRight: 12 }}>
+                <button onClick={() => setZoom(z => Math.max(30, z - 10))}
+                  style={{ width: 28, height: 28, border: `1.5px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  −
+                </button>
+                <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, minWidth: 40, textAlign: "center", userSelect: "none" }}>{zoom}%</span>
+                <button onClick={() => setZoom(z => Math.min(150, z + 10))}
+                  style={{ width: 28, height: 28, border: `1.5px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  +
+                </button>
+              </div>
 
-          <button onClick={() => exportPDF(previewRef, data.personal.name)}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 18px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.download} /></svg>
-            Download PDF
-          </button>
-        </div>
+              <button onClick={() => exportPDF(previewRef, data.personal.name)}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 18px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.download} /></svg>
+                Download PDF
+              </button>
+            </div>
 
-        <div style={{ flex: 1, overflowY: "auto", background: C.previewBg, padding: "28px 0 60px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center", width: PAGE_W }}>
-            <PaginatedResume
-              data={data}
-              template={activeTemplate}
-              exportRef={previewRef}
-              headingFont={headingFont}
-              bodyFont={bodyFont}
-            />
-          </div>
-        </div>
+            <div style={{ flex: 1, overflowY: "auto", background: C.previewBg, padding: "28px 0 60px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center", width: PAGE_W }}>
+                <PaginatedResume
+                  data={data}
+                  template={activeTemplate}
+                  exportRef={previewRef}
+                  headingFont={headingFont}
+                  bodyFont={bodyFont}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1578,6 +1887,198 @@ function HobbiesForm({ hobbies, update, IS }) {
       <FL>Hobbies</FL>
       <textarea value={hobbies} onChange={e => update("hobbies", e.target.value)} placeholder="Reading tech blogs, Open source, Chess, Photography..." rows={4} style={{ ...IS, resize: "vertical" }} />
       <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6 }}>Separate multiple hobbies with commas.</div>
+    </div>
+  );
+}
+
+// ── Cover Letter Form (left panel) ────────────────────────────────────────────
+function CoverLetterForm({ clJD, setClJD, clTone, setClTone, clLength, setClLength, clHiringManager, setClHiringManager, clCompany, setClCompany, clJobTitle, setClJobTitle, detectedJobTitle, clLoading, clError, onGenerate, IS }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+        <div style={{ width: 28, height: 28, background: "#f5f3ff", border: "1.5px solid #ddd6fe", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={icons.coverLetter} /></svg>
+        </div>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: "#1a2332" }}>Cover Letter Generator</div>
+          <div style={{ fontSize: 10, color: "#6b7688" }}>AI writes from your resume + job description</div>
+        </div>
+      </div>
+
+      <div style={{ background: "#f9fafb", border: "1px solid #e5e9f0", borderRadius: 10, padding: 13 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#7c3aed", letterSpacing: 1, marginBottom: 7 }}>STEP 1 · PASTE JOB DESCRIPTION</div>
+        <textarea value={clJD} onChange={e => setClJD(e.target.value)} placeholder="Paste the full job description here..." rows={6} style={{ ...IS, resize: "vertical", fontSize: 11, lineHeight: 1.6 }} />
+        {clJD.trim() && <div style={{ fontSize: 10, color: "#9aa3af", marginTop: 4 }}>{clJD.trim().split(/\s+/).length} words</div>}
+      </div>
+
+      <div style={{ background: "#f9fafb", border: "1px solid #e5e9f0", borderRadius: 10, padding: 13 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#7c3aed", letterSpacing: 1, marginBottom: 10 }}>STEP 2 · CUSTOMIZE</div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 9 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#6b7688", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Tone</div>
+            <select value={clTone} onChange={e => setClTone(e.target.value)} style={{ ...IS, fontSize: 11, cursor: "pointer" }}>
+              {["Professional", "Confident", "Enthusiastic", "Formal", "Creative", "Concise"].map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#6b7688", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Length</div>
+            <select value={clLength} onChange={e => setClLength(e.target.value)} style={{ ...IS, fontSize: 11, cursor: "pointer" }}>
+              <option value="Short">Short (~150 words)</option>
+              <option value="Medium">Medium (~250 words)</option>
+              <option value="Long">Long (~400 words)</option>
+            </select>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#6b7688", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Hiring Manager</div>
+            <input value={clHiringManager} onChange={e => setClHiringManager(e.target.value)} placeholder="Mr. Sharma (optional)" style={{ ...IS, fontSize: 11 }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#6b7688", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Company Name</div>
+            <input value={clCompany} onChange={e => setClCompany(e.target.value)} placeholder="Google, TechCorp..." style={{ ...IS, fontSize: 11 }} />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#6b7688", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Job Title</div>
+            <input value={clJobTitle} onChange={e => setClJobTitle(e.target.value)} placeholder={detectedJobTitle || "e.g. Data Analyst"} style={{ ...IS, fontSize: 11 }} />
+            {detectedJobTitle && !clJobTitle && <div style={{ fontSize: 9, color: "#9aa3af", marginTop: 3 }}>Auto-detected: {detectedJobTitle}</div>}
+          </div>
+        </div>
+      </div>
+
+      <button onClick={onGenerate} disabled={clLoading}
+        style={{ width: "100%", padding: "12px 16px", background: clLoading ? "#e5e7eb" : "linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)", border: "none", borderRadius: 10, color: clLoading ? "#9ca3af" : "#fff", fontSize: 13, fontWeight: 800, letterSpacing: 0.3, cursor: clLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        {clLoading ? <><span>⏳</span> Groq AI is writing your cover letter...</> : <><span>✨</span> Generate Cover Letter with AI</>}
+      </button>
+
+      {clError && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#dc2626" }}>⚠ {clError}</div>}
+
+      <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 9, padding: "10px 13px" }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#92400e", letterSpacing: 0.5, marginBottom: 6 }}>⚡ TIPS FOR BEST RESULTS</div>
+        {["Fill in your Experience + Skills before generating", "Paste the complete job description for better matching", "Use Edit mode in the preview to fine-tune the output", "Try Regenerate to get a different version"].map((t, i) => (
+          <div key={i} style={{ fontSize: 10.5, color: "#92400e", marginBottom: i < 3 ? 4 : 0, display: "flex", gap: 5 }}><span>•</span><span>{t}</span></div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Cover Letter Preview (right panel) — 3 templates ──────────────────────────
+function CoverLetterPreview({ coverLetter, setCoverLetter, personal, clHiringManager, clCompany, clLoading, clEditMode, clHeadingFont, clBodyFont, clFontSize, clLineHeight, detectedJobTitle, clTemplate, clJobTitle }) {
+  const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const wordCount = coverLetter.trim() ? coverLetter.trim().split(/\s+/).length : 0;
+  const wcColor = wordCount === 0 ? "#c0c8d2" : wordCount > 400 ? "#b45309" : wordCount >= 150 ? "#15803d" : "#9aa3af";
+  const jt = (clJobTitle && clJobTitle.trim()) || detectedJobTitle || "the position";
+  const links = [personal.linkedin, personal.github].filter(Boolean);
+  const cleanedText = cleanCoverLetter(coverLetter, personal.name);
+
+  const loadingEl = <div style={{ fontFamily: clBodyFont, fontSize: `${clFontSize + 1}pt`, color: "#9aa3af", fontStyle: "italic", textAlign: "center", paddingTop: 60, lineHeight: 2 }}>✨ Groq AI is crafting your cover letter...</div>;
+  const emptyEl = <div style={{ fontFamily: clBodyFont, fontSize: `${clFontSize + 1}pt`, color: "#c0c8d2", fontStyle: "italic", textAlign: "center", paddingTop: 80, lineHeight: 2.2 }}>Your cover letter will appear here.<br />Fill in the form on the left,<br />then click Generate ✨</div>;
+  const editEl = <textarea value={coverLetter} onChange={e => setCoverLetter(e.target.value)} style={{ width: "100%", minHeight: 400, border: "1.5px solid #bfdbfe", borderRadius: 6, padding: "12px 14px", fontFamily: clBodyFont, fontSize: `${clFontSize}pt`, lineHeight: clLineHeight, color: "#1e293b", outline: "none", resize: "vertical", background: "#fafeff", boxSizing: "border-box" }} />;
+  const wcEl = wordCount > 0 && <div style={{ position: "absolute", bottom: 20, right: 28, fontSize: 9, color: wcColor, fontWeight: 600, fontFamily: "sans-serif" }}>{wordCount} words{wordCount > 400 ? " · consider shortening" : wordCount >= 150 ? " · ✓ good length" : ""}</div>;
+
+  const bodyContent = clLoading ? loadingEl : clEditMode ? editEl : cleanedText ? null : emptyEl;
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto", background: "#d8dde6", padding: "28px 0 60px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ width: 794, transform: "scale(0.80)", transformOrigin: "top center", marginBottom: "-18%" }}>
+
+        {/* ── EXECUTIVE TEMPLATE ── */}
+        {clTemplate === "executive" && (
+          <div style={{ background: "#fff", boxShadow: "0 4px 28px rgba(0,0,0,0.13)", borderRadius: 2, padding: "56px 64px 64px", minHeight: 1123, position: "relative" }}>
+            <div style={{ fontFamily: clHeadingFont, fontSize: "26pt", fontWeight: 700, color: "#0f172a", marginBottom: 5 }}>{personal.name || "Your Name"}</div>
+            {jt && <div style={{ fontFamily: clBodyFont, fontSize: "10.5pt", fontWeight: 600, color: "#2563eb", letterSpacing: 0.3, marginBottom: 8 }}>Applying for: {jt}</div>}
+            <div style={{ fontSize: "9pt", color: "#64748b" }}>
+              {[personal.email, personal.phone, personal.location].filter(Boolean).join(" · ")}
+              {links.length > 0 && <> · {links.map((l, i) => <span key={i} style={{ color: "#2563eb" }}>{i > 0 ? " · " : ""}{l}</span>)}</>}
+            </div>
+            <div style={{ width: "100%", height: 2, border: "none", background: "linear-gradient(to right, #0f172a 55%, #e2e8f0 100%)", margin: "20px 0 24px" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 26 }}>
+              <div style={{ fontSize: "9.5pt", color: "#64748b", fontStyle: "italic" }}>{date}</div>
+              <div style={{ textAlign: "right" }}>
+                {clHiringManager && <div style={{ fontFamily: clHeadingFont, fontSize: "12pt", fontWeight: 700, color: "#0f172a" }}>{clHiringManager}</div>}
+                {clCompany && <div style={{ fontSize: "10pt", fontWeight: 600, color: "#475569" }}>{clCompany}</div>}
+              </div>
+            </div>
+            {!clLoading && <div style={{ fontFamily: clHeadingFont, fontSize: "12pt", fontWeight: 600, color: "#0f172a", marginBottom: 20 }}>Dear {clHiringManager || "Hiring Team"},</div>}
+            {bodyContent || (cleanedText && !clEditMode && <div style={{ fontFamily: clBodyFont, fontSize: `${clFontSize}pt`, lineHeight: clLineHeight, color: "#1e293b", whiteSpace: "pre-wrap", textAlign: "justify", marginBottom: 18 }}>{cleanedText}</div>)}
+            {cleanedText && !clLoading && !clEditMode && (
+              <div style={{ marginTop: 28 }}>
+                <div style={{ fontFamily: clBodyFont, fontSize: "11pt", color: "#1e293b", marginBottom: 32 }}>Sincerely,</div>
+                <div style={{ width: 160, height: 1, background: "#cbd5e1", marginBottom: 6 }} />
+                <div style={{ fontFamily: clHeadingFont, fontSize: "13pt", fontWeight: 700, color: "#0f172a", marginBottom: 2 }}>{personal.name}</div>
+                <div style={{ fontFamily: clBodyFont, fontSize: "9pt", color: "#64748b" }}>Applying for: {jt}</div>
+              </div>
+            )}
+            {wcEl}
+          </div>
+        )}
+
+        {/* ── MODERN TEMPLATE ── */}
+        {clTemplate === "modern" && (
+          <div style={{ display: "flex", minHeight: 1123, boxShadow: "0 4px 28px rgba(0,0,0,0.13)", borderRadius: 2, overflow: "hidden" }}>
+            {/* Sidebar */}
+            <div style={{ width: "28%", background: "#0f172a", color: "#fff", padding: "40px 20px", display: "flex", flexDirection: "column", gap: 0 }}>
+              <div style={{ fontFamily: clHeadingFont, fontSize: "16pt", fontWeight: 700, color: "#fff", marginBottom: 4, lineHeight: 1.2 }}>{personal.name || "Your Name"}</div>
+              <div style={{ fontSize: "8pt", color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 3 }}>Applying for</div>
+              <div style={{ fontSize: "9.5pt", color: "#60a5fa", fontWeight: 600, lineHeight: 1.4, marginBottom: 0 }}>{jt}</div>
+              <div style={{ height: 1, background: "#334155", margin: "16px 0" }} />
+              <div style={{ fontSize: "8pt", color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 10 }}>Contact</div>
+              {[personal.email, personal.phone, personal.location, ...links].filter(Boolean).map((c, i) => (
+                <div key={i} style={{ fontSize: "8.5pt", color: "#cbd5e1", marginBottom: 6, wordBreak: "break-all", lineHeight: 1.4 }}>{c}</div>
+              ))}
+              <div style={{ height: 1, background: "#334155", margin: "16px 0" }} />
+              <div style={{ fontSize: "8pt", color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6 }}>Date</div>
+              <div style={{ fontSize: "8.5pt", color: "#cbd5e1", marginBottom: 16 }}>{date}</div>
+              <div style={{ fontSize: "8pt", color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6 }}>To</div>
+              {clHiringManager && <div style={{ fontSize: "10pt", fontWeight: 700, color: "#fff", marginBottom: 2 }}>{clHiringManager}</div>}
+              {clCompany && <div style={{ fontSize: "9pt", color: "#94a3b8" }}>{clCompany}</div>}
+            </div>
+            {/* Right content */}
+            <div style={{ flex: 1, background: "#fff", padding: "44px 40px 44px 36px", position: "relative" }}>
+              {!clLoading && <div style={{ fontFamily: clHeadingFont, fontSize: "13pt", fontWeight: 600, color: "#0f172a", marginBottom: 22 }}>Dear {clHiringManager || "Hiring Team"},</div>}
+              {bodyContent || (cleanedText && !clEditMode && <div style={{ fontFamily: clBodyFont, fontSize: `${clFontSize}pt`, lineHeight: clLineHeight, color: "#1e293b", whiteSpace: "pre-wrap", textAlign: "justify", marginBottom: 16 }}>{cleanedText}</div>)}
+              {cleanedText && !clLoading && !clEditMode && (
+                <div style={{ marginTop: 28 }}>
+                  <div style={{ fontFamily: clBodyFont, fontSize: "11pt", color: "#1e293b", marginBottom: 28 }}>Sincerely,</div>
+                  <div style={{ width: 40, height: 3, background: "#2563eb", marginBottom: 10 }} />
+                  <div style={{ fontFamily: clHeadingFont, fontSize: "13pt", fontWeight: 700, color: "#0f172a", marginBottom: 3 }}>{personal.name}</div>
+                  <div style={{ fontFamily: clBodyFont, fontSize: "9pt", color: "#64748b", marginTop: 3 }}>Applying for: {jt}</div>
+                </div>
+              )}
+              {wcEl}
+            </div>
+          </div>
+        )}
+
+        {/* ── MINIMAL TEMPLATE ── */}
+        {clTemplate === "minimal" && (
+          <div style={{ background: "#fff", boxShadow: "0 4px 28px rgba(0,0,0,0.13)", borderRadius: 2, padding: "64px 80px", minHeight: 1123, position: "relative" }}>
+            <div style={{ fontFamily: clHeadingFont, fontSize: "22pt", fontWeight: 700, color: "#111827", letterSpacing: -0.5, marginBottom: 3 }}>{personal.name || "Your Name"}</div>
+            {jt && <div style={{ fontFamily: clBodyFont, fontSize: "10pt", color: "#6b7280", fontWeight: 500, marginBottom: 10 }}>Applying for: {jt}</div>}
+            <div style={{ fontSize: "8.5pt", color: "#9ca3af" }}>{[personal.email, personal.phone, personal.location].filter(Boolean).join("  |  ")}</div>
+            <div style={{ width: 32, height: 3, background: "#111827", margin: "18px 0 20px" }} />
+            <div style={{ fontSize: "9pt", color: "#9ca3af", marginBottom: 16 }}>{date}</div>
+            <div style={{ marginBottom: 22 }}>
+              {clHiringManager && <div style={{ fontSize: "10.5pt", fontWeight: 700, color: "#111827", marginBottom: 1 }}>{clHiringManager}</div>}
+              {clCompany && <div style={{ fontSize: "10pt", color: "#6b7280" }}>{clCompany}</div>}
+            </div>
+            {!clLoading && <div style={{ fontFamily: clHeadingFont, fontSize: "11pt", fontWeight: 600, color: "#111827", marginBottom: 18 }}>Dear {clHiringManager || "Hiring Team"},</div>}
+            {bodyContent || (cleanedText && !clEditMode && <div style={{ fontFamily: clBodyFont, fontSize: `${clFontSize}pt`, lineHeight: clLineHeight, color: "#374151", whiteSpace: "pre-wrap", textAlign: "left", marginBottom: 16 }}>{cleanedText}</div>)}
+            {cleanedText && !clLoading && !clEditMode && (
+              <div style={{ marginTop: 28 }}>
+                <div style={{ fontFamily: clBodyFont, fontSize: "10.5pt", color: "#374151", marginBottom: 24 }}>Sincerely,</div>
+                <div style={{ fontFamily: clHeadingFont, fontSize: "12pt", fontWeight: 700, color: "#111827", marginBottom: 2 }}>{personal.name}</div>
+                <div style={{ fontFamily: clBodyFont, fontSize: "9pt", color: "#9ca3af" }}>Applying for: {jt}</div>
+              </div>
+            )}
+            {wcEl}
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }
