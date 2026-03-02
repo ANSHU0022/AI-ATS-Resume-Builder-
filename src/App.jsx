@@ -594,8 +594,6 @@ function TemplateC({ data, headingFont, bodyFont }) {
 }
 
 // ── UPLOAD MODAL ──────────────────────────────────────────────────────────────
-// ── Groq API key (persisted in memory for session) ────────────────────────────
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
 
 function UploadModal({ onClose, onParsed }) {
   const [dragging, setDragging] = useState(false);
@@ -1311,8 +1309,8 @@ function ResumeBuilder() {
     const certs = data.certifications.filter(c => c.name).map(c => c.name).join(", ");
     const prompt = `Write a ${toneMap[clTone]} professional cover letter that is ${lengthMap[clLength]}.\n\nCANDIDATE RESUME:\nName: ${data.personal.name || "Candidate"}\nTitle: ${data.personal.title || ""}\nLocation: ${data.personal.location || ""}\nSummary: ${data.summary || ""}\nSkills: ${skills}\nExperience: ${exp}\nProjects: ${projects}\nEducation: ${edu}\nCertifications: ${certs}\n\nJOB DESCRIPTION:\n${clJD}\n\nHIRING MANAGER: ${clHiringManager || "Hiring Manager"}\nCOMPANY: ${clCompany || "the company"}\n\nSTRICT RULES:\n1. Start DIRECTLY with: Dear ${clHiringManager || "Hiring Team"},\n2. Opening paragraph: Powerful hook — specific value you bring to THIS role\n3. Second paragraph: Most relevant experience + measurable achievements that match the JD requirements exactly\n4. Third paragraph: 3-4 key skills from resume that match JD keywords\n5. Closing paragraph: Strong call to action, express genuine interest\n6. Sign off: Sincerely,\\n${data.personal.name || "Candidate"}\n7. Naturally mirror keywords from the job description\n8. Use REAL details — actual company name, role title, real skills\n9. NEVER write: "I am writing to express", "Please find attached", "To whom it may concern", "I believe I would be a great fit", "I am excited to apply for", "passionate about"\n10. Output ONLY letter body — start from Dear, end after sign-off. Do NOT include name/address/date header — UI adds those separately`;
     try {
-      const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_API_KEY}` },
+      const resp = await fetch("/api/groq", {
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile", temperature: 0.72, max_tokens: 1500, messages: [
             { role: "system", content: "You are a world-class career coach and cover letter writer with 20 years experience. You write specific, compelling, ATS-optimized cover letters that get interviews. You never use cliche phrases. Every sentence must add value." },
@@ -1320,6 +1318,10 @@ function ResumeBuilder() {
           ]
         })
       });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `Groq API error ${resp.status}. Please try again.`);
+      }
       const json = await resp.json();
       const text = json.choices?.[0]?.message?.content?.trim() || "";
       if (text) { setCoverLetter(text); setClEditMode(false); }
