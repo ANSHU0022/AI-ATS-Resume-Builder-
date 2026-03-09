@@ -1,10 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Routes, Route } from "react-router-dom";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
 import html2pdf from "html2pdf.js";
 import * as pdfjsLib from "pdfjs-dist";
 // Use Vite's ?url syntax to get the worker path statically
 import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.js?url";
-
+import LatexEditor from "../latex-editor/pages";
+import FontPickerPanel from "../../components/FontPickerPanel/FontPickerPanel";
+import { supabase } from "../../lib/supabase";
+import "./ResumeBuilder.css";
 // Set the workerSrc for PDF.js globally
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 
@@ -33,12 +36,12 @@ const icons = {
 
 // ── Design Tokens ──────────────────────────────────────────────────────────────
 const C = {
-  appBg: "#f5f7fa", sidebarBg: "#ffffff", panelBg: "#ffffff",
-  toolbarBg: "#ffffff", previewBg: "#d8dde6", cardBg: "#f9fafb",
-  atsBg: "#f0f7ff", border: "#e3e8ef", cardBorder: "#e5e9f0",
-  text: "#1a2332", textMuted: "#6b7688", textLight: "#9aa3af",
-  inputBg: "#ffffff", inputBorder: "#d5dae3",
-  accent: "#2563eb", accentLight: "#eff6ff", accentBorder: "#bfdbfe",
+  appBg: "#f8f9fa", sidebarBg: "#ffffff", panelBg: "#ffffff",
+  toolbarBg: "#ffffff", previewBg: "#f1f3f5", cardBg: "#ffffff",
+  atsBg: "#f8f5ff", border: "#e5e7eb", cardBorder: "#e5e7eb",
+  text: "#111111", textMuted: "#666666", textLight: "#888888",
+  inputBg: "#ffffff", inputBorder: "#d1d5db",
+  accent: "#6B4DB0", accentLight: "rgba(107, 77, 176, 0.08)", accentBorder: "rgba(107, 77, 176, 0.2)",
 };
 
 const initialData = {
@@ -174,71 +177,7 @@ const FONT_PAIRS = [
   { label: "Classic ATS", headId: "georgia", bodyId: "arial" },
 ];
 
-// ── Cover Letter Font Definitions ─────────────────────────────────────────────
-const CL_FONTS = [
-  { name: "Georgia", family: "Georgia, serif", url: null, category: "Serif" },
-  { name: "EB Garamond", family: "'EB Garamond', serif", url: "https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap", category: "Serif" },
-  { name: "Lora", family: "'Lora', serif", url: "https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap", category: "Serif" },
-  { name: "Merriweather", family: "'Merriweather', serif", url: "https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap", category: "Serif" },
-  { name: "Playfair Display", family: "'Playfair Display', serif", url: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap", category: "Serif" },
-  { name: "Inter", family: "'Inter', sans-serif", url: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap", category: "Sans-Serif" },
-  { name: "Roboto", family: "'Roboto', sans-serif", url: "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap", category: "Sans-Serif" },
-  { name: "Open Sans", family: "'Open Sans', sans-serif", url: "https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap", category: "Sans-Serif" },
-  { name: "Lato", family: "'Lato', sans-serif", url: "https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap", category: "Sans-Serif" },
-  { name: "Source Sans 3", family: "'Source Sans 3', sans-serif", url: "https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap", category: "Sans-Serif" },
-  { name: "Nunito Sans", family: "'Nunito Sans', sans-serif", url: "https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap", category: "Sans-Serif" },
-];
-const loadCLFont = (url) => {
-  if (!url) return;
-  const id = "clf-" + btoa(url).slice(0, 12);
-  if (!document.getElementById(id)) {
-    const l = document.createElement("link");
-    l.id = id; l.rel = "stylesheet"; l.href = url;
-    document.head.appendChild(l);
-  }
-};
 
-const detectJobTitle = (jdText) => {
-  if (!jdText) return "";
-  const patterns = [
-    /job title[:\s]+([^\n]+)/i,
-    /position[:\s]+([^\n]+)/i,
-    /role[:\s]+([^\n]+)/i,
-    /we are (?:looking for|hiring)(?: a| an)?\s+([^\n,.]+)/i,
-    /hiring(?: a| an)?\s+([^\n,.]+)/i,
-  ];
-  for (const pattern of patterns) {
-    const match = jdText.match(pattern);
-    if (match) return match[1].trim().replace(/[–—-].*$/, "").trim();
-  }
-  const lines = jdText.split("\n").map(l => l.trim()).filter(Boolean);
-  for (const line of lines.slice(0, 5)) {
-    if (line.length > 5 && line.length < 80 && !line.includes("@")) {
-      return line.replace(/[–—-].*$/, "").trim();
-    }
-  }
-  return "the position";
-};
-
-const loadHtml2Pdf = () => new Promise((resolve, reject) => {
-  if (window.html2pdf) { resolve(); return; }
-  const script = document.createElement("script");
-  script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-  script.onload = resolve;
-  script.onerror = reject;
-  document.head.appendChild(script);
-});
-
-// Strip greeting + signoff from AI text since templates render those separately
-const cleanCoverLetter = (text, name) => {
-  if (!text) return "";
-  let cleaned = text.trim();
-  // Remove greeting line (Dear ... ,)
-  cleaned = cleaned.replace(/^Dear\s+[^,\n]+,?\s*\n?/i, "").trim();
-  // Remove trailing signoff: Sincerely, / candidate name
-  cleaned = cleaned.replace(/\n*Sincerely,?\s*\n.*/si, "").trim();
-  return cleaned;
-};
 
 function PaginatedResume({ data, template, exportRef, headingFont, bodyFont }) {
   const TemplateComp = template === "A" ? TemplateA : template === "B" ? TemplateB : TemplateC;
@@ -515,7 +454,7 @@ function TemplateB({ data, headingFont, bodyFont }) {
             {experience.filter(e => e.role).map((e, i) => (
               <div key={i} style={{ marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}><strong style={{ fontFamily: hf }}>{e.role}</strong><span style={{ fontSize: "9pt", color: "#555" }}>{e.duration}</span></div>
-                <div style={{ color: "#2c3e50", fontStyle: "italic", fontFamily: hf }}>{e.company}{e.location ? ` · ${e.location}` : ""}</div>
+                <div style={{ color: "#2c3e50", fontStyle: "italic", fontFamily: hf }}>{e.company}{e.location ? ` Â· ${e.location}` : ""}</div>
                 {e.bullets?.filter(b => b?.trim()).length > 0 && (
                   <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
                     {e.bullets.filter(b => b?.trim()).map((b, j) => <li key={j} style={{ marginBottom: 2 }}>{b}</li>)}
@@ -529,7 +468,7 @@ function TemplateB({ data, headingFont, bodyFont }) {
           <RS title="PROJECTS" accent="#2c3e50" headingFontFamily={hf}>
             {projects.filter(p => p.name).map((proj, i) => (
               <div key={i} style={{ marginBottom: 7 }}>
-                <strong style={{ fontFamily: hf }}>{proj.link ? <a href={proj.link.startsWith("http") ? proj.link : `https://${proj.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "none" }}>{proj.name}</a> : proj.name}</strong>{proj.tech && <span style={{ fontSize: "9pt", color: "#555" }}> · {proj.tech}</span>}
+                <strong style={{ fontFamily: hf }}>{proj.link ? <a href={proj.link.startsWith("http") ? proj.link : `https://${proj.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "none" }}>{proj.name}</a> : proj.name}</strong>{proj.tech && <span style={{ fontSize: "9pt", color: "#555" }}> Â· {proj.tech}</span>}
                 {proj.bullets?.filter(b => b?.trim()).length > 0 && (
                   <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
                     {proj.bullets.filter(b => b?.trim()).map((b, j) => <li key={j} style={{ marginBottom: 2 }}>{b}</li>)}
@@ -697,8 +636,19 @@ RESUME TEXT:
       });
 
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err?.error?.message || `Groq API error ${resp.status}. Please try again.`);
+        let errStr = "";
+        try {
+          const errData = await resp.json();
+          errStr = errData?.error?.message || errData?.message || JSON.stringify(errData);
+        } catch {
+          errStr = "The backend server was unreachable or returned an invalid response. Please make sure `npm run dev` is running.";
+        }
+
+        if (resp.status === 429) {
+          errStr = "Groq API rate limit exceeded. Please wait a moment and try again.";
+        }
+
+        throw new Error(errStr || `Groq API error ${resp.status}. Please try again.`);
       }
 
       const json = await resp.json();
@@ -741,7 +691,7 @@ RESUME TEXT:
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Upload Existing Resume</div>
             <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
-              Powered by <span style={{ fontWeight: 700, color: "#f55036" }}>Groq</span> · LLaMA 3.3 70B · Ultra-fast parsing
+              Powered by <span style={{ fontWeight: 700, color: "#f55036" }}>Groq</span> Â· LLaMA 3.3 70B Â· Ultra-fast parsing
             </div>
           </div>
           <button onClick={onClose} style={{ background: "#f3f4f6", border: "none", borderRadius: 8, width: 30, height: 30, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: C.textMuted }}>
@@ -764,21 +714,21 @@ RESUME TEXT:
             onDragOver={e => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
-            onClick={() => !isBusy && inputRef.current?.click()}
+            onClick={() => { if (!isBusy && inputRef.current) inputRef.current.click(); }}
             style={{ border: `2px dashed ${dragging ? C.accent : file ? "#22c55e" : C.inputBorder}`, borderRadius: 12, padding: "24px 20px", textAlign: "center", background: dragging ? C.accentLight : file ? "#f0fdf4" : "#fafafa", cursor: isBusy ? "default" : "pointer", transition: "all 0.2s", marginBottom: 14 }}>
             <input ref={inputRef} type="file" accept=".pdf,.txt,.doc,.docx" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
             {file ? (
               <div>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>📄</div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#15803d" }}>{file.name}</div>
-                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>{(file.size / 1024).toFixed(1)} KB · {!isBusy && "Click to change"}</div>
+                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>{(file.size / 1024).toFixed(1)} KB • {!isBusy && "Click to change"}</div>
               </div>
             ) : (
               <div>
                 <svg width={32} height={32} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="1.5" style={{ margin: "0 auto 8px" }}><path d={icons.upload} /></svg>
                 <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 3 }}>Drag & drop your resume here</div>
                 <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 6 }}>or click to browse</div>
-                <span style={{ fontSize: 11, color: C.textLight, background: "#f3f4f6", borderRadius: 6, padding: "3px 10px" }}>PDF · TXT · DOC · DOCX</span>
+                <span style={{ fontSize: 11, color: C.textLight, background: "#f3f4f6", borderRadius: 6, padding: "3px 10px" }}>PDF • TXT • DOC • DOCX</span>
               </div>
             )}
           </div>
@@ -821,7 +771,7 @@ RESUME TEXT:
               Cancel
             </button>
             <button onClick={parseResume} disabled={!canParse || isBusy || status === "done"}
-              style={{ flex: 2, padding: "9px 16px", background: canParse ? "#f55036" : "#e5e7eb", border: `1.5px solid ${canParse ? "#f55036" : "#e5e7eb"}`, borderRadius: 8, color: canParse ? "#fff" : "#9ca3af", fontSize: 13, fontWeight: 700, cursor: canParse ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              style={{ flex: 2, padding: "9px 16px", background: canParse ? "linear-gradient(135deg, #7c5cbf, #6b4db0)" : "#e5e7eb", border: "none", borderRadius: 8, color: canParse ? "#fff" : "#9ca3af", fontSize: 13, fontWeight: 700, cursor: canParse ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, boxShadow: canParse ? "0 2px 8px rgba(107, 77, 176, 0.2)" : "none" }}>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.upload} /></svg>
               {isBusy ? "Working…" : status === "done" ? "✓ Done!" : "Parse with Groq ⚡"}
             </button>
@@ -834,89 +784,7 @@ RESUME TEXT:
 
 
 
-// ── FONT PICKER PANEL ─────────────────────────────────────────────────────────
-function FontPickerPanel({ headingFont, setHeadingFont, bodyFont, setBodyFont, onClose }) {
-  const panelRef = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (panelRef.current && !panelRef.current.contains(e.target)) onClose(); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
-
-  const atsBadge = (score) => {
-    const colors = score === "Excellent" ? { c: "#15803d", bg: "#f0fdf4" } : score === "Good" ? { c: "#2563eb", bg: "#eff6ff" } : { c: "#b45309", bg: "#fffbeb" };
-    return { fontSize: 8, fontWeight: 700, color: colors.c, background: colors.bg, padding: "2px 6px", borderRadius: 4 };
-  };
-
-  const renderFontList = (selected, onSelect, role) => {
-    const cats = ["Sans-Serif", "Serif", "Monospace"];
-    return cats.map(cat => {
-      const fonts = ATS_FONTS.filter(f => f.category === cat);
-      if (fonts.length === 0) return null;
-      return (
-        <div key={cat}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", margin: "10px 0 4px", letterSpacing: 1 }}>{cat.toUpperCase()}</div>
-          {fonts.map(f => (
-            <div key={f.id} onClick={() => { loadFont(f); onSelect(f); }}
-              style={{
-                padding: "7px 10px", borderRadius: 8, cursor: "pointer", marginBottom: 3,
-                background: selected.id === f.id ? "#eff6ff" : "#fff",
-                border: selected.id === f.id ? "1.5px solid #2563eb" : "1px solid #e5e7eb",
-                transition: "all 0.15s"
-              }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontFamily: f.family, fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{f.name}</span>
-                <div style={{ display: "flex", gap: 4 }}>
-                  <span style={atsBadge(f.atsScore)}>{f.atsScore}</span>
-                  {f.category === "Monospace" && <span style={{ fontSize: 7, fontWeight: 700, color: "#b45309", background: "#fffbeb", padding: "2px 5px", borderRadius: 4 }}>⚠️ ATS</span>}
-                </div>
-              </div>
-              <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 2 }}>{f.bestFor}</div>
-            </div>
-          ))}
-        </div>
-      );
-    });
-  };
-
-  return (
-    <div ref={panelRef} style={{ position: "absolute", top: "100%", right: 0, marginTop: 6, width: 560, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, boxShadow: "0 12px 40px rgba(0,0,0,0.15)", zIndex: 9000, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", gap: 16 }}>
-        {/* Heading Font Column */}
-        <div style={{ flex: 1, maxHeight: 340, overflowY: "auto" }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#374151", letterSpacing: 1, marginBottom: 2 }}>HEADING FONT</div>
-          <div style={{ fontSize: 9, color: "#94a3b8", marginBottom: 8 }}>Name · Section titles · Company names</div>
-          {renderFontList(headingFont, setHeadingFont, "heading")}
-        </div>
-        {/* Divider */}
-        <div style={{ width: 1, background: "#e5e7eb" }} />
-        {/* Body Font Column */}
-        <div style={{ flex: 1, maxHeight: 340, overflowY: "auto" }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#374151", letterSpacing: 1, marginBottom: 2 }}>BODY FONT</div>
-          <div style={{ fontSize: 9, color: "#94a3b8", marginBottom: 8 }}>Bullets · Descriptions · Dates</div>
-          {renderFontList(bodyFont, setBodyFont, "body")}
-        </div>
-      </div>
-      {/* Pair Suggestions */}
-      <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", marginBottom: 6, letterSpacing: 1 }}>PAIR SUGGESTIONS</div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {FONT_PAIRS.map(p => (
-            <button key={p.label} onClick={() => {
-              const h = ATS_FONTS.find(f => f.id === p.headId);
-              const b = ATS_FONTS.find(f => f.id === p.bodyId);
-              if (h) { loadFont(h); setHeadingFont(h); }
-              if (b) { loadFont(b); setBodyFont(b); }
-            }} style={{ flex: 1, padding: "6px 8px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fafbfc", cursor: "pointer", fontSize: 10, fontWeight: 600, color: "#475569", transition: "all 0.15s" }}>
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+// (Old inline FontPickerPanel removed, using imported FontPickerPanel)
 
 // ── JD KEYWORD ANALYZER MODAL ─────────────────────────────────────────────────
 function JDAnalyzerModal({ onClose, data, setData }) {
@@ -925,6 +793,8 @@ function JDAnalyzerModal({ onClose, data, setData }) {
   const [analysis, setAnalysis] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [added, setAdded] = useState({});
+  const [showGuide, setShowGuide] = useState(false);
+  const [guideRead, setGuideRead] = useState(false);
 
   const buildResumeText = () => {
     const p = data.personal;
@@ -952,11 +822,23 @@ function JDAnalyzerModal({ onClose, data, setData }) {
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: "You are an ATS expert. Always respond with only valid JSON." },
-            { role: "user", content: `You are an ATS (Applicant Tracking System) expert. Analyze the job description and resume.\n\nJOB DESCRIPTION:\n${jdText}\n\nRESUME CONTENT:\n${resumeText}\n\nReturn ONLY valid JSON with this exact structure:\n{\n  "matchScore": 72,\n  "jobTitle": "Job title detected from JD",\n  "matchedCount": 18,\n  "matched": [\n    { "keyword": "Python", "importance": "high", "category": "Programming Languages" }\n  ],\n  "missing": [\n    { "keyword": "Docker", "importance": "high", "category": "Tools & Technologies", "suggestion": "Add to Tools & Technologies" }\n  ],\n  "softSkills": ["communication", "teamwork"],\n  "topTip": "One sentence tip to improve resume for this specific job"\n}\n\nRules:\n- importance levels: high (required or appears 3+ times), medium (preferred), low (nice to have)\n- category must be one of: Programming Languages, Frameworks, Tools & Technologies, Soft Skills, Cloud & DevOps, Databases\n- Extract EVERY SINGLE technical keyword from the JD � typically 15 to 40 keywords. Do NOT limit to 5 or 10. The missing list must include ALL keywords from JD not found in resume. Be EXHAUSTIVE\n- Return ONLY the JSON, no explanation, no markdown` }
+            { role: "user", content: `You are an ATS (Applicant Tracking System) expert. Analyze the job description and resume.\n\nJOB DESCRIPTION:\n${jdText}\n\nRESUME CONTENT:\n${resumeText}\n\nReturn ONLY valid JSON with this exact structure:\n{\n  "matchScore": 72,\n  "jobTitle": "Job title detected from JD",\n  "matchedCount": 18,\n  "matched": [\n    { "keyword": "Python", "importance": "high", "category": "Programming Languages" }\n  ],\n  "missing": [\n    { "keyword": "Docker", "importance": "high", "category": "Tools & Technologies", "suggestion": "Add to Tools & Technologies" }\n  ],\n  "softSkills": ["communication", "teamwork"],\n  "topTip": "One sentence tip to improve resume for this specific job"\n}\n\nRules:\n- importance levels: high (required or appears 3+ times), medium (preferred), low (nice to have)\n- category must be one of: Programming Languages, Frameworks, Tools & Technologies, Soft Skills, Cloud & DevOps, Databases\n- Extract EVERY SINGLE technical keyword from the JD — typically 15 to 40 keywords. Do NOT limit to 5 or 10. The missing list must include ALL keywords from JD not found in resume. Be EXHAUSTIVE\n- Return ONLY the JSON, no explanation, no markdown` }
           ]
         })
       });
-      if (!resp.ok) throw new Error(`Groq API error: ${resp.status}`);
+
+      if (!resp.ok) {
+        let errStr = "";
+        try {
+          const errData = await resp.json();
+          errStr = errData?.error?.message || errData?.message || JSON.stringify(errData);
+        } catch {
+          errStr = "The backend server was unreachable or returned an invalid response. Please make sure `npm run dev` is running.";
+        }
+        if (resp.status === 429) errStr = "Groq API rate limit exceeded. Please wait a moment and try again.";
+        throw new Error(errStr || `Groq API error ${resp.status}.`);
+      }
+
       const json = await resp.json();
       const text = json.choices?.[0]?.message?.content || "";
       const parsed = JSON.parse(text);
@@ -1002,6 +884,94 @@ function JDAnalyzerModal({ onClose, data, setData }) {
   const impColor = (imp) => imp === "high" ? { c: "#dc2626", bg: "#fef2f2" } : imp === "medium" ? { c: "#b45309", bg: "#fffbeb" } : { c: "#6b7688", bg: "#f3f4f6" };
   const scoreColor = (s) => s >= 75 ? { c: "#15803d", bg: "#f0fdf4", bar: "#22c55e" } : s >= 50 ? { c: "#b45309", bg: "#fffbeb", bar: "#f59e0b" } : { c: "#dc2626", bg: "#fef2f2", bar: "#ef4444" };
 
+  const guideContent = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18, color: "#475569", fontSize: 12, lineHeight: 1.6 }}>
+      {/* Why Use This Tool? */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>🎯</span>
+          Why Use This Tool?
+        </div>
+        <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5, paddingLeft: 26 }}>
+          The JD Analyzer compares your resume against a job description and identifies skill gaps. Get instant insights on how well your qualifications match the position.
+        </div>
+      </div>
+
+      {/* What You'll Get */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>✨</span>
+          What You'll Get:
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 26 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 16, minWidth: 22 }}>📊</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ fontWeight: 600, color: "#0f172a" }}>Match Score</div>
+              <div style={{ fontSize: 11, color: "#64748b" }}>Percentage match between your resume and job description</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 16, minWidth: 22 }}>✅</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ fontWeight: 600, color: "#0f172a" }}>Matched Keywords</div>
+              <div style={{ fontSize: 11, color: "#64748b" }}>Skills and keywords your resume already covers</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 16, minWidth: 22 }}>⚠️</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ fontWeight: 600, color: "#0f172a" }}>Missing Keywords</div>
+              <div style={{ fontSize: 11, color: "#64748b" }}>Critical skills mentioned in the JD but not in your resume</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 16, minWidth: 22 }}>💡</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ fontWeight: 600, color: "#0f172a" }}>Smart Tips</div>
+              <div style={{ fontSize: 11, color: "#64748b" }}>AI-powered recommendations to improve your match score</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* How to Use */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 18 }}>📋</span>
+          How to Use:
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 26 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <div style={{ width: 22, height: 22, background: "#3b82f6", color: "white", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11, minWidth: 22 }}>1</div>
+            <div style={{ fontSize: 11, paddingTop: 2 }}>Find the job posting and copy the full job description</div>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <div style={{ width: 22, height: 22, background: "#3b82f6", color: "white", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11, minWidth: 22 }}>2</div>
+            <div style={{ fontSize: 11, paddingTop: 2 }}>Paste it in the text area on the left side</div>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <div style={{ width: 22, height: 22, background: "#3b82f6", color: "white", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11, minWidth: 22 }}>3</div>
+            <div style={{ fontSize: 11, paddingTop: 2 }}>Click the "Analyze Keywords" button</div>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <div style={{ width: 22, height: 22, background: "#3b82f6", color: "white", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11, minWidth: 22 }}>4</div>
+            <div style={{ fontSize: 11, paddingTop: 2 }}>Review results and update your resume accordingly</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pro Tip */}
+      <div style={{ background: "#fef08a", border: "1px solid #facc15", borderRadius: 12, padding: "10px 12px", display: "flex", gap: 10 }}>
+        <span style={{ fontSize: 16, minWidth: 18 }}>⭐</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ fontWeight: 600, color: "#714819", fontSize: 11 }}>Pro Tip</div>
+          <div style={{ fontSize: 11, color: "#854d0e", lineHeight: 1.4 }}>Focus on adding the missing keywords naturally throughout your resume. Avoid keyword stuffing—hiring managers and ATS systems value quality over quantity.</div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }} onClick={onClose}>
       <div style={{ width: 900, maxWidth: "95vw", maxHeight: "90vh", background: "#fff", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", overflow: "hidden" }} onClick={e => e.stopPropagation()}>
@@ -1012,7 +982,12 @@ function JDAnalyzerModal({ onClose, data, setData }) {
             <span style={{ fontSize: 22 }}>🎯</span>
             <div><div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>Job Description Analyzer</div><div style={{ fontSize: 11, color: "#94a3b8" }}>Paste a JD to find missing keywords and boost your ATS score</div></div>
           </div>
-          <button onClick={onClose} style={{ width: 32, height: 32, border: "none", background: "#f3f4f6", borderRadius: 8, cursor: "pointer", fontSize: 16, color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => setShowGuide(s => !s)} style={{ padding: "6px 12px", border: "1px solid #e5e7eb", background: showGuide ? "#eef2ff" : "#ffffff", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: showGuide ? "#4338ca" : "#475569" }}>
+              {guideRead ? "Guide ✓" : "Why this tool?"}
+            </button>
+            <button onClick={onClose} style={{ width: 32, height: 32, border: "none", background: "#f3f4f6", borderRadius: 8, cursor: "pointer", fontSize: 16, color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          </div>
         </div>
 
         {/* Body — Two Panels */}
@@ -1022,19 +997,35 @@ function JDAnalyzerModal({ onClose, data, setData }) {
             <label style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>Paste Job Description</label>
             <textarea value={jdText} onChange={e => setJdText(e.target.value)} placeholder="Paste the full job description here..." style={{ flex: 1, minHeight: 260, padding: 12, border: "1.5px solid #e5e7eb", borderRadius: 10, resize: "none", fontSize: 12, lineHeight: 1.6, fontFamily: "'Segoe UI', sans-serif", outline: "none", color: "#1a1a1a" }} />
             <div style={{ fontSize: 10, color: "#94a3b8" }}>{wordCount} words</div>
-            <button onClick={analyze} disabled={status === "analyzing"} style={{ padding: "11px 0", background: status === "analyzing" ? "#fdba74" : "#f55036", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: status === "analyzing" ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.2s" }}>
+            <button onClick={analyze} disabled={status === "analyzing"} style={{ padding: "11px 0", background: status === "analyzing" ? "#bba8e3" : "linear-gradient(135deg, #7c5cbf, #6b4db0)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: status === "analyzing" ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.2s", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
               {status === "analyzing" ? <><span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⚙️</span> Analyzing...</> : <>⚡ Analyze Keywords</>}
             </button>
             {errorMsg && <div style={{ fontSize: 11, color: "#dc2626", background: "#fef2f2", padding: "8px 12px", borderRadius: 8 }}>❌ {errorMsg}</div>}
           </div>
 
           {/* RIGHT — Results */}
-          <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: 20, position: "relative", background: "#fff" }}>
+            {showGuide && (
+              <div style={{ position: "absolute", inset: 12, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, overflowY: "auto", zIndex: 5, boxShadow: "0 10px 30px rgba(0,0,0,0.12)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>Guide</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button onClick={() => { setGuideRead(true); setShowGuide(false); }} style={{ padding: "5px 10px", border: "1px solid #d1fae5", background: "#ecfdf3", borderRadius: 8, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#15803d" }}>
+                      Mark as Read
+                    </button>
+                    <button onClick={() => setShowGuide(false)} style={{ width: 28, height: 28, border: "none", background: "#f3f4f6", borderRadius: 8, cursor: "pointer", fontSize: 14, color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+                  </div>
+                </div>
+                {guideContent}
+              </div>
+            )}
             {status === "idle" && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", gap: 12, textAlign: "center", padding: 40 }}>
-                <span style={{ fontSize: 48 }}>🔍</span>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>No analysis yet</div>
-                <div style={{ fontSize: 12, maxWidth: 280 }}>Paste a job description on the left and click "Analyze Keywords" to find missing skills</div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 10, textAlign: "center", color: "#94a3b8" }}>
+                <div style={{ width: 70, height: 70, borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 28 }}>🔍</span>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#64748b" }}>No analysis yet</div>
+                <div style={{ fontSize: 12, color: "#94a3b8", maxWidth: 320 }}>Paste a job description on the left and click "Analyze Keywords" to find missing skills</div>
               </div>
             )}
 
@@ -1060,7 +1051,7 @@ function JDAnalyzerModal({ onClose, data, setData }) {
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 800, color: sc.c }}>{analysis.matchScore >= 75 ? "Great Match!" : analysis.matchScore >= 50 ? "Decent Match" : "Needs Work"}</div>
                       {analysis.jobTitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>JD: {analysis.jobTitle}</div>}
-                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{analysis.matched?.length || 0} matched · {analysis.missing?.length || 0} missing keywords</div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{analysis.matched?.length || 0} matched Â· {analysis.missing?.length || 0} missing keywords</div>
                     </div>
                   </div>
 
@@ -1148,19 +1139,38 @@ function JDAnalyzerModal({ onClose, data, setData }) {
 
 
 // ── Routing Wrapper ───────────────────────────────────────────────────────────
-import HomePage from './HomePage.jsx';
+import HomePage from '../HomePage/HomePage.jsx';
+import CoverLetterBuilder from '../CoverLetterBuilder/CoverLetterBuilder.jsx';
+import Header from '../../components/Header/Header.jsx';
+import Footer from '../../components/Footer/Footer.jsx';
+import Steps from '../../components/Steps.jsx';
+import Networking from '../Networking/Networking.jsx';
+import JobPortals from '../JobPortals/JobPortals.jsx';
 
-export default function App() {
+function App() {
+  const location = useLocation();
+  const hideFooter = location.pathname === "/builder" || location.pathname === "/cover-letter";
+
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/builder" element={<ResumeBuilder />} />
-    </Routes>
+    <>
+      <Header />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/builder" element={<ResumeBuilder />} />
+        <Route path="/cover-letter" element={<CoverLetterBuilder />} />
+        <Route path="/latex-editor" element={<LatexEditor />} />
+        <Route path="/steps" element={<Steps />} />
+        <Route path="/networking" element={<Networking />} />
+        <Route path="/job-portals" element={<JobPortals />} />
+      </Routes>
+      {!hideFooter && <Footer />}
+    </>
   );
 }
 
 // ── Resume Builder Page ──────────────────────────────────────────────────────
 function ResumeBuilder() {
+  const location = useLocation();
   const [data, setData] = useState(initialData);
   const [activeSection, setActiveSection] = useState("personal");
   const [activeTemplate, setActiveTemplate] = useState("A");
@@ -1181,37 +1191,89 @@ function ResumeBuilder() {
   });
   const [showFontPanel, setShowFontPanel] = useState(false);
 
-  // Cover letter state
-  const [coverLetter, setCoverLetter] = useState("");
-  const [clJD, setClJD] = useState("");
-  const [clTone, setClTone] = useState("Professional");
-  const [clLength, setClLength] = useState("Medium");
-  const [clHiringManager, setClHiringManager] = useState("");
-  const [clCompany, setClCompany] = useState("");
-  const [clLoading, setClLoading] = useState(false);
-  const [clError, setClError] = useState("");
-  const [clEditMode, setClEditMode] = useState(false);
-  const [clCopied, setClCopied] = useState(false);
-  const [clHeadingFont, setClHeadingFont] = useState("'EB Garamond', serif");
-  const [clBodyFont, setClBodyFont] = useState("'Source Sans 3', sans-serif");
-  const [clFontSize, setClFontSize] = useState(11);
-  const [clLineHeight, setClLineHeight] = useState(1.85);
-  const [showClFontPanel, setShowClFontPanel] = useState(false);
-  const [clTemplate, setClTemplate] = useState(() => localStorage.getItem("cl_template") || "executive");
-  const [clDownloading, setClDownloading] = useState(false);
-  const [detectedJobTitle, setDetectedJobTitle] = useState("");
-  const [clJobTitle, setClJobTitle] = useState("");
+  const [user, setUser] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+
+  // Check auth and load saved resume
+  useEffect(() => {
+    const fetchSessionAndData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+
+        // Fetch saved resume
+        const { data: dbData, error } = await supabase
+          .from('resume_data')
+          .select('resume_data')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (dbData?.resume_data && !error) {
+          // Merge with initial data to ensure all structural keys (e.g. arrays for projects) exist
+          setData((prev) => ({ ...prev, ...dbData.resume_data }));
+        }
+      }
+    };
+    fetchSessionAndData();
+
+    // Listen to login/logout events cleanly
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        const { data: dbData } = await supabase.from('resume_data').select('resume_data').eq('user_id', session.user.id).single();
+        if (dbData?.resume_data) {
+          setData((prev) => ({ ...prev, ...dbData.resume_data }));
+        }
+      } else {
+        setUser(null);
+        setData(initialData); // Reset to blank if logged out
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSaveToDb = async () => {
+    if (!user) {
+      alert("Please sign in or create an account to save your resume seamlessly.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('resume_data').upsert({
+        user_id: user.id,
+        resume_data: data,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+
+      if (error) throw error;
+
+      setSaveMessage("Saved!");
+      setTimeout(() => setSaveMessage(""), 2500);
+    } catch (err) {
+      console.error(err);
+      setSaveMessage("Failed to save");
+      setTimeout(() => setSaveMessage(""), 3000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Load fonts on mount and when changed
   useEffect(() => { loadFont(headingFont); loadFont(bodyFont); }, []);
   useEffect(() => { loadFont(headingFont); localStorage.setItem("resume-heading-font", headingFont.id); }, [headingFont]);
   useEffect(() => { loadFont(bodyFont); localStorage.setItem("resume-body-font", bodyFont.id); }, [bodyFont]);
   useEffect(() => { window.__resumeHeadingFont = headingFont; window.__resumeBodyFont = bodyFont; }, [headingFont, bodyFont]);
-  useEffect(() => { setDetectedJobTitle(detectJobTitle(clJD)); }, [clJD]);
-  useEffect(() => { localStorage.setItem("cl_template", clTemplate); }, [clTemplate]);
+
+  // Open JD panel if coming from header "Match JD" button
   useEffect(() => {
-    loadCLFont(CL_FONTS.find(f => f.name === "EB Garamond")?.url);
-    loadCLFont(CL_FONTS.find(f => f.name === "Source Sans 3")?.url);
+    if (location.state?.openJDPanel) {
+      setShowJD(true);
+      // Clear the state so it doesn't reopen on refresh
+      window.history.replaceState({}, document.title);
+    }
   }, []);
 
   const [showJD, setShowJD] = useState(false);
@@ -1219,7 +1281,7 @@ function ResumeBuilder() {
   const [numPages, setNumPages] = useState(1);
   const [zoom, setZoom] = useState(80);
 
-  const [formWidth, setFormWidth] = useState(400);
+  const [formWidth, setFormWidth] = useState(480);
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
@@ -1227,7 +1289,7 @@ function ResumeBuilder() {
     const handleMouseMove = (e) => {
       let w = e.clientX - 58;
       if (w < 250) w = 250;
-      if (w > 800) w = 800;
+      if (w > 1000) w = 1000;
       setFormWidth(w);
     };
     const handleMouseUp = () => setIsDragging(false);
@@ -1256,17 +1318,42 @@ function ResumeBuilder() {
   const handleParsed = useCallback((parsed) => {
     setData(prev => {
       const merged = JSON.parse(JSON.stringify(prev));
-      // Personal
+
+      // Personal - preserve explicitly requested URLs
+      const preserveUrls = ['linkedin', 'github', 'portfolio'];
       Object.keys(parsed.personal || {}).forEach(k => {
-        if (!merged.personal[k] && parsed.personal[k]) merged.personal[k] = parsed.personal[k];
+        if (!merged.personal[k] && parsed.personal[k]) {
+          merged.personal[k] = parsed.personal[k];
+        } else if (preserveUrls.includes(k) && merged.personal[k]) {
+          // Explicitly do NOT overwrite existing URL links with blank or AI guessed values
+        }
       });
+
       if (!merged.summary && parsed.summary) merged.summary = parsed.summary;
       if (parsed.skills?.length) merged.skills = parsed.skills;
       if (parsed.education?.some(e => e.degree)) merged.education = parsed.education;
       if (parsed.experience?.some(e => e.role)) merged.experience = parsed.experience;
-      if (parsed.projects?.some(p => p.name)) merged.projects = parsed.projects;
+
+      // Merge Projects while preserving URLs by matching names or indices
+      if (parsed.projects?.some(p => p.name)) {
+        const newProjects = parsed.projects.map((p, i) => {
+          // Attempt to find a matching project by name (case-insensitive)
+          const existingByName = prev.projects.find(ep => ep.name && p.name && ep.name.toLowerCase() === p.name.toLowerCase());
+          // Or fallback to matched array index if it had a URL
+          const existingByIndex = prev.projects[i];
+
+          let preservedLink = "";
+          if (existingByName && existingByName.link) preservedLink = existingByName.link;
+          else if (existingByIndex && existingByIndex.link) preservedLink = existingByIndex.link;
+
+          return { ...p, link: preservedLink || p.link || "" };
+        });
+        merged.projects = newProjects;
+      }
+
       if (parsed.certifications?.some(c => c.name)) merged.certifications = parsed.certifications;
       if (!merged.hobbies && parsed.hobbies) merged.hobbies = parsed.hobbies;
+
       return merged;
     });
     setActiveSection("personal");
@@ -1295,140 +1382,8 @@ function ResumeBuilder() {
   const atsColor = ats.score >= 75 ? "#15803d" : ats.score >= 50 ? "#b45309" : "#b91c1c";
   const atsBar = ats.score >= 75 ? "#22c55e" : ats.score >= 50 ? "#f59e0b" : "#ef4444";
 
-  // ── Cover Letter functions ──
-  const generateCoverLetter = async () => {
-    if (!clJD.trim()) { setClError("Please paste a job description first."); return; }
-    setClLoading(true); setClError(""); setCoverLetter("");
-    const lengthMap = { "Short": "around 150 words", "Medium": "around 250 words", "Long": "around 400 words" };
-    const toneMap = { "Professional": "formal, polished, results-focused", "Confident": "assertive, achievement-driven, bold", "Enthusiastic": "energetic, passionate, warm", "Formal": "very formal, structured, traditional", "Creative": "memorable opening, storytelling, unique", "Concise": "brief, punchy, every sentence earns its place" };
-    const skills = data.skills.filter(s => s.items).map(s => s.category + ": " + s.items).join(" | ");
-    const exp = data.experience.filter(e => e.role).map(e => e.role + " at " + e.company + " (" + e.duration + "): " + (e.bullets || []).filter(b => b).join(", ")).join(" | ");
-    const projects = data.projects.filter(p => p.name).map(p => p.name + " [" + p.tech + "]").join(", ");
-    const edu = data.education.filter(e => e.degree).map(e => e.degree + " from " + e.institution).join(", ");
-    const certs = data.certifications.filter(c => c.name).map(c => c.name).join(", ");
-    const prompt = `Write a ${toneMap[clTone]} professional cover letter that is ${lengthMap[clLength]}.\n\nCANDIDATE RESUME:\nName: ${data.personal.name || "Candidate"}\nTitle: ${data.personal.title || ""}\nLocation: ${data.personal.location || ""}\nSummary: ${data.summary || ""}\nSkills: ${skills}\nExperience: ${exp}\nProjects: ${projects}\nEducation: ${edu}\nCertifications: ${certs}\n\nJOB DESCRIPTION:\n${clJD}\n\nHIRING MANAGER: ${clHiringManager || "Hiring Manager"}\nCOMPANY: ${clCompany || "the company"}\n\nSTRICT RULES:\n1. Start DIRECTLY with: Dear ${clHiringManager || "Hiring Team"},\n2. Opening paragraph: Powerful hook — specific value you bring to THIS role\n3. Second paragraph: Most relevant experience + measurable achievements that match the JD requirements exactly\n4. Third paragraph: 3-4 key skills from resume that match JD keywords\n5. Closing paragraph: Strong call to action, express genuine interest\n6. Sign off: Sincerely,\\n${data.personal.name || "Candidate"}\n7. Naturally mirror keywords from the job description\n8. Use REAL details — actual company name, role title, real skills\n9. NEVER write: "I am writing to express", "Please find attached", "To whom it may concern", "I believe I would be a great fit", "I am excited to apply for", "passionate about"\n10. Output ONLY letter body — start from Dear, end after sign-off. Do NOT include name/address/date header — UI adds those separately`;
-    try {
-      const resp = await fetch("/api/groq", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile", temperature: 0.72, max_tokens: 1500, messages: [
-            { role: "system", content: "You are a world-class career coach and cover letter writer with 20 years experience. You write specific, compelling, ATS-optimized cover letters that get interviews. You never use cliche phrases. Every sentence must add value." },
-            { role: "user", content: prompt }
-          ]
-        })
-      });
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err?.error?.message || `Groq API error ${resp.status}. Please try again.`);
-      }
-      const json = await resp.json();
-      const text = json.choices?.[0]?.message?.content?.trim() || "";
-      if (text) { setCoverLetter(text); setClEditMode(false); }
-      else setClError("Generation failed. Please try again.");
-    } catch (e) { setClError("API error: " + e.message); }
-    setClLoading(false);
-  };
 
-  const handleCopyCL = () => {
-    const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-    const full = [data.personal.name, [data.personal.email, data.personal.phone, data.personal.location].filter(Boolean).join(" · "), date, "", clHiringManager, clCompany, "", coverLetter].filter(l => l !== undefined && l !== null).join("\n");
-    navigator.clipboard.writeText(full);
-    setClCopied(true); setTimeout(() => setClCopied(false), 2500);
-  };
 
-  const downloadCoverLetterPDF = async () => {
-    if (!coverLetter) return;
-    setClDownloading(true);
-    try {
-      await loadHtml2Pdf();
-      const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-      const fontLinks = [clHeadingFont, clBodyFont].map(f => CL_FONTS.find(x => x.family === f)).filter(f => f?.url).map(f => `<link rel="stylesheet" href="${f.url}">`).join("\n");
-      const jt = clJobTitle.trim() || detectedJobTitle || "the position";
-      const name = data.personal.name || "";
-      const contact = [data.personal.email, data.personal.phone, data.personal.location].filter(Boolean).join(" · ");
-      const links = [data.personal.linkedin, data.personal.github].filter(Boolean);
-      let bodyHtml = "";
-      if (clTemplate === "executive") {
-        bodyHtml = `<div style="font-family:${clBodyFont};padding:56px 64px;background:#fff;color:#1e293b;">
-          <div style="font-family:${clHeadingFont};font-size:26pt;font-weight:700;color:#0f172a;margin-bottom:5px;">${name}</div>
-          <div style="font-size:10.5pt;font-weight:600;color:#2563eb;margin-bottom:8px;">Applying for: ${jt}</div>
-          <div style="font-size:9pt;color:#64748b;">${contact}${links.length ? ' · ' + links.map(l => '<span style="color:#2563eb;">' + l + '</span>').join(' · ') : ''}</div>
-          <div style="height:2px;background:linear-gradient(to right,#0f172a 55%,#e2e8f0 100%);margin:20px 0 24px;"></div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:26px;">
-            <div style="font-size:9.5pt;color:#64748b;font-style:italic;">${date}</div>
-            <div style="text-align:right;"><div style="font-family:${clHeadingFont};font-size:12pt;font-weight:700;color:#0f172a;">${clHiringManager || ""}</div><div style="font-size:10pt;font-weight:600;color:#475569;">${clCompany || ""}</div></div>
-          </div>
-          <div style="font-family:${clHeadingFont};font-size:12pt;font-weight:600;color:#0f172a;margin-bottom:20px;">Dear ${clHiringManager || "Hiring Team"},</div>
-          <div style="font-size:${clFontSize}pt;line-height:${clLineHeight};text-align:justify;white-space:pre-wrap;">${cleanCoverLetter(coverLetter, name)}</div>
-          <div style="margin-top:28px;"><div style="font-size:11pt;margin-bottom:30px;">Sincerely,</div><div style="width:160px;height:1px;background:#cbd5e1;margin-bottom:6px;"></div><div style="font-family:${clHeadingFont};font-size:13pt;font-weight:700;color:#0f172a;margin-bottom:2px;">${name}</div><div style="font-size:9pt;color:#64748b;">Applying for: ${jt}</div></div>
-        </div>`;
-      } else if (clTemplate === "modern") {
-        bodyHtml = `<div style="display:flex;font-family:${clBodyFont};">
-          <div style="width:30%;background:#0f172a;color:#fff;padding:40px 20px;">
-            <div style="font-family:${clHeadingFont};font-size:16pt;font-weight:700;color:#fff;margin-bottom:4px;">${name}</div>
-            <div style="font-size:8pt;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px;">Applying for</div>
-            <div style="font-size:9.5pt;color:#60a5fa;font-weight:600;margin-bottom:18px;line-height:1.4;">${jt}</div>
-            <div style="height:1px;background:#334155;margin-bottom:16px;"></div>
-            <div style="font-size:8pt;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Contact</div>
-            ${[data.personal.email, data.personal.phone, data.personal.location, ...links].filter(Boolean).map(c => `<div style="font-size:8.5pt;color:#cbd5e1;margin-bottom:5px;word-break:break-all;">${c}</div>`).join("")}
-            <div style="height:1px;background:#334155;margin:16px 0;"></div>
-            <div style="font-size:8pt;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Date</div>
-            <div style="font-size:8.5pt;color:#cbd5e1;margin-bottom:16px;">${date}</div>
-            <div style="font-size:8pt;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">To</div>
-            <div style="font-size:10pt;font-weight:700;color:#fff;margin-bottom:2px;">${clHiringManager || ""}</div>
-            <div style="font-size:9pt;color:#94a3b8;">${clCompany || ""}</div>
-          </div>
-          <div style="flex:1;padding:44px 40px;background:#fff;">
-            <div style="font-family:${clHeadingFont};font-size:13pt;font-weight:600;color:#0f172a;margin-bottom:22px;">Dear ${clHiringManager || "Hiring Team"},</div>
-            <div style="font-size:${clFontSize}pt;line-height:${clLineHeight};color:#1e293b;text-align:justify;white-space:pre-wrap;">${cleanCoverLetter(coverLetter, name)}</div>
-            <div style="margin-top:28px;"><div style="font-size:11pt;margin-bottom:26px;">Sincerely,</div><div style="width:40px;height:3px;background:#2563eb;margin-bottom:10px;"></div><div style="font-family:${clHeadingFont};font-size:13pt;font-weight:700;color:#0f172a;margin-bottom:3px;">${name}</div><div style="font-size:9pt;color:#64748b;">Applying for: ${jt}</div></div>
-          </div>
-        </div>`;
-      } else {
-        bodyHtml = `<div style="font-family:${clBodyFont};padding:64px 80px;background:#fff;color:#374151;">
-          <div style="font-family:${clHeadingFont};font-size:22pt;font-weight:700;color:#111827;letter-spacing:-0.5px;margin-bottom:3px;">${name}</div>
-          <div style="font-size:10pt;color:#6b7280;font-weight:500;margin-bottom:10px;">Applying for: ${jt}</div>
-          <div style="font-size:8.5pt;color:#9ca3af;">${[data.personal.email, data.personal.phone, data.personal.location].filter(Boolean).join("  |  ")}</div>
-          <div style="width:32px;height:3px;background:#111827;margin:18px 0 20px;"></div>
-          <div style="font-size:9pt;color:#9ca3af;margin-bottom:16px;">${date}</div>
-          <div style="margin-bottom:22px;"><div style="font-size:10.5pt;font-weight:700;color:#111827;margin-bottom:1px;">${clHiringManager || ""}</div><div style="font-size:10pt;color:#6b7280;">${clCompany || ""}</div></div>
-          <div style="font-size:11pt;font-weight:600;color:#111827;margin-bottom:18px;">Dear ${clHiringManager || "Hiring Team"},</div>
-          <div style="font-size:${clFontSize}pt;line-height:${clLineHeight};white-space:pre-wrap;color:#374151;">${cleanCoverLetter(coverLetter, name)}</div>
-          <div style="margin-top:28px;"><div style="font-size:10.5pt;margin-bottom:22px;color:#374151;">Sincerely,</div><div style="font-family:${clHeadingFont};font-size:12pt;font-weight:700;color:#111827;margin-bottom:2px;">${name}</div><div style="font-size:9pt;color:#9ca3af;">Applying for: ${jt}</div></div>
-        </div>`;
-      }
-      const container = document.createElement("div");
-      container.style.position = "absolute";
-      container.style.left = "0";
-      container.style.top = "0";
-      container.style.width = "210mm";
-      container.style.zIndex = "-9999";
-      container.style.overflow = "hidden";
-      container.style.opacity = "0";
-      container.innerHTML = bodyHtml;
-      document.body.appendChild(container);
-      const fontEls = [clHeadingFont, clBodyFont].map(f => CL_FONTS.find(x => x.family === f)).filter(f => f?.url);
-      fontEls.forEach(f => loadCLFont(f.url));
-      // Wait for fonts to load
-      await new Promise(r => setTimeout(r, 800));
-      const jtClean = (detectedJobTitle || "").replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
-      const nameClean = (data.personal.name || "").replace(/\s+/g, "_");
-      const el = container.firstElementChild || container;
-      await window.html2pdf().set({
-        margin: 0,
-        filename: `Cover_Letter_${nameClean}${jtClean ? "_" + jtClean : ""}.pdf`,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, width: el.scrollWidth, height: el.scrollHeight },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        pagebreak: { mode: ["avoid-all", "css", "legacy"] }
-      }).from(el).save();
-      document.body.removeChild(container);
-    } catch (e) {
-      console.error("PDF download error:", e);
-      alert("PDF download failed: " + e.message);
-    }
-    setClDownloading(false);
-  };
 
   const sideNav = [
     { id: "personal", label: "Personal", icon: icons.user },
@@ -1439,27 +1394,68 @@ function ResumeBuilder() {
     { id: "projects", label: "Projects", icon: icons.globe },
     { id: "certifications", label: "Certs", icon: icons.award },
     { id: "hobbies", label: "Hobbies", icon: icons.heart },
-    { id: "coverLetter", label: "Cover Letter", icon: icons.coverLetter },
   ];
 
-  const IS = { width: "100%", padding: "7px 10px", background: C.inputBg, border: `1px solid ${C.inputBorder}`, borderRadius: 7, color: C.text, fontSize: 12, outline: "none", boxSizing: "border-box" };
-  const CS = { background: C.cardBg, border: `1px solid ${C.cardBorder}`, borderRadius: 10, padding: 14, marginBottom: 10 };
+  const IS = { width: "100%", padding: "11px 14px", background: "#f8fafc", border: `1px solid #cbd5e1`, borderRadius: 10, color: C.text, fontSize: 13, outline: "none", boxSizing: "border-box", transition: "all 0.2s ease", boxShadow: "inset 0 3px 6px rgba(0,0,0,0.06), inset 0 0 4px rgba(0,0,0,0.02), 0 1px 0 rgba(255,255,255,0.8)" };
+  const CS = { background: "#ffffff", border: `1px solid #e2e8f0`, borderRadius: 14, padding: 18, marginBottom: 16, boxShadow: "0 4px 10px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.03), inset 0 2px 0 rgba(255,255,255,1), inset 0 -2px 0 rgba(0,0,0,0.02)" };
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: C.appBg, fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100vh", background: C.appBg, fontFamily: "'Sora', sans-serif", overflow: "hidden" }}>
 
-      {showUpload && <UploadModal onClose={() => setShowUpload(false)} onParsed={handleParsed} />}
       {showJD && <JDAnalyzerModal onClose={() => setShowJD(false)} data={data} setData={setData} />}
+      {showUpload && <UploadModal onClose={() => setShowUpload(false)} onParsed={handleParsed} />}
 
       {/* ── Sidebar with Icons + Labels ── */}
-      <div style={{ width: 140, background: C.sidebarBg, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 12, gap: 2, boxShadow: "1px 0 4px rgba(0,0,0,0.05)" }}>
-        <div style={{ width: 34, height: 34, background: C.accentLight, border: `2px solid ${C.accentBorder}`, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-          <span style={{ color: C.accent, fontWeight: 900, fontSize: 15 }}>R</span>
+      <div style={{ width: 200, background: C.sidebarBg, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 40, gap: 2, boxShadow: "1px 0 4px rgba(0,0,0,0.02)", fontFamily: "'Sora', sans-serif", zIndex: 10 }}>
+
+        {/* ATS Score Circular */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#000", letterSpacing: 1.2, marginBottom: 12, marginTop: -12 }}>ATS SCORE</div>
+          <div style={{ position: "relative", width: 84, height: 84, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="84" height="84" viewBox="0 0 36 36" style={{ transform: "rotate(-90deg)" }}>
+              <circle cx="18" cy="18" r="15.91549430918954" fill="transparent" stroke="#e5e7eb" strokeWidth="2.5"></circle>
+              <circle cx="18" cy="18" r="15.91549430918954" fill="transparent" stroke={C.accent} strokeWidth="2.5" strokeDasharray={`${ats.score}, 100`} strokeLinecap="round" style={{ transition: "stroke-dasharray 0.5s ease" }}></circle>
+            </svg>
+            <div style={{ position: "absolute", fontSize: 24, fontWeight: 900, color: "#000" }}>{ats.score}</div>
+          </div>
+          <button onClick={() => setShowTips(!showTips)} style={{ background: "none", border: "none", cursor: "pointer", color: C.textLight, marginTop: 8, display: "flex", alignItems: "center", gap: 3, fontSize: 11 }}>
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.info} /></svg> Tips
+          </button>
+
+          {showTips && ats.tips.length > 0 && (
+            <div style={{ marginTop: 8, background: "#fff", borderRadius: 8, padding: "8px 10px", border: `1px solid ${C.border}`, width: "90%", boxSizing: "border-box", fontSize: 10 }}>
+              {ats.tips.map((t, i) => (
+                <div key={i} style={{ color: "#92400e", marginBottom: 3, display: "flex", alignItems: "flex-start", gap: 5, lineHeight: 1.3 }}>
+                  <span style={{ fontSize: 10 }}>⚡</span><span>{t}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         {sideNav.map(s => (
           <button key={s.id} onClick={() => setActiveSection(s.id)} title={s.label}
-            style={{ width: "90%", height: 38, border: activeSection === s.id ? `1.5px solid ${C.accentBorder}` : "1.5px solid transparent", cursor: "pointer", borderRadius: 9, display: "flex", alignItems: "center", gap: 8, paddingLeft: 12, background: activeSection === s.id ? C.accentLight : "transparent", color: activeSection === s.id ? C.accent : C.textLight, transition: "all 0.15s", fontSize: 12, fontWeight: activeSection === s.id ? 700 : 500 }}>
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={s.icon} /></svg>
+            style={{
+              width: "88%",
+              height: 42,
+              border: activeSection === s.id ? `1.5px solid ${C.accent}` : "1px solid #d1d5db",
+              cursor: "pointer",
+              borderRadius: 10,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              paddingLeft: 16,
+              background: activeSection === s.id ? `linear-gradient(145deg, ${C.accentLight}, #ffffff)` : "linear-gradient(145deg, #ffffff, #f3f4f6)",
+              color: activeSection === s.id ? C.accent : "#4b5563",
+              transition: "all 0.15s ease",
+              fontSize: 13,
+              fontWeight: 600,
+              boxShadow: activeSection === s.id
+                ? "0 4px 10px rgba(124, 58, 237, 0.2), inset 0 2px 0 rgba(255,255,255,0.8), inset 0 -2px 0 rgba(124, 58, 237, 0.1)"
+                : "0 4px 6px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.05), inset 0 2px 0 rgba(255,255,255,1), inset 0 -2px 0 rgba(0,0,0,0.02)",
+              transform: activeSection === s.id ? "translateY(2px)" : "translateY(0)",
+              marginBottom: 8
+            }}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d={s.icon} /></svg>
             {s.label}
           </button>
         ))}
@@ -1476,22 +1472,34 @@ function ResumeBuilder() {
       <div style={{ width: formWidth, flexShrink: 0, background: C.panelBg, borderRight: `none`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* Header with Upload button */}
-        <div style={{ padding: "12px 16px 10px", borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ padding: "16px 20px 14px", borderBottom: `1px solid ${C.border}`, fontFamily: "'Sora', sans-serif" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Resume Builder</div>
-              <div style={{ fontSize: 10, color: C.textMuted }}>AI-powered · ATS optimized</div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 6 }}>Resume<em style={{ color: C.accent, fontStyle: "normal" }}>Forge</em></div>
+              <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>AI-powered ATS optimized</div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
+              {/* Save Button */}
+              <button onClick={handleSaveToDb}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#fff", border: `1.5px solid ${C.inputBorder}`, borderRadius: 8, color: C.textMuted, fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}>
+                {isSaving ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg>
+                ) : saveMessage === "Saved!" ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#15803d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                )} {saveMessage || "Save"}
+              </button>
               {/* Match JD button */}
               <button onClick={() => setShowJD(true)}
-                style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", background: "#fff", border: "1.5px solid #f55036", borderRadius: 8, color: "#f55036", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                🎯 Match JD
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}>
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+                Match JD
               </button>
               {/* Upload Resume button */}
               <button onClick={() => setShowUpload(true)}
-                style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 11px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.upload} /></svg>
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.upload} /></svg>
                 Upload CV
               </button>
             </div>
@@ -1503,31 +1511,7 @@ function ResumeBuilder() {
           </div>
         </div>
 
-        {/* ATS Score */}
-        <div style={{ padding: "10px 16px 12px", borderBottom: `1px solid ${C.border}`, background: C.atsBg }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, color: C.accent, letterSpacing: 1 }}>ATS SCORE</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <span style={{ fontSize: 20, fontWeight: 900, color: atsColor }}>{ats.score}</span>
-              <span style={{ fontSize: 11, color: C.textMuted }}>/100</span>
-              <button onClick={() => setShowTips(!showTips)} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted, padding: 2 }}>
-                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={icons.info} /></svg>
-              </button>
-            </div>
-          </div>
-          <div style={{ background: "#dbeafe", borderRadius: 4, height: 7, overflow: "hidden" }}>
-            <div style={{ width: `${ats.score}%`, height: "100%", background: atsBar, borderRadius: 4, transition: "width 0.5s" }} />
-          </div>
-          {showTips && ats.tips.length > 0 && (
-            <div style={{ marginTop: 8, background: "#fff", borderRadius: 8, padding: "8px 10px", border: `1px solid ${C.border}` }}>
-              {ats.tips.map((t, i) => (
-                <div key={i} style={{ fontSize: 10.5, color: "#92400e", marginBottom: 3, display: "flex", gap: 5 }}>
-                  <span>⚡</span><span>{t}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Form Content Wrapper */}
 
         {/* Form Content */}
         <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px" }}>
@@ -1588,39 +1572,105 @@ function ResumeBuilder() {
               <div style={{ flex: 1 }} />
               <button onClick={handleCopyCL} style={{ padding: "5px 13px", background: "#fff", border: "1.5px solid #e3e8ef", borderRadius: 7, color: clCopied ? "#15803d" : "#6b7688", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{clCopied ? "✅ Copied!" : "📋 Copy"}</button>
               <button onClick={downloadCoverLetterPDF} disabled={!coverLetter || clDownloading} style={{ padding: "5px 16px", background: coverLetter && !clDownloading ? "#fff" : "#f3f4f6", border: `1.5px solid ${coverLetter && !clDownloading ? "#2563eb" : "#e3e8ef"}`, borderRadius: 7, color: coverLetter && !clDownloading ? "#2563eb" : "#9ca3af", fontSize: 12, fontWeight: 700, cursor: coverLetter && !clDownloading ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 5, opacity: clDownloading ? 0.7 : 1 }}>
-                {clDownloading ? "⏳ Generating PDF..." : <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg> Download PDF</>}
+                {clDownloading ? "⏳ Generating PDF..." : <><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg> Download PDF</>}
               </button>
             </div>
             {showClFontPanel && (
               <div style={{ position: "relative", zIndex: 100 }}>
-                <div style={{ position: "absolute", top: 0, left: 18, background: "#fff", border: "1px solid #e3e8ef", borderRadius: 12, padding: 16, boxShadow: "0 8px 32px rgba(0,0,0,0.12)", width: 480, display: "flex", gap: 16 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 10, fontWeight: 800, color: "#6b7688", letterSpacing: 1, marginBottom: 8 }}>HEADING FONT</div>
-                    <div style={{ fontSize: 10, color: "#9aa3af", marginBottom: 10 }}>Name · Date · Signature</div>
-                    {["Serif", "Sans-Serif"].map(cat => (
-                      <div key={cat}>
-                        <div style={{ fontSize: 9, color: "#c0c8d2", fontWeight: 700, letterSpacing: 1, marginBottom: 5, marginTop: 8 }}>{cat.toUpperCase()}</div>
-                        {CL_FONTS.filter(f => f.category === cat).map(f => (
-                          <div key={f.name} onClick={() => { setClHeadingFont(f.family); loadCLFont(f.url); }} style={{ padding: "7px 10px", borderRadius: 8, cursor: "pointer", marginBottom: 3, background: clHeadingFont === f.family ? "#eff6ff" : "transparent", border: `1.5px solid ${clHeadingFont === f.family ? "#2563eb" : "transparent"}` }}>
-                            <span style={{ fontFamily: f.family, fontSize: 14, color: "#1a2332" }}>{f.name}</span>
+                <div className="card" style={{
+                  position: "absolute", top: 10, left: 18, padding: 24, width: 480, display: "flex", flexDirection: "column", gap: 20, zIndex: 9000,
+                }}>
+                  {/* Close Button */}
+                  <button onClick={() => setShowClFontPanel(false)} style={{
+                    position: "absolute", top: 12, right: 12, width: 28, height: 28,
+                    background: "rgba(255, 255, 255, 0.2)", border: "1px solid rgba(255, 255, 255, 0.3)", borderRadius: "50%",
+                    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", transition: "all 0.2s"
+                  }} onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.4)"} onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)"}>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.x} /></svg>
+                  </button>
+
+                  <div style={{ display: "flex", gap: 24 }}>
+                    <div style={{ flex: 1, position: "relative", zIndex: 2, display: "flex", flexDirection: "column" }}>
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#1e293b", letterSpacing: 0.5, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ width: 6, height: 18, background: "#6366f1", borderRadius: 3 }} />
+                          Heading Font
+                        </div>
+                        <div style={{ fontSize: 11, color: "#64748b", marginLeft: 12 }}>Name Â· Date Â· Signature</div>
+                      </div>
+                      <div style={{ maxHeight: 320, overflowY: "auto", paddingRight: 8, marginRight: -8 }} className="custom-scroll">
+                        {["Serif", "Sans-Serif"].map(cat => (
+                          <div key={cat} style={{ marginBottom: 16 }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", marginBottom: 8, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 6 }}>
+                              {cat.toUpperCase()}
+                              <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(203, 213, 225, 0.5), transparent)" }} />
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 6 }}>
+                              {CL_FONTS.filter(f => f.category === cat).map(f => {
+                                const isSel = clHeadingFont === f.family;
+                                return (
+                                  <div key={f.name} onClick={() => { setClHeadingFont(f.family); loadCLFont(f.url); }}
+                                    style={{
+                                      padding: "10px 14px", borderRadius: 12, cursor: "pointer",
+                                      background: isSel ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.4)",
+                                      border: isSel ? "1.5px solid #6366f1" : "1px solid rgba(226, 232, 240, 0.6)",
+                                      boxShadow: isSel ? "0 4px 12px rgba(99, 102, 241, 0.15)" : "0 2px 4px rgba(0,0,0,0.02)",
+                                      transform: isSel ? "translateY(-1px)" : "none",
+                                      transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
+                                    }}
+                                    onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = "rgba(255, 255, 255, 0.7)"; }}
+                                    onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = "rgba(255, 255, 255, 0.4)"; }}>
+                                    <span style={{ fontFamily: f.family, fontSize: 16, fontWeight: 500, color: isSel ? "#4f46e5" : "#1e293b", display: "block" }}>{f.name}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         ))}
                       </div>
-                    ))}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 10, fontWeight: 800, color: "#6b7688", letterSpacing: 1, marginBottom: 8 }}>BODY FONT</div>
-                    <div style={{ fontSize: 10, color: "#9aa3af", marginBottom: 10 }}>Paragraphs · All body text</div>
-                    {["Serif", "Sans-Serif"].map(cat => (
-                      <div key={cat}>
-                        <div style={{ fontSize: 9, color: "#c0c8d2", fontWeight: 700, letterSpacing: 1, marginBottom: 5, marginTop: 8 }}>{cat.toUpperCase()}</div>
-                        {CL_FONTS.filter(f => f.category === cat).map(f => (
-                          <div key={f.name} onClick={() => { setClBodyFont(f.family); loadCLFont(f.url); }} style={{ padding: "7px 10px", borderRadius: 8, cursor: "pointer", marginBottom: 3, background: clBodyFont === f.family ? "#eff6ff" : "transparent", border: `1.5px solid ${clBodyFont === f.family ? "#2563eb" : "transparent"}` }}>
-                            <span style={{ fontFamily: f.family, fontSize: 14, color: "#1a2332" }}>{f.name}</span>
+                    </div>
+
+                    <div style={{ width: 1, background: "linear-gradient(180deg, transparent, rgba(203, 213, 225, 0.6), transparent)" }} />
+
+                    <div style={{ flex: 1, position: "relative", zIndex: 2, display: "flex", flexDirection: "column" }}>
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#1e293b", letterSpacing: 0.5, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ width: 6, height: 18, background: "#8b5cf6", borderRadius: 3 }} />
+                          Body Font
+                        </div>
+                        <div style={{ fontSize: 11, color: "#64748b", marginLeft: 12 }}>Paragraphs Â· All text</div>
+                      </div>
+                      <div style={{ maxHeight: 320, overflowY: "auto", paddingRight: 8, marginRight: -8 }} className="custom-scroll">
+                        {["Serif", "Sans-Serif"].map(cat => (
+                          <div key={cat} style={{ marginBottom: 16 }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", marginBottom: 8, letterSpacing: 1.5, display: "flex", alignItems: "center", gap: 6 }}>
+                              {cat.toUpperCase()}
+                              <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(203, 213, 225, 0.5), transparent)" }} />
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 6 }}>
+                              {CL_FONTS.filter(f => f.category === cat).map(f => {
+                                const isSel = clBodyFont === f.family;
+                                return (
+                                  <div key={f.name} onClick={() => { setClBodyFont(f.family); loadCLFont(f.url); }}
+                                    style={{
+                                      padding: "10px 14px", borderRadius: 12, cursor: "pointer",
+                                      background: isSel ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.4)",
+                                      border: isSel ? "1.5px solid #8b5cf6" : "1px solid rgba(226, 232, 240, 0.6)",
+                                      boxShadow: isSel ? "0 4px 12px rgba(139, 92, 246, 0.15)" : "0 2px 4px rgba(0,0,0,0.02)",
+                                      transform: isSel ? "translateY(-1px)" : "none",
+                                      transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
+                                    }}
+                                    onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = "rgba(255, 255, 255, 0.7)"; }}
+                                    onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = "rgba(255, 255, 255, 0.4)"; }}>
+                                    <span style={{ fontFamily: f.family, fontSize: 16, fontWeight: 500, color: isSel ? "#7c3aed" : "#1e293b", display: "block" }}>{f.name}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         ))}
                       </div>
-                    ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1643,10 +1693,23 @@ function ResumeBuilder() {
               {/* Font Picker */}
               <div style={{ position: "relative" }}>
                 <button onClick={() => setShowFontPanel(!showFontPanel)}
-                  style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", background: showFontPanel ? C.accentLight : "#fff", border: showFontPanel ? `1.5px solid ${C.accentBorder}` : `1.5px solid ${C.border}`, borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 600, color: showFontPanel ? C.accent : C.textLight, transition: "all 0.15s" }}>
-                  🔤 {headingFont.name}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", background: showFontPanel ? C.accentLight : "#fff", border: showFontPanel ? `1.5px solid ${C.accentBorder}` : `1.5px solid ${C.border}`, borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 600, color: showFontPanel ? C.accent : C.textLight, transition: "all 0.15s" }}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>
+                  Font
                 </button>
-                {showFontPanel && <FontPickerPanel headingFont={headingFont} setHeadingFont={setHeadingFont} bodyFont={bodyFont} setBodyFont={setBodyFont} onClose={() => setShowFontPanel(false)} />}
+                <FontPickerPanel
+                  isOpen={showFontPanel}
+                  onClose={() => setShowFontPanel(false)}
+                  defaultHeading={headingFont?.name || "Inter"}
+                  defaultBody={bodyFont?.name || "Roboto"}
+                  onApply={(hName, bName) => {
+                    const hFont = ATS_FONTS.find(f => f.name === hName) || ATS_FONTS[0];
+                    const bFont = ATS_FONTS.find(f => f.name === bName) || ATS_FONTS[1];
+                    setHeadingFont(hFont);
+                    setBodyFont(bFont);
+                    setShowFontPanel(false);
+                  }}
+                />
               </div>
 
               {/* Zoom Controls */}
@@ -1661,11 +1724,11 @@ function ResumeBuilder() {
                   +
                 </button>
               </div>
-
-              <button onClick={() => exportPDF(previewRef, data.personal.name)}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 18px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              {/* Export button */}
+              <button disabled={aiLoading} onClick={() => exportPDF(previewRef, data.personal.name)}
+                style={{ height: 32, padding: "0 14px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.download} /></svg>
-                Download PDF
+                PDF
               </button>
             </div>
 
@@ -1683,7 +1746,7 @@ function ResumeBuilder() {
           </>
         )}
       </div>
-    </div>
+    </div >
   );
 }
 
@@ -1704,7 +1767,7 @@ function SH({ title, icon }) {
 function AB({ onClick, label }) {
   return (
     <button onClick={onClick} style={{ width: "100%", marginTop: 6, padding: "8px 14px", background: C.accentLight, border: `1.5px dashed ${C.accentBorder}`, borderRadius: 8, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-      ＋ {label}
+      ï¼‹ {label}
     </button>
   );
 }
@@ -1731,7 +1794,7 @@ function BulletEditor({ bullets, onUpdate, onAdd, onRemove, IS, placeholder }) {
           <RB onClick={() => onRemove(j)} />
         </div>
       ))}
-      <button onClick={onAdd} style={{ background: "#fff", border: `1px dashed ${C.inputBorder}`, borderRadius: 6, color: C.textMuted, fontSize: 11, padding: "4px 10px", cursor: "pointer", width: "100%", marginTop: 2 }}>＋ Add bullet point</button>
+      <button onClick={onAdd} style={{ background: "#fff", border: `1px dashed ${C.inputBorder}`, borderRadius: 6, color: C.textMuted, fontSize: 11, padding: "4px 10px", cursor: "pointer", width: "100%", marginTop: 2 }}>ï¼‹ Add bullet point</button>
     </div>
   );
 }
@@ -1860,6 +1923,7 @@ function ProjectsForm({ projects, setData, IS, CS }) {
     </div>
   );
 }
+
 function CertsForm({ certifications, setData, IS, CS }) {
   const upd = (i, k, v) => setData(p => { const a = [...p.certifications]; a[i] = { ...a[i], [k]: v }; return { ...p, certifications: a }; });
   const add = () => setData(p => ({ ...p, certifications: [...p.certifications, { name: "", issuer: "", year: "", link: "" }] }));
@@ -1881,18 +1945,21 @@ function CertsForm({ certifications, setData, IS, CS }) {
     </div>
   );
 }
+
 function HobbiesForm({ hobbies, update, IS }) {
   return (
     <div>
       <SH title="Hobbies & Interests" icon={icons.heart} />
       <FL>Hobbies</FL>
-      <textarea value={hobbies} onChange={e => update("hobbies", e.target.value)} placeholder="Reading tech blogs, Open source, Chess, Photography..." rows={4} style={{ ...IS, resize: "vertical" }} />
-      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6 }}>Separate multiple hobbies with commas.</div>
+      <textarea value={hobbies} onChange={e => update("hobbies", e.target.value)} placeholder="Reading tech blogs, Open source, Chess, Photography..." rows={4} style={{ ...IS, resize: "vertical" }}
+        onFocus={e => { e.currentTarget.style.border = "1px solid #000000"; e.currentTarget.style.background = "#ffffff"; }}
+        onBlur={e => { e.currentTarget.style.border = `1px solid ${C.inputBorder}`; e.currentTarget.style.background = "#f8f9fa"; }} />
+      <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>Separate multiple hobbies with commas.</div>
     </div>
   );
 }
 
-// ── Cover Letter Form (left panel) ────────────────────────────────────────────
+// ── Cover Letter Form (left panel) ──────────────────────────────────────────
 function CoverLetterForm({ clJD, setClJD, clTone, setClTone, clLength, setClLength, clHiringManager, setClHiringManager, clCompany, setClCompany, clJobTitle, setClJobTitle, detectedJobTitle, clLoading, clError, onGenerate, IS }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1954,7 +2021,7 @@ function CoverLetterForm({ clJD, setClJD, clTone, setClTone, clLength, setClLeng
         {clLoading ? <><span>⏳</span> Groq AI is writing your cover letter...</> : <><span>✨</span> Generate Cover Letter with AI</>}
       </button>
 
-      {clError && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#dc2626" }}>⚠ {clError}</div>}
+      {clError && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#dc2626" }}>⚠️ {clError}</div>}
 
       <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 9, padding: "10px 13px" }}>
         <div style={{ fontSize: 10, fontWeight: 800, color: "#92400e", letterSpacing: 0.5, marginBottom: 6 }}>⚡ TIPS FOR BEST RESULTS</div>
@@ -1966,7 +2033,7 @@ function CoverLetterForm({ clJD, setClJD, clTone, setClTone, clLength, setClLeng
   );
 }
 
-// ── Cover Letter Preview (right panel) — 3 templates ──────────────────────────
+// ── Cover Letter Preview (right panel) — 3 templates ──────────────────────
 function CoverLetterPreview({ coverLetter, setCoverLetter, personal, clHiringManager, clCompany, clLoading, clEditMode, clHeadingFont, clBodyFont, clFontSize, clLineHeight, detectedJobTitle, clTemplate, clJobTitle }) {
   const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const wordCount = coverLetter.trim() ? coverLetter.trim().split(/\s+/).length : 0;
@@ -2078,8 +2145,9 @@ function CoverLetterPreview({ coverLetter, setCoverLetter, personal, clHiringMan
             {wcEl}
           </div>
         )}
-
       </div>
     </div>
   );
 }
+
+export default App;

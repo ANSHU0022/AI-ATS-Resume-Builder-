@@ -47,6 +47,10 @@ app.post("/api/groq", async (req, res) => {
   }
 });
 
+// ── New endpoint: /api/latex ──────────────────────────────────────────────────
+const latexRoutes = require('./backend/latex-editor/routes/latexRoutes.cjs');
+app.use('/api/latex', latexRoutes);
+
 // Health check
 app.get("/api/health", (_, res) => res.json({ status: "ok", service: "Groq Proxy" }));
 
@@ -56,4 +60,13 @@ app.get(/(.*)/, (_, res) => res.sendFile(path.join(__dirname, "dist", "index.htm
 app.listen(PORT, () => {
   console.log(`✅ Groq proxy running at http://localhost:${PORT}`);
   console.log(`   POST http://localhost:${PORT}/api/groq  →  Groq API`);
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`⚠️ Port ${PORT} is already in use by another instance. Using existing proxy.`);
+  } else {
+    console.error(`❌ Server error:`, err);
+  }
 });
+
+process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
+process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));

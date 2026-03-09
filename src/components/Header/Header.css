@@ -1,0 +1,170 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap');
+
+.rf-nav {
+  --black: #111111;
+  --mid: #444444;
+  --white: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(237, 233, 252, 0.55);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-bottom: 1px solid rgba(160, 120, 230, 0.18);
+  padding: 0 60px;
+  height: 66px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'Sora', sans-serif;
+  color: var(--black);
+}
+
+.rf-logo {
+  font-family: 'DM Serif Display', serif;
+  font-size: 23px;
+  color: var(--black);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.rf-logo-icon {
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(135deg, #7c5cbf, #6b4db0);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+}
+
+.rf-logo-text em {
+  color: #6b4db0;
+  font-style: normal;
+}
+
+.rf-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rf-nav-link {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mid);
+  text-decoration: none;
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: 'Sora', sans-serif;
+}
+
+.rf-nav-link:hover {
+  color: var(--black);
+}
+
+.rf-nav-link .arr {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.rf-nav-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-signin {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--black);
+  padding: 9px 22px;
+  border: 1.5px solid rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Sora', sans-serif;
+}
+
+.btn-signin:hover {
+  border-color: var(--black);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.btn-start {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--white);
+  padding: 9px 22px;
+  border: none;
+  border-radius: 8px;
+  background: #7c5cbf;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Sora', sans-serif;
+  box-shadow: 0 4px 14px rgba(124, 92, 191, 0.35);
+}
+
+.btn-start:hover {
+  background: #6b4db0;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 92, 191, 0.4);
+}
+
+@media (max-width: 980px) {
+  .rf-nav {
+    padding: 0 22px;
+  }
+
+  .rf-nav-links {
+    display: none;
+  }
+
+  .rf-nav-actions {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 600px) {
+  .rf-nav {
+    padding: 0 16px;
+    height: 62px;
+  }
+
+  .btn-signin,
+  .btn-start {
+    padding: 8px 14px;
+    font-size: 12.5px;
+  }
+}
+
+.rf-user-greeting {
+  font-family: 'Sora', sans-serif;
+  color: var(--black);
+  font-size: 14.5px;
+  background: rgba(255, 255, 255, 0.4);
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(160, 120, 230, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}

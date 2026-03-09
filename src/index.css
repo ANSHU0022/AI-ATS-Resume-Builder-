@@ -1,4 +1,3 @@
-*,
 *::before,
 *::after {
   box-sizing: border-box;
@@ -35,10 +34,23 @@ html {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100%;
-  background-color: #f5f7fa;
+  overflow-x: hidden;
+  background: #ede9f8;
   font-family: 'Segoe UI', system-ui, sans-serif;
   color: #1a2332;
+}
+
+.page-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 75% 60% at 2% 60%, rgba(155, 90, 235, 0.50) 0%, transparent 55%),
+    radial-gradient(ellipse 65% 65% at 98% 15%, rgba(200, 130, 255, 0.44) 0%, transparent 52%),
+    radial-gradient(ellipse 50% 45% at 55% 100%, rgba(255, 185, 110, 0.22) 0%, transparent 48%),
+    radial-gradient(ellipse 35% 35% at 50% 48%, rgba(170, 110, 230, 0.14) 0%, transparent 55%),
+    #ede9f8;
 }
 
 /* Ensure svgs inside buttons don't get squished by default paddings */
@@ -50,4 +62,10 @@ button {
 .resume-container li {
   page-break-inside: avoid;
   break-inside: avoid;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
 }
