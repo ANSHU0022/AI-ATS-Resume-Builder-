@@ -1,102 +1,67 @@
-const fs = require('fs-extra');
-const path = require('path');
-const { spawn } = require('child_process');
-const { v4: uuidv4 } = require('uuid');
+const FormData = require('form-data');
+const axios = require('axios');
 const { parseLatexLog } = require('../utils/latexErrorParser.cjs');
-
-const TEMP_DIR_BASE = path.join(__dirname, '..', '..', '..', 'temp_latex');
 
 /**
  * Compiles a LaTeX string into a PDF and returns the base64 encoded PDF.
+ * Uses the free texlive.net API.
  * @param {string} latexCode - The raw LaTeX source code.
  * @returns {Promise<{success: boolean, pdfBase64: string, errors: Array}>}
  */
 async function compileLatex(latexCode) {
-    const jobId = uuidv4();
-    const jobDir = path.join(TEMP_DIR_BASE, jobId);
-    const texFilePath = path.join(jobDir, 'resume.tex');
-    const pdfFilePath = path.join(jobDir, 'resume.pdf');
-    const logFilePath = path.join(jobDir, 'resume.log');
-
     try {
-        // 1. Create isolated temp directory
-        await fs.ensureDir(jobDir);
+        const formData = new FormData();
 
-        // 2. Write the LaTeX code to resume.tex
-        await fs.writeFile(texFilePath, latexCode, 'utf8');
+        // Append the LaTeX code
+        formData.append('filecontents[]', latexCode);
+        formData.append('filename[]', 'document.tex');
+        formData.append('engine', 'pdflatex');
+        formData.append('return', 'pdf');
 
-        // 3. Execute pdflatex
-        // -interaction=nonstopmode prevents pdflatex from halting and waiting for user input on error
-        // -halt-on-error stops compilation immediately on the first error
-        return await new Promise((resolve) => {
-            const pdflatex = spawn('pdflatex', [
-                '-interaction=nonstopmode',
-                '-halt-on-error',
-                'resume.tex'
-            ], {
-                cwd: jobDir, // Run command inside the temp directory
-                timeout: 30000 // 30 seconds max
-            });
-
-            let stdoutData = '';
-            let stderrData = '';
-
-            pdflatex.stdout.on('data', (data) => {
-                stdoutData += data.toString();
-            });
-
-            pdflatex.stderr.on('data', (data) => {
-                stderrData += data.toString();
-            });
-
-            pdflatex.on('close', async (code, signal) => {
-                if (code === 0) {
-                    // Compilation succeeded
-                    try {
-                        const pdfBuffer = await fs.readFile(pdfFilePath);
-                        const pdfBase64 = pdfBuffer.toString('base64');
-                        resolve({ success: true, pdfBase64, errors: [] });
-                    } catch (readErr) {
-                        console.error('Failed to read resulting PDF:', readErr);
-                        resolve({ success: false, errors: [{ message: 'Failed to read compiled PDF file.' }] });
-                    }
-                } else if (signal === 'SIGTERM') {
-                    // Compilation timed out
-                    resolve({
-                        success: false,
-                        errors: [{ message: 'Compilation timed out (took longer than 30 seconds). This may happen if the compiler is stuck waiting for required LaTeX packages to be installed.' }]
-                    });
-                } else {
-                    // Compilation failed. Read the log file to parse errors.
-                    try {
-                        const logContent = await fs.readFile(logFilePath, 'utf8');
-                        const parsedErrors = parseLatexLog(logContent);
-                        resolve({ success: false, errors: parsedErrors });
-                    } catch (logErr) {
-                        console.error('Failed to read log file:', logErr);
-                        // Fallback to stderr or stdout if log file is missing
-                        const fallbackOutput = stderrData || stdoutData || 'Unknown pdflatex error';
-                        resolve({ success: false, errors: [{ message: 'Compilation failed: ' + fallbackOutput.substring(0, 200) }] });
-                    }
-                }
-
-                // 4. Cleanup temp directory in the background (fire and forget)
-                fs.remove(jobDir).catch(err => console.error(`Failed to clean up temp dir ${jobDir}:`, err));
-            });
-
-            pdflatex.on('error', (err) => {
-                resolve({
-                    success: false, errors: [{ message: `Failed to start pdflatex process. Ensure TeX Live is installed on the server. Error: ${err.message}` }]
-                });
-                fs.remove(jobDir).catch(e => console.error(e));
-            });
+        // Make the API request to texlive.net
+        // Response type must be arraybuffer to correctly handle the binary PDF data
+        const response = await axios.post('https://texlive.net/cgi-bin/latexcgi', formData, {
+            headers: {
+                ...formData.getHeaders(),
+            },
+            responseType: 'arraybuffer',
+            timeout: 30000, // 30 seconds max
+            validateStatus: status => true // handle all statuses manually
         });
 
+        const contentType = response.headers['content-type'] || '';
+
+        // The API returns application/pdf on success
+        if (response.status === 200 && contentType.includes('application/pdf')) {
+            // Compilation succeeded, response data is the PDF binary buffer
+            const pdfBase64 = Buffer.from(response.data).toString('base64');
+            return { success: true, pdfBase64, errors: [] };
+        } else {
+            // Compilation failed. Attempt to read error logs from the response content.
+            let errorMessage = 'Unknown compilation error from API';
+            try {
+                // Determine if the returned buffer is text (log)
+                errorMessage = Buffer.from(response.data).toString('utf8');
+
+                // Try parsing the LaTeX log
+                const parsedErrors = parseLatexLog(errorMessage);
+                if (parsedErrors && parsedErrors.length > 0) {
+                    return { success: false, errors: parsedErrors };
+                }
+            } catch (parseErr) {
+                console.error("Failed to parse API error response:", parseErr);
+            }
+
+            return { success: false, errors: [{ message: `Compilation failed (Status ${response.status}):\n${errorMessage.substring(0, 500)}` }] };
+        }
     } catch (error) {
         console.error('Fatal error in compileLatex service:', error);
-        // Attempt cleanup if something threw before the spawn finished
-        fs.remove(jobDir).catch(() => { });
-        return { success: false, errors: [{ message: 'Server error during compilation: ' + error.message }] };
+
+        let errorMsg = error.message;
+        if (error.code === 'ECONNABORTED') {
+            errorMsg = 'Compilation timed out (took longer than 30 seconds).';
+        }
+        return { success: false, errors: [{ message: 'Server error communicating with compiler API: ' + errorMsg }] };
     }
 }
 

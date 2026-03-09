@@ -5,7 +5,9 @@ import PreviewPanel from '../components/PreviewPanel/PreviewPanel';
 import ErrorPanel from '../components/ErrorPanel/ErrorPanel';
 import { useLatexCompiler } from '../hooks/useLatexCompiler';
 import styles from './LatexEditor.module.css';
+import { faangResume } from '../templates/faangResume'; // Import the FAANG template
 
+// The DEFAULT_BLANK_CODE is no longer the primary default, but kept for reference or other uses if needed.
 const DEFAULT_BLANK_CODE = `% Write or paste your LaTeX code here.\n% Or select a template from the "Templates" dropdown above.\n`;
 
 export default function LatexEditor() {
@@ -18,7 +20,7 @@ export default function LatexEditor() {
         handleCompile,
         loadTemplate,
         lastCompiledAt
-    } = useLatexCompiler(DEFAULT_BLANK_CODE);
+    } = useLatexCompiler(faangResume); // Pass faangResume as the initial template
 
     return (
         <div className={styles.pageContainer}>
@@ -27,6 +29,8 @@ export default function LatexEditor() {
                 isCompiling={isCompiling}
                 onSelectTemplate={loadTemplate}
                 pdfUrl={pdfUrl}
+                // Add the beta version text to the EditorNavbar
+                betaVersion={true}
             />
 
             <div className={styles.splitScreenContainer}>

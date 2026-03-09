@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { compileLatexCode } from '../services/latexService';
 import { createPdfBlobUrl } from '../utils/latexHelpers';
+import { faangResume } from '../templates/faangResume';
 
 const AUTOSAVE_INTERVAL_MS = 30000; // 30 seconds
 const STORAGE_KEY = 'latex_editor_draft';
@@ -14,19 +15,12 @@ export function useLatexCompiler(initialTemplateCode) {
 
     // Initialize state with initialTemplateCode or localStorage draft
     useEffect(() => {
-        // If the initialTemplateCode is the default blank code, try to load draft
-        const isBlankTemplate = typeof initialTemplateCode === 'string' && initialTemplateCode.includes('Write or paste your LaTeX code here');
-
-        if (isBlankTemplate) {
-            const savedDraft = localStorage.getItem(STORAGE_KEY);
-            if (savedDraft) {
-                setLatexCode(savedDraft);
-            } else {
-                setLatexCode(initialTemplateCode);
-            }
+        const savedDraft = localStorage.getItem(STORAGE_KEY);
+        if (savedDraft) {
+            setLatexCode(savedDraft);
         } else {
-            // If a specific template was passed initially, prioritize it
-            setLatexCode(initialTemplateCode);
+            // Default to the provided initialTemplateCode (now faangResume from index.jsx)
+            setLatexCode(initialTemplateCode || faangResume);
         }
     }, [initialTemplateCode]);
 

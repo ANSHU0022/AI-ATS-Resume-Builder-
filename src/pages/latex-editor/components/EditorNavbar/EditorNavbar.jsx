@@ -33,6 +33,10 @@ export default function EditorNavbar({
                 </div>
             </div>
 
+            <div className={styles.navCenter}>
+                <div className={styles.betaBadge}>BETA VERSION</div>
+            </div>
+
             <div className={styles.navRight}>
                 <TemplateSelector onSelectTemplate={onSelectTemplate} />
 
