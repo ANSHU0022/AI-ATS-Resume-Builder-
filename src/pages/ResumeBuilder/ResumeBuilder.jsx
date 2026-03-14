@@ -91,21 +91,21 @@ function RS({ title, children, accent = "#1a1a1a", headingFontFamily }) {
   return (
     <div style={{ marginBottom: 10 }}>
       {/* Ensure the heading doesn't stick to the bottom of the page if the content moves to next page */}
-      <div style={{ fontSize: "10pt", fontWeight: 700, letterSpacing: 0.5, borderBottom: `1.5px solid ${accent}`, paddingBottom: 2, marginBottom: 5, pageBreakAfter: "avoid", breakAfter: "avoid", ...(headingFontFamily ? { fontFamily: headingFontFamily } : {}) }}>{title}</div>
-      <div style={{ fontSize: "9.5pt" }}>{children}</div>
+      <div style={{ fontSize: "1em", fontWeight: 700, letterSpacing: 0.5, borderBottom: `1.5px solid ${accent}`, paddingBottom: 2, marginBottom: 5, pageBreakAfter: "avoid", breakAfter: "avoid", ...(headingFontFamily ? { fontFamily: headingFontFamily } : {}) }}>{title}</div>
+      <div style={{ fontSize: "0.95em" }}>{children}</div>
     </div>
   );
 }
 function SS({ title, children, headingFontFamily }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: "8pt", letterSpacing: 2, color: "#64748b", marginBottom: 6, fontWeight: 700, pageBreakAfter: "avoid", breakAfter: "avoid", ...(headingFontFamily ? { fontFamily: headingFontFamily } : {}) }}>{title}</div>
+      <div style={{ fontSize: "0.8em", letterSpacing: 2, color: "#64748b", marginBottom: 6, fontWeight: 700, pageBreakAfter: "avoid", breakAfter: "avoid", ...(headingFontFamily ? { fontFamily: headingFontFamily } : {}) }}>{title}</div>
       {children}
     </div>
   );
 }
 function MH({ title, headingFontFamily }) {
-  return <div style={{ fontSize: "8pt", fontWeight: 700, letterSpacing: 2, color: "#888", marginBottom: 4, marginTop: 10, borderBottom: "1px solid #ddd", paddingBottom: 3, ...(headingFontFamily ? { fontFamily: headingFontFamily } : {}) }}>{title}</div>;
+  return <div style={{ fontSize: "0.85em", fontWeight: 700, letterSpacing: 2, color: "#888", marginBottom: 4, marginTop: 10, borderBottom: "1px solid #ddd", paddingBottom: 3, ...(headingFontFamily ? { fontFamily: headingFontFamily } : {}) }}>{title}</div>;
 }
 
 // ── PDF Export ────────────────────────────────────────────────────────────────
@@ -179,7 +179,7 @@ const FONT_PAIRS = [
 
 
 
-function PaginatedResume({ data, template, exportRef, headingFont, bodyFont }) {
+function PaginatedResume({ data, template, exportRef, headingFont, bodyFont, fontSize = 10, lineHeight = 1.45 }) {
   const TemplateComp = template === "A" ? TemplateA : template === "B" ? TemplateB : TemplateC;
 
   const measureRef = useRef(null);
@@ -251,14 +251,14 @@ function PaginatedResume({ data, template, exportRef, headingFont, bodyFont }) {
       {/* Hidden continuous container for html2pdf */}
       <div style={{ position: "fixed", top: 0, left: -9999, width: PAGE_W, pointerEvents: "none", zIndex: -1 }}>
         <div ref={exportRef} className="resume-container">
-          <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} />
+          <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} fontSize={fontSize} lineHeight={lineHeight} />
         </div>
       </div>
 
       {/* Hidden measuring container */}
       <div style={{ position: "fixed", top: 0, left: -9999, width: PAGE_W, pointerEvents: "none", zIndex: -1 }}>
         <div ref={measureRef} className="resume-container">
-          <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} />
+          <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} fontSize={fontSize} lineHeight={lineHeight} />
         </div>
       </div>
 
@@ -285,7 +285,7 @@ function PaginatedResume({ data, template, exportRef, headingFont, bodyFont }) {
               <div style={{ position: "absolute", top: vTop, left: 0, width: PAGE_W, height: vHeight, overflow: "hidden" }}>
                 <div style={{ position: "absolute", top: cTop, left: 0, width: PAGE_W }}>
                   <div className="resume-container" style={{ boxShadow: "none", minHeight: vHeight }}>
-                    <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} />
+                    <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} fontSize={fontSize} lineHeight={lineHeight} />
                   </div>
                 </div>
               </div>
@@ -301,12 +301,12 @@ function PaginatedResume({ data, template, exportRef, headingFont, bodyFont }) {
 }
 
 // ── Template A (Classic) ──────────────────────────────────────────────────────
-function TemplateA({ data, headingFont, bodyFont }) {
+function TemplateA({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.45 }) {
   const hf = headingFont?.family || "'Segoe UI', sans-serif";
   const bf = bodyFont?.family || "'Segoe UI', sans-serif";
   const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
   return (
-    <div style={{ fontSize: "10pt", color: "#1a1a1a", padding: "28px 32px", lineHeight: 1.45, fontFamily: bf, background: "#fff" }}>
+    <div style={{ fontSize: `${fontSize}pt`, color: "#1a1a1a", padding: "28px 32px", lineHeight: lineHeight, fontFamily: bf, background: "#fff" }}>
       <div style={{ textAlign: "center", marginBottom: 10 }}>
         {p.name && <div style={{ fontSize: "22pt", fontWeight: 700, fontFamily: hf, letterSpacing: 1, marginBottom: 2 }}>{p.name}</div>}
         {p.title && <div style={{ fontSize: "11pt", color: "#444", marginBottom: 7 }}>{p.title}</div>}
@@ -393,12 +393,12 @@ function TemplateA({ data, headingFont, bodyFont }) {
 }
 
 // ── Template B (Modern Sidebar) ───────────────────────────────────────────────
-function TemplateB({ data, headingFont, bodyFont }) {
+function TemplateB({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.45 }) {
   const hf = headingFont?.family || "'Segoe UI', sans-serif";
   const bf = bodyFont?.family || "'Segoe UI', sans-serif";
   const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
   return (
-    <div style={{ fontFamily: bf, fontSize: "10pt", color: "#1a1a1a", background: "#fff", display: "flex", minHeight: "100%" }}>
+    <div style={{ fontFamily: bf, fontSize: `${fontSize}pt`, color: "#1a1a1a", background: "#fff", display: "flex", minHeight: "100%", lineHeight: lineHeight }}>
       <div style={{ width: "32%", background: "#2c3e50", color: "#ecf0f1", padding: "28px 16px" }}>
         {p.name && <div style={{ fontSize: "15pt", fontWeight: 700, fontFamily: hf, color: "#fff", marginBottom: 4 }}>{p.name}</div>}
         {p.title && <div style={{ fontSize: "9pt", color: "#bdc3c7", marginBottom: 16 }}>{p.title}</div>}
@@ -484,12 +484,12 @@ function TemplateB({ data, headingFont, bodyFont }) {
 }
 
 // ── Template C (Minimal) ──────────────────────────────────────────────────────
-function TemplateC({ data, headingFont, bodyFont }) {
+function TemplateC({ data, headingFont, bodyFont, fontSize = 9.5, lineHeight = 1.45 }) {
   const hf = headingFont?.family || "'Segoe UI', sans-serif";
   const bf = bodyFont?.family || "'Segoe UI', sans-serif";
   const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
   return (
-    <div style={{ fontFamily: bf, fontSize: "9.5pt", color: "#111", padding: "24px 36px", background: "#fff" }}>
+    <div style={{ fontFamily: bf, fontSize: `${fontSize}pt`, color: "#111", padding: "24px 36px", background: "#fff", lineHeight: lineHeight }}>
       {p.name && <div style={{ fontSize: "24pt", fontWeight: 900, fontFamily: hf, borderBottom: "3px solid #111", paddingBottom: 6, marginBottom: 4 }}>{p.name}</div>}
       {p.title && <div style={{ fontSize: "11pt", color: "#555", marginBottom: 8 }}>{p.title}</div>}
       <div style={{ fontSize: "8.5pt", color: "#444", marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
@@ -528,6 +528,46 @@ function TemplateC({ data, headingFont, bodyFont }) {
         </div>
       ))}</>)}
       {hobbies && <><MH title="HOBBIES" headingFontFamily={hf} /><div>{hobbies}</div></>}
+    </div>
+  );
+}
+
+// ── TEMPLATE MODAL ────────────────────────────────────────────────────────────
+
+function TemplateModal({ onClose, activeTemplate, onSelect }) {
+  const templates = [
+    { id: "A", label: "Classic", desc: "Traditional layout optimized for strict ATS systems." },
+    { id: "B", label: "Modern", desc: "Contemporary look with a distinct sidebar for contact and skills." },
+    { id: "C", label: "Minimal", desc: "Clean and sparse design focusing purely on content." }
+  ];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10000, backdropFilter: "blur(4px)" }}>
+      <div className="modal-enter card" style={{ background: "#fff", width: 440, borderRadius: 20, padding: 32, boxShadow: "0 24px 48px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.1) inset", position: "relative" }}>
+        <button onClick={onClose} style={{ position: "absolute", top: 20, right: 20, width: 32, height: 32, background: "#f1f5f9", border: "none", borderRadius: "50%", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+        <h2 style={{ margin: "0 0 24px 0", fontSize: 20, fontWeight: 800, color: "#0f172a", letterSpacing: -0.5 }}>Choose Template</h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {templates.map(t => (
+            <div key={t.id} onClick={() => { onSelect(t.id); onClose(); }}
+              style={{ padding: "16px 20px", borderRadius: 16, border: `2px solid ${activeTemplate === t.id ? '#6366f1' : '#f1f5f9'}`, background: activeTemplate === t.id ? '#eef2ff' : '#fff', cursor: "pointer", display: "flex", alignItems: "center", gap: 16, transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)", boxShadow: activeTemplate === t.id ? "0 4px 12px rgba(99, 102, 241, 0.15)" : "0 2px 4px transparent" }}>
+              <div style={{ width: 40, height: 52, background: activeTemplate === t.id ? '#fff' : '#f8fafc', border: `1px solid ${activeTemplate === t.id ? '#c7d2fe' : '#e2e8f0'}`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                <span style={{ fontSize: 18, fontWeight: 900, color: activeTemplate === t.id ? '#6366f1' : '#94a3b8' }}>{t.id}</span>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: activeTemplate === t.id ? '#4f46e5' : '#1e293b', marginBottom: 4 }}>{t.label}</div>
+                <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.4 }}>{t.desc}</div>
+              </div>
+              {activeTemplate === t.id && (
+                <div style={{ width: 24, height: 24, background: "#6366f1", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -618,7 +658,7 @@ RESUME TEXT:
       if (!resumeText || resumeText.trim().length < 10)
         throw new Error("Could not extract readable text. The document appears to be empty or is an image-based PDF without selectable text.");
 
-      setStatus("parsing"); setStep("Groq LLaMA is reading your resume…");
+      setStatus("parsing"); setStep("AI is reading your resume…");
 
       const resp = await fetch("/api/groq", {
         method: "POST",
@@ -691,7 +731,7 @@ RESUME TEXT:
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Upload Existing Resume</div>
             <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
-              Powered by <span style={{ fontWeight: 700, color: "#f55036" }}>Groq</span> Â· LLaMA 3.3 70B Â· Ultra-fast parsing
+              Powered by <span style={{ fontWeight: 700, color: "#7c5cbf" }}>AI</span> · Real-time ATS parsing
             </div>
           </div>
           <button onClick={onClose} style={{ background: "#f3f4f6", border: "none", borderRadius: 8, width: 30, height: 30, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: C.textMuted }}>
@@ -701,11 +741,10 @@ RESUME TEXT:
 
         <div style={{ padding: "20px 24px 24px" }}>
 
-          {/* Groq info banner */}
-          <div style={{ background: "#fff8f5", border: "1px solid #fdd0c0", borderRadius: 8, padding: "8px 12px", marginBottom: 14, display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 8, padding: "8px 12px", marginBottom: 14, display: "flex", alignItems: "flex-start", gap: 8 }}>
             <span style={{ fontSize: 14 }}>⚡</span>
-            <div style={{ fontSize: 11, color: "#9a3412" }}>
-              <strong>Groq API</strong> uses LLaMA 3.3 70B running on custom LPU hardware — typically <strong>5–10× faster</strong> than standard LLMs. Your resume is parsed in seconds, not minutes.
+            <div style={{ fontSize: 11, color: "#5b21b6" }}>
+              <strong>Advanced AI</strong> analyzes your resume with high precision — typically <strong>5–10× faster</strong> than standard tools. Your resume is parsed in seconds.
             </div>
           </div>
 
@@ -743,7 +782,7 @@ RESUME TEXT:
             <div style={{ background: C.accentLight, border: `1px solid ${C.accentBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: C.accent, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
               <span>⏳</span>
               <div>
-                <div style={{ fontWeight: 700 }}>{status === "extracting" ? "Extracting text…" : "Parsing with Groq LLaMA…"}</div>
+                <div style={{ fontWeight: 700 }}>{status === "extracting" ? "Extracting text…" : "Parsing with AI…"}</div>
                 <div style={{ fontSize: 11, marginTop: 2, opacity: 0.8 }}>{step}</div>
               </div>
             </div>
@@ -757,7 +796,7 @@ RESUME TEXT:
 
           {/* What gets auto-filled */}
           <div style={{ background: "#f8fafc", borderRadius: 8, padding: "9px 12px", marginBottom: 16, border: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, marginBottom: 6, letterSpacing: 0.5 }}>GROQ WILL AUTO-FILL ALL 8 SECTIONS:</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, marginBottom: 6, letterSpacing: 0.5 }}>AI WILL AUTO-FILL ALL 8 SECTIONS:</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
               {["Personal", "Summary", "Skills", "Education", "Experience", "Projects", "Certifications", "Hobbies"].map(s => (
                 <span key={s} style={{ fontSize: 10.5, background: C.accentLight, color: C.accent, border: `1px solid ${C.accentBorder}`, borderRadius: 5, padding: "2px 8px" }}>{s}</span>
@@ -773,7 +812,7 @@ RESUME TEXT:
             <button onClick={parseResume} disabled={!canParse || isBusy || status === "done"}
               style={{ flex: 2, padding: "9px 16px", background: canParse ? "linear-gradient(135deg, #7c5cbf, #6b4db0)" : "#e5e7eb", border: "none", borderRadius: 8, color: canParse ? "#fff" : "#9ca3af", fontSize: 13, fontWeight: 700, cursor: canParse ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, boxShadow: canParse ? "0 2px 8px rgba(107, 77, 176, 0.2)" : "none" }}>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.upload} /></svg>
-              {isBusy ? "Working…" : status === "done" ? "✓ Done!" : "Parse with Groq ⚡"}
+              {isBusy ? "Working…" : status === "done" ? "✓ Done!" : "Parse with AI ⚡"}
             </button>
           </div>
         </div>
@@ -821,8 +860,28 @@ function JDAnalyzerModal({ onClose, data, setData }) {
           model: "llama-3.3-70b-versatile", temperature: 0.1, max_tokens: 4000,
           response_format: { type: "json_object" },
           messages: [
-            { role: "system", content: "You are an ATS expert. Always respond with only valid JSON." },
-            { role: "user", content: `You are an ATS (Applicant Tracking System) expert. Analyze the job description and resume.\n\nJOB DESCRIPTION:\n${jdText}\n\nRESUME CONTENT:\n${resumeText}\n\nReturn ONLY valid JSON with this exact structure:\n{\n  "matchScore": 72,\n  "jobTitle": "Job title detected from JD",\n  "matchedCount": 18,\n  "matched": [\n    { "keyword": "Python", "importance": "high", "category": "Programming Languages" }\n  ],\n  "missing": [\n    { "keyword": "Docker", "importance": "high", "category": "Tools & Technologies", "suggestion": "Add to Tools & Technologies" }\n  ],\n  "softSkills": ["communication", "teamwork"],\n  "topTip": "One sentence tip to improve resume for this specific job"\n}\n\nRules:\n- importance levels: high (required or appears 3+ times), medium (preferred), low (nice to have)\n- category must be one of: Programming Languages, Frameworks, Tools & Technologies, Soft Skills, Cloud & DevOps, Databases\n- Extract EVERY SINGLE technical keyword from the JD — typically 15 to 40 keywords. Do NOT limit to 5 or 10. The missing list must include ALL keywords from JD not found in resume. Be EXHAUSTIVE\n- Return ONLY the JSON, no explanation, no markdown` }
+            {
+              role: "system", content: `You are an ATS Resume Analyzer. Your task is to analyze a Job Description and a Resume and produce three outputs: Matched Keywords, Missing Keywords, and Partial Matches.
+
+Follow these rules strictly to avoid hallucinations.
+
+STEP 1 — Extract Keywords from Job Description. Extract only meaningful keywords. Categories: Technical Skills, Tools / Software, Data & Analytics Skills, Marketing / Domain Skills, Metrics / KPIs, Business Concepts. Ignore filler words, adjectives, generic verbs.
+
+STEP 2 — Extract Skills from Resume. Scan the ENTIRE resume: Skills section, Experience, Projects, Tools mentioned inside bullet points. Create a list of all skills, tools, and concepts.
+
+STEP 3 — Matching Logic (3 levels):
+LEVEL 1 — EXACT MATCH: Keyword appears exactly in resume. → matched
+LEVEL 2 — SYNONYM MATCH: Allow limited synonyms ONLY if meaning is identical (e.g. KPI ↔ KPIs, Trend ↔ Trend Analysis, Predictive Models ↔ Predictive Modeling). → partialMatch
+LEVEL 3 — SEMANTIC MATCH (STRICT): Semantic similarity ONLY if context is identical (e.g. Campaign Effectiveness ↔ Campaign Performance Analysis). → partialMatch
+
+STEP 4 — NEVER ASSUME TOOL EQUIVALENCE. Do NOT match tools unless they are exactly the same. Power BI ≠ Tableau, Google Analytics ≠ Meta Ads Manager, SQL ≠ PostgreSQL, Excel ≠ Google Sheets. Treat as separate tools.
+
+STEP 5 — A keyword is MISSING only if: it exists in JD, does NOT appear anywhere in resume, and no synonym or semantic equivalent exists.
+
+STEP 6 — Prevent Hallucinations. Never add tools or skills that do not exist in the resume text. Do NOT assume skills based on domain. If resume contains Power BI, do NOT assume Tableau.
+
+Always respond with ONLY valid JSON.` },
+            { role: "user", content: `Analyze the following Job Description and Resume.\n\nJOB DESCRIPTION:\n${jdText}\n\nRESUME CONTENT:\n${resumeText}\n\nReturn ONLY valid JSON with this exact structure:\n{\n  "matchScore": 72,\n  "jobTitle": "Job title detected from JD",\n  "matched": [\n    { "keyword": "Python", "importance": "high", "category": "Technical Skills" }\n  ],\n  "partialMatches": [\n    { "keyword": "Campaign Optimization", "resumeEquivalent": "Campaign Performance Analysis", "matchType": "semantic", "importance": "medium", "category": "Marketing / Domain Skills" }\n  ],\n  "missing": [\n    { "keyword": "Docker", "importance": "high", "category": "Tools / Software", "suggestion": "Add Docker to Tools section" }\n  ],\n  "softSkills": ["communication", "teamwork"],\n  "topTip": "One sentence tip to improve resume for this specific job"\n}\n\nRules:\n- importance levels: high (required or appears 3+ times), medium (preferred), low (nice to have)\n- category must be one of: Technical Skills, Tools / Software, Data & Analytics Skills, Marketing / Domain Skills, Metrics / KPIs, Business Concepts, Soft Skills\n- For partialMatches: matchType must be either "synonym" or "semantic". Include resumeEquivalent showing what was found in resume.\n- Extract EVERY SINGLE meaningful keyword from the JD — typically 15 to 40 keywords. Do NOT limit to 5 or 10. Be EXHAUSTIVE.\n- NEVER guess. NEVER hallucinate. Only rely on the text provided.\n- Return ONLY the JSON, no explanation, no markdown` }
           ]
         })
       });
@@ -842,11 +901,12 @@ function JDAnalyzerModal({ onClose, data, setData }) {
       const json = await resp.json();
       const text = json.choices?.[0]?.message?.content || "";
       const parsed = JSON.parse(text);
-      // Recalculate match score from actual counts — never trust AI's number
-      const mc = parsed.matched?.length || 0;
-      const ms = parsed.missing?.length || 0;
-      const total = mc + ms;
-      parsed.matchScore = total > 0 ? Math.round((mc / total) * 100) : 0;
+      // Recalculate match score: (Exact + 0.5 × Partial) / Total × 100
+      const exactCount = parsed.matched?.length || 0;
+      const partialCount = parsed.partialMatches?.length || 0;
+      const missingCount = parsed.missing?.length || 0;
+      const totalJDKeywords = exactCount + partialCount + missingCount;
+      parsed.matchScore = totalJDKeywords > 0 ? Math.round(((exactCount + 0.5 * partialCount) / totalJDKeywords) * 100) : 0;
       setAnalysis(parsed);
       setStatus("done");
     } catch (err) { setErrorMsg(err.message || "Analysis failed."); setStatus("error"); }
@@ -1051,7 +1111,7 @@ function JDAnalyzerModal({ onClose, data, setData }) {
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 800, color: sc.c }}>{analysis.matchScore >= 75 ? "Great Match!" : analysis.matchScore >= 50 ? "Decent Match" : "Needs Work"}</div>
                       {analysis.jobTitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>JD: {analysis.jobTitle}</div>}
-                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{analysis.matched?.length || 0} matched Â· {analysis.missing?.length || 0} missing keywords</div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{analysis.matched?.length || 0} matched · {analysis.partialMatches?.length || 0} partial · {analysis.missing?.length || 0} missing</div>
                     </div>
                   </div>
 
@@ -1087,6 +1147,32 @@ function JDAnalyzerModal({ onClose, data, setData }) {
                                   {isAdded ? "✓ Added" : "+ Add"}
                                 </button>
                                 {isAdded && <span style={{ fontSize: 9, color: "#15803d" }}>✅ Added to Skills → {isAdded}</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Partial Matches */}
+                  {analysis.partialMatches?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>🔶 Partial Matches ({analysis.partialMatches.length})</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {analysis.partialMatches.map((pm, i) => {
+                          const ic = impColor(pm.importance);
+                          return (
+                            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", background: "#fffbeb", border: "1px solid #fde68a", borderLeft: "4px solid #f59e0b", borderRadius: 8 }}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{pm.keyword}</span>
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: ic.c, background: ic.bg, padding: "2px 8px", borderRadius: 20 }}>{pm.importance}</span>
+                                  <span style={{ fontSize: 9, color: "#94a3b8" }}>{pm.category}</span>
+                                </div>
+                                <div style={{ fontSize: 10, color: "#92400e" }}>
+                                  <span style={{ fontWeight: 600 }}>Resume has:</span> {pm.resumeEquivalent} <span style={{ color: "#b45309", fontWeight: 600 }}>({pm.matchType})</span>
+                                </div>
                               </div>
                             </div>
                           );
@@ -1179,6 +1265,7 @@ function ResumeBuilder() {
   const [aiError, setAiError] = useState("");
   const [showTips, setShowTips] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [headingFont, setHeadingFont] = useState(() => {
     const saved = localStorage.getItem("resume-heading-font");
     const found = saved ? ATS_FONTS.find(f => f.id === saved) : null;
@@ -1267,11 +1354,14 @@ function ResumeBuilder() {
   useEffect(() => { loadFont(bodyFont); localStorage.setItem("resume-body-font", bodyFont.id); }, [bodyFont]);
   useEffect(() => { window.__resumeHeadingFont = headingFont; window.__resumeBodyFont = bodyFont; }, [headingFont, bodyFont]);
 
-  // Open JD panel if coming from header "Match JD" button
+  // Open JD or Upload panel if coming from home page buttons
   useEffect(() => {
     if (location.state?.openJDPanel) {
       setShowJD(true);
-      // Clear the state so it doesn't reopen on refresh
+      window.history.replaceState({}, document.title);
+    }
+    if (location.state?.openUpload) {
+      setShowUpload(true);
       window.history.replaceState({}, document.title);
     }
   }, []);
@@ -1280,6 +1370,8 @@ function ResumeBuilder() {
   const previewRef = useRef(null);
   const [numPages, setNumPages] = useState(1);
   const [zoom, setZoom] = useState(80);
+  const [resumeFontSize, setResumeFontSize] = useState(10);
+  const [resumeLineHeight, setResumeLineHeight] = useState(1.45);
 
   const [formWidth, setFormWidth] = useState(480);
   const [isDragging, setIsDragging] = useState(false);
@@ -1404,6 +1496,7 @@ function ResumeBuilder() {
 
       {showJD && <JDAnalyzerModal onClose={() => setShowJD(false)} data={data} setData={setData} />}
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} onParsed={handleParsed} />}
+      {showTemplateModal && <TemplateModal onClose={() => setShowTemplateModal(false)} activeTemplate={activeTemplate} onSelect={setActiveTemplate} />}
 
       {/* ── Sidebar with Icons + Labels ── */}
       <div style={{ width: 200, background: C.sidebarBg, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 40, gap: 2, boxShadow: "1px 0 4px rgba(0,0,0,0.02)", fontFamily: "'Sora', sans-serif", zIndex: 10 }}>
@@ -1682,12 +1775,11 @@ function ResumeBuilder() {
             {/* Toolbar */}
             <div style={{ padding: "9px 18px", background: C.toolbarBg, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginRight: 4 }}>Template:</span>
-              {["A", "B", "C"].map(t => (
-                <button key={t} onClick={() => setActiveTemplate(t)}
-                  style={{ padding: "5px 14px", border: `1.5px solid ${activeTemplate === t ? C.accent : C.border}`, borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, background: activeTemplate === t ? C.accentLight : "#fff", color: activeTemplate === t ? C.accent : C.textMuted, transition: "all 0.15s" }}>
-                  {t === "A" ? "Classic" : t === "B" ? "Modern" : "Minimal"}
-                </button>
-              ))}
+              <button onClick={() => setShowTemplateModal(true)}
+                style={{ padding: "5px 14px", border: `1.5px solid ${C.border}`, borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, background: "#fff", color: C.textLight, transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6 }}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg>
+                {activeTemplate === "A" ? "Classic" : activeTemplate === "B" ? "Modern" : "Minimal"}
+              </button>
               <div style={{ flex: 1 }} />
 
               {/* Font Picker */}
@@ -1712,15 +1804,32 @@ function ResumeBuilder() {
                 />
               </div>
 
+              {/* Font Size Controls */}
+              <div style={{ display: "flex", alignItems: "center", gap: 3, marginLeft: 4 }}>
+                <button onClick={() => setResumeFontSize(v => Math.max(8, v - 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                <span style={{ fontSize: 12, color: C.text, fontWeight: 600, minWidth: 28, textAlign: "center" }}>{resumeFontSize}pt</span>
+                <button onClick={() => setResumeFontSize(v => Math.min(14, v + 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+              </div>
+
+              {/* Line Spacing Controls */}
+              <div style={{ display: "flex", alignItems: "center", gap: 3, marginLeft: 6 }}>
+                <span style={{ fontSize: 11, color: C.textLight }}>Spacing</span>
+                {[1.5, 1.8, 2].map(lh => (
+                  <button key={lh} onClick={() => setResumeLineHeight(lh)} style={{ padding: "4px 8px", background: resumeLineHeight === lh ? C.accentLight : "#fff", border: `1px solid ${resumeLineHeight === lh ? C.accent : C.border}`, borderRadius: 5, color: resumeLineHeight === lh ? C.accent : C.textMuted, fontSize: 11, cursor: "pointer" }}>{lh}</button>
+                ))}
+              </div>
+
+              <div style={{ width: 1, background: C.border, height: 24, margin: "0 4px" }} />
+
               {/* Zoom Controls */}
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginRight: 12 }}>
                 <button onClick={() => setZoom(z => Math.max(30, z - 10))}
-                  style={{ width: 28, height: 28, border: `1.5px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   −
                 </button>
                 <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, minWidth: 40, textAlign: "center", userSelect: "none" }}>{zoom}%</span>
                 <button onClick={() => setZoom(z => Math.min(150, z + 10))}
-                  style={{ width: 28, height: 28, border: `1.5px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   +
                 </button>
               </div>
@@ -1740,6 +1849,8 @@ function ResumeBuilder() {
                   exportRef={previewRef}
                   headingFont={headingFont}
                   bodyFont={bodyFont}
+                  fontSize={resumeFontSize}
+                  lineHeight={resumeLineHeight}
                 />
               </div>
             </div>
@@ -2042,7 +2153,7 @@ function CoverLetterPreview({ coverLetter, setCoverLetter, personal, clHiringMan
   const links = [personal.linkedin, personal.github].filter(Boolean);
   const cleanedText = cleanCoverLetter(coverLetter, personal.name);
 
-  const loadingEl = <div style={{ fontFamily: clBodyFont, fontSize: `${clFontSize + 1}pt`, color: "#9aa3af", fontStyle: "italic", textAlign: "center", paddingTop: 60, lineHeight: 2 }}>✨ Groq AI is crafting your cover letter...</div>;
+  const loadingEl = <div style={{ fontFamily: clBodyFont, fontSize: `${clFontSize + 1}pt`, color: "#9aa3af", fontStyle: "italic", textAlign: "center", paddingTop: 60, lineHeight: 2 }}>✨ AI is crafting your cover letter...</div>;
   const emptyEl = <div style={{ fontFamily: clBodyFont, fontSize: `${clFontSize + 1}pt`, color: "#c0c8d2", fontStyle: "italic", textAlign: "center", paddingTop: 80, lineHeight: 2.2 }}>Your cover letter will appear here.<br />Fill in the form on the left,<br />then click Generate ✨</div>;
   const editEl = <textarea value={coverLetter} onChange={e => setCoverLetter(e.target.value)} style={{ width: "100%", minHeight: 400, border: "1.5px solid #bfdbfe", borderRadius: 6, padding: "12px 14px", fontFamily: clBodyFont, fontSize: `${clFontSize}pt`, lineHeight: clLineHeight, color: "#1e293b", outline: "none", resize: "vertical", background: "#fafeff", boxSizing: "border-box" }} />;
   const wcEl = wordCount > 0 && <div style={{ position: "absolute", bottom: 20, right: 28, fontSize: 9, color: wcColor, fontWeight: 600, fontFamily: "sans-serif" }}>{wordCount} words{wordCount > 400 ? " · consider shortening" : wordCount >= 150 ? " · ✓ good length" : ""}</div>;

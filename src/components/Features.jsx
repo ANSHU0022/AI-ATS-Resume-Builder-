@@ -223,14 +223,21 @@ const CARDS = [
   { num: "06", title: "LaTeX Editor", sub: "Write or paste your LaTeX code, compile it live, and see your resume render in real time. Download the final PDF with one click.", bg: "linear-gradient(135deg,#1a1a3a 0%,#2a2a6a 50%,#4a4a9a 100%)", Svg: SVG6, points: ["Full LaTeX code editor with syntax highlighting", "Live side-by-side PDF preview as you type", "One-click compile — no local LaTeX install needed", "Download publication-quality PDF instantly"] },
 ];
 
+import { motion } from "framer-motion";
+
 const Card = ({ c, i, scrollY, hasScrolled }) => {
   const [hov, setHov] = useState(false);
   const parallax = hasScrolled ? Math.sin((scrollY + i * 140) / 700) * 6 : 0;
   const tiltX = hasScrolled ? Math.sin((scrollY + i * 110) / 1200) * 2 : 0;
   const tiltY = hasScrolled ? Math.cos((scrollY + i * 130) / 1200) * 2 : 0;
   const lift = hov ? -8 : 0;
+
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.6, delay: i * 0.1, ease: "easeOut" }}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
@@ -249,11 +256,6 @@ const Card = ({ c, i, scrollY, hasScrolled }) => {
         transformStyle: "preserve-3d",
         willChange: "transform",
         transition: "transform .35s cubic-bezier(.25,.46,.45,.94),box-shadow .35s",
-        animationName: "cardIn",
-        animationDuration: "0.65s",
-        animationTimingFunction: "ease",
-        animationFillMode: "both",
-        animationDelay: `${i * 0.07 + 0.04}s`,
       }}
     >
       {/* illustration */}
@@ -292,7 +294,7 @@ const Card = ({ c, i, scrollY, hasScrolled }) => {
           ))}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

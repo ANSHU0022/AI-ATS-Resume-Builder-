@@ -1,5 +1,5 @@
 {
-  "name": "resume-builder",
+  "name": "ats-forge",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -17,6 +17,7 @@
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "form-data": "^4.0.5",
+    "framer-motion": "^12.35.2",
     "fs-extra": "^11.3.3",
     "html2pdf.js": "^0.14.0",
     "node-fetch": "^3.3.2",

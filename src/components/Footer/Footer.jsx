@@ -42,8 +42,8 @@ export default function Footer() {
                 {/* Brand column */}
                 <div className="footer-brand">
                     <div className="footer-logo" onClick={() => navigate('/')}>
-                        <div className="footer-logo-icon">R</div>
-                        <span className="footer-logo-text">Resume<em>Forge</em></span>
+                        <div className="footer-logo-icon">A</div>
+                        <span className="footer-logo-text">ATS<em>Forge</em></span>
                     </div>
                     <p className="footer-tagline">
                         Build professional, ATS-optimized resumes in minutes.<br />
@@ -70,7 +70,7 @@ export default function Footer() {
 
             {/* Bottom bar */}
             <div className="footer-bottom">
-                <span>© {year} ResumeForge. All rights reserved.</span>
+                <span>© {year} ATSForge. All rights reserved.</span>
                 <div className="footer-bottom-links">
                     <span>Free to use</span>
                     <span className="footer-dot">·</span>

@@ -81,7 +81,7 @@ function TemplateOne() {
                 </div>
             </div>
 
-            
+
         </div>
     );
 }
@@ -149,7 +149,7 @@ function TemplateTwo() {
                 <div className="sk w65" />
             </div>
 
-            
+
         </div>
     );
 }
@@ -215,7 +215,7 @@ function TemplateThree() {
                 <div className="sk w55" />
             </div>
 
-            
+
         </div>
     );
 }
@@ -325,6 +325,13 @@ export default function HomePage() {
                             </svg>
                             AI Resume Analysis
                         </span>
+                        <span>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                                <polyline points="22,6 12,13 2,6" />
+                            </svg>
+                            Ai Cold Email & Dm
+                        </span>
                     </div>
 
                     <div className="cta-group">
@@ -332,7 +339,7 @@ export default function HomePage() {
                             Build My Resume
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                         </button>
-                        <button className="cta-outline" type="button" onClick={() => navigate('/builder')}>
+                        <button className="cta-outline" type="button" onClick={() => navigate('/builder', { state: { openUpload: true } })}>
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
                             Upload Existing CV
                         </button>
@@ -461,7 +468,7 @@ export default function HomePage() {
                 </div>
             </div>
 
-            
+
 
 
             <Features />
