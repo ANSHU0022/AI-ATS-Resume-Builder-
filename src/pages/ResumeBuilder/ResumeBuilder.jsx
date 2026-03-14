@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import html2pdf from "html2pdf.js";
 import * as pdfjsLib from "pdfjs-dist";
@@ -52,7 +52,7 @@ const initialData = {
   experience: [{ role: "", company: "", location: "", duration: "", bullets: [""] }],
   projects: [{ name: "", tech: "", link: "", bullets: [""] }],
   certifications: [{ name: "", issuer: "", year: "" }],
-  hobbies: "",
+  achievements: [{ title: "", url: "" }],
 };
 
 // ── ATS Scoring ───────────────────────────────────────────────────────────────
@@ -304,7 +304,7 @@ function PaginatedResume({ data, template, exportRef, headingFont, bodyFont, fon
 function TemplateA({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.45 }) {
   const hf = headingFont?.family || "'Segoe UI', sans-serif";
   const bf = bodyFont?.family || "'Segoe UI', sans-serif";
-  const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
+  const { personal: p, summary, skills, education, experience, projects, certifications, achievements } = data;
   return (
     <div style={{ fontSize: `${fontSize}pt`, color: "#1a1a1a", padding: "28px 32px", lineHeight: lineHeight, fontFamily: bf, background: "#fff" }}>
       <div style={{ textAlign: "center", marginBottom: 10 }}>
@@ -387,7 +387,18 @@ function TemplateA({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
           </ul>
         </RS>
       )}
-      {hobbies && <RS title="HOBBIES & INTERESTS" headingFontFamily={hf}><p style={{ margin: 0 }}>{hobbies}</p></RS>}
+      {achievements?.some(a => a.title) && (
+        <RS title="ACHIEVEMENTS & AWARDS" headingFontFamily={hf}>
+          <ul style={{ margin: 0, padding: "0 0 0 18px", listStyle: "disc" }}>
+            {achievements.filter(a => a.title).map((a, i) => (
+              <li key={i} style={{ marginBottom: 2 }}>
+                {a.title}
+                {a.url && <> <a href={a.url.startsWith("http") ? a.url : `https://${a.url}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", marginLeft: 4 }} title={a.url}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "middle" }}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg></a></>}
+              </li>
+            ))}
+          </ul>
+        </RS>
+      )}
     </div>
   );
 }
@@ -396,7 +407,7 @@ function TemplateA({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
 function TemplateB({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.45 }) {
   const hf = headingFont?.family || "'Segoe UI', sans-serif";
   const bf = bodyFont?.family || "'Segoe UI', sans-serif";
-  const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
+  const { personal: p, summary, skills, education, experience, projects, certifications, achievements } = data;
   return (
     <div style={{ fontFamily: bf, fontSize: `${fontSize}pt`, color: "#1a1a1a", background: "#fff", display: "flex", minHeight: "100%", lineHeight: lineHeight }}>
       <div style={{ width: "32%", background: "#2c3e50", color: "#ecf0f1", padding: "28px 16px" }}>
@@ -435,7 +446,18 @@ function TemplateB({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
             ))}
           </SS>
         )}
-        {hobbies && <SS title="HOBBIES" headingFontFamily={hf}><div style={{ fontSize: "9pt", lineHeight: 1.6 }}>{hobbies}</div></SS>}
+        {achievements?.some(a => a.title) && (
+          <SS title="ACHIEVEMENTS" headingFontFamily={hf}>
+            <ul style={{ margin: 0, padding: "0 0 0 14px", listStyle: "disc", fontSize: "9pt", lineHeight: 1.6 }}>
+              {achievements.filter(a => a.title).map((a, i) => (
+                <li key={i} style={{ marginBottom: 2 }}>
+                  {a.title}
+                  {a.url && <> <a href={a.url.startsWith("http") ? a.url : `https://${a.url}`} target="_blank" rel="noopener noreferrer" style={{ color: "#ecf0f1", marginLeft: 4 }} title={a.url}><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "middle" }}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg></a></>}
+                </li>
+              ))}
+            </ul>
+          </SS>
+        )}
       </div>
       <div style={{ flex: 1, padding: "28px 24px" }}>
         {summary && <RS title="PROFILE" accent="#2c3e50" headingFontFamily={hf}>{summary}</RS>}
@@ -487,7 +509,7 @@ function TemplateB({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
 function TemplateC({ data, headingFont, bodyFont, fontSize = 9.5, lineHeight = 1.45 }) {
   const hf = headingFont?.family || "'Segoe UI', sans-serif";
   const bf = bodyFont?.family || "'Segoe UI', sans-serif";
-  const { personal: p, summary, skills, education, experience, projects, certifications, hobbies } = data;
+  const { personal: p, summary, skills, education, experience, projects, certifications, achievements } = data;
   return (
     <div style={{ fontFamily: bf, fontSize: `${fontSize}pt`, color: "#111", padding: "24px 36px", background: "#fff", lineHeight: lineHeight }}>
       {p.name && <div style={{ fontSize: "24pt", fontWeight: 900, fontFamily: hf, borderBottom: "3px solid #111", paddingBottom: 6, marginBottom: 4 }}>{p.name}</div>}
@@ -527,7 +549,9 @@ function TemplateC({ data, headingFont, bodyFont, fontSize = 9.5, lineHeight = 1
           {c.year && <span>{c.year}</span>}
         </div>
       ))}</>)}
-      {hobbies && <><MH title="HOBBIES" headingFontFamily={hf} /><div>{hobbies}</div></>}
+      {achievements?.some(a => a.title) && (<><MH title="ACHIEVEMENTS & AWARDS" headingFontFamily={hf} />{achievements.filter(a => a.title).map((a, i) => (
+        <div key={i} style={{ marginBottom: 3, paddingLeft: 12 }}>• {a.title}{a.url && <> <a href={a.url.startsWith("http") ? a.url : `https://${a.url}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", marginLeft: 4 }} title={a.url}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "middle" }}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg></a></>}</div>
+      ))}</>)}
     </div>
   );
 }
@@ -630,7 +654,7 @@ Required JSON structure:
   "experience": [{ "role": "", "company": "", "location": "", "duration": "", "bullets": ["bullet point 1", "bullet point 2"] }],
   "projects": [{ "name": "", "tech": "", "link": "", "bullets": ["bullet point 1", "bullet point 2"] }],
   "certifications": [{ "name": "", "issuer": "", "year": "", "link": "" }],
-  "hobbies": ""
+  "achievements": [{ "title": "", "url": "" }]
 }
 
 Rules:
@@ -798,7 +822,7 @@ RESUME TEXT:
           <div style={{ background: "#f8fafc", borderRadius: 8, padding: "9px 12px", marginBottom: 16, border: `1px solid ${C.border}` }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, marginBottom: 6, letterSpacing: 0.5 }}>AI WILL AUTO-FILL ALL 8 SECTIONS:</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-              {["Personal", "Summary", "Skills", "Education", "Experience", "Projects", "Certifications", "Hobbies"].map(s => (
+              {["Personal", "Summary", "Skills", "Education", "Experience", "Projects", "Certifications", "Achievements"].map(s => (
                 <span key={s} style={{ fontSize: 10.5, background: C.accentLight, color: C.accent, border: `1px solid ${C.accentBorder}`, borderRadius: 5, padding: "2px 8px" }}>{s}</span>
               ))}
             </div>
@@ -832,6 +856,9 @@ function JDAnalyzerModal({ onClose, data, setData }) {
   const [analysis, setAnalysis] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [added, setAdded] = useState({});
+  const [appliedExp, setAppliedExp] = useState({});
+  const [appliedProj, setAppliedProj] = useState({});
+  const [appliedSummary, setAppliedSummary] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [guideRead, setGuideRead] = useState(false);
 
@@ -861,27 +888,33 @@ function JDAnalyzerModal({ onClose, data, setData }) {
           response_format: { type: "json_object" },
           messages: [
             {
-              role: "system", content: `You are an ATS Resume Analyzer. Your task is to analyze a Job Description and a Resume and produce three outputs: Matched Keywords, Missing Keywords, and Partial Matches.
+              role: "system", content: `You are an ATS Resume Analyzer.
 
-Follow these rules strictly to avoid hallucinations.
+Analyze the Job Description (JD) and the Resume. Follow these strict rules:
 
-STEP 1 — Extract Keywords from Job Description. Extract only meaningful keywords. Categories: Technical Skills, Tools / Software, Data & Analytics Skills, Marketing / Domain Skills, Metrics / KPIs, Business Concepts. Ignore filler words, adjectives, generic verbs.
+STEP 1 — EXTRACT ALL IMPORTANT KEYWORDS FROM THE JOB DESCRIPTION ONLY.
+Keywords can include: tools, technologies, programming languages, frameworks, AI/ML concepts, analytics methods, cloud platforms, important domain skills, databases, methodologies, certifications, libraries, APIs, protocols, operating systems, version control tools, CI/CD tools, testing frameworks, data formats, visualization tools.
+Extract EVERY SINGLE important keyword. Be EXHAUSTIVE — typically 20 to 50+ keywords. Do NOT skip any.
 
-STEP 2 — Extract Skills from Resume. Scan the ENTIRE resume: Skills section, Experience, Projects, Tools mentioned inside bullet points. Create a list of all skills, tools, and concepts.
+STEP 2 — MATCHING RULES:
+A keyword should be marked as MATCHED only if the EXACT keyword (case-insensitive) appears somewhere in the resume text (Skills, Summary, Experience bullets, Project bullets, Education, Certifications — anywhere).
 
-STEP 3 — Matching Logic (3 levels):
-LEVEL 1 — EXACT MATCH: Keyword appears exactly in resume. → matched
-LEVEL 2 — SYNONYM MATCH: Allow limited synonyms ONLY if meaning is identical (e.g. KPI ↔ KPIs, Trend ↔ Trend Analysis, Predictive Models ↔ Predictive Modeling). → partialMatch
-LEVEL 3 — SEMANTIC MATCH (STRICT): Semantic similarity ONLY if context is identical (e.g. Campaign Effectiveness ↔ Campaign Performance Analysis). → partialMatch
+STEP 3 — MISSING RULES:
+If the keyword appears in the JD but NOT anywhere in the resume text, mark it as MISSING.
+Do NOT guess or assume skills. Do NOT treat different tools as the same.
+Examples: Power BI ≠ Tableau, PyTorch ≠ TensorFlow, SQL ≠ PostgreSQL, AWS ≠ Azure, React ≠ Angular.
 
-STEP 4 — NEVER ASSUME TOOL EQUIVALENCE. Do NOT match tools unless they are exactly the same. Power BI ≠ Tableau, Google Analytics ≠ Meta Ads Manager, SQL ≠ PostgreSQL, Excel ≠ Google Sheets. Treat as separate tools.
+STEP 4 — MATCH SCORE:
+matchScore = (number of matched keywords / total JD keywords) × 100, rounded to nearest integer.
 
-STEP 5 — A keyword is MISSING only if: it exists in JD, does NOT appear anywhere in resume, and no synonym or semantic equivalent exists.
+STEP 5 — OPTIMIZED SUMMARY:
+Write an optimized professional summary that is EXACTLY between 40 to 55 words. It must naturally incorporate the most important missing keywords from the JD. Make it ATS-friendly, impactful, and relevant to the job title detected.
 
-STEP 6 — Prevent Hallucinations. Never add tools or skills that do not exist in the resume text. Do NOT assume skills based on domain. If resume contains Power BI, do NOT assume Tableau.
+STEP 6 — OPTIMIZED BULLETS:
+Rewrite the existing Experience and Project bullet points to naturally incorporate missing keywords. Keep them impactful with action verbs and numbers. Do NOT invent new jobs or projects, only enhance existing bullets.
 
 Always respond with ONLY valid JSON.` },
-            { role: "user", content: `Analyze the following Job Description and Resume.\n\nJOB DESCRIPTION:\n${jdText}\n\nRESUME CONTENT:\n${resumeText}\n\nReturn ONLY valid JSON with this exact structure:\n{\n  "matchScore": 72,\n  "jobTitle": "Job title detected from JD",\n  "matched": [\n    { "keyword": "Python", "importance": "high", "category": "Technical Skills" }\n  ],\n  "partialMatches": [\n    { "keyword": "Campaign Optimization", "resumeEquivalent": "Campaign Performance Analysis", "matchType": "semantic", "importance": "medium", "category": "Marketing / Domain Skills" }\n  ],\n  "missing": [\n    { "keyword": "Docker", "importance": "high", "category": "Tools / Software", "suggestion": "Add Docker to Tools section" }\n  ],\n  "softSkills": ["communication", "teamwork"],\n  "topTip": "One sentence tip to improve resume for this specific job"\n}\n\nRules:\n- importance levels: high (required or appears 3+ times), medium (preferred), low (nice to have)\n- category must be one of: Technical Skills, Tools / Software, Data & Analytics Skills, Marketing / Domain Skills, Metrics / KPIs, Business Concepts, Soft Skills\n- For partialMatches: matchType must be either "synonym" or "semantic". Include resumeEquivalent showing what was found in resume.\n- Extract EVERY SINGLE meaningful keyword from the JD — typically 15 to 40 keywords. Do NOT limit to 5 or 10. Be EXHAUSTIVE.\n- NEVER guess. NEVER hallucinate. Only rely on the text provided.\n- Return ONLY the JSON, no explanation, no markdown` }
+            { role: "user", content: `Analyze the following Job Description and Resume.\n\nJOB DESCRIPTION:\n${jdText}\n\nRESUME CONTENT:\n${resumeText}\n\nReturn ONLY valid JSON with this exact structure:\n{\n  "matchScore": 72,\n  "jobTitle": "Job title detected from JD",\n  "totalJDKeywords": 35,\n  "matched": [\n    { "keyword": "Python", "importance": "high", "category": "Technical Skills" }\n  ],\n  "missing": [\n    { "keyword": "Docker", "importance": "high", "category": "Tools / Software", "suggestion": "Add Docker to your Skills section under Tools" }\n  ],\n  "softSkills": ["communication", "teamwork"],\n  "topTip": "One sentence tip to improve resume for this specific job",\n  "optimizedSummary": "An optimized 40-55 word professional summary...",\n  "optimizedExperience": [\n    { "company": "Company Name", "role": "Role Name", "optimizedBullets": ["Optimized bullet 1", "Optimized bullet 2"] }\n  ],\n  "optimizedProjects": [\n    { "name": "Project Name", "optimizedBullets": ["Optimized bullet 1", "Optimized bullet 2"] }\n  ]\n}\n\nRules:\n- importance: high (required/appears 3+ times), medium (preferred), low (nice to have)\n- category: Technical Skills, Tools / Software, Frameworks, AI/ML, Cloud Platforms, Databases, Analytics, Domain Skills, Certifications, Other\n- Extract EVERY SINGLE meaningful keyword from the JD — be EXHAUSTIVE (20-50+ keywords)\n- matchScore = (matched count / total JD keywords) × 100\n- optimizedSummary MUST be between 40 and 55 words\n- NEVER guess. NEVER hallucinate. Only rely on the text provided.\n- Return ONLY the JSON, no explanation, no markdown` }
           ]
         })
       });
@@ -901,12 +934,12 @@ Always respond with ONLY valid JSON.` },
       const json = await resp.json();
       const text = json.choices?.[0]?.message?.content || "";
       const parsed = JSON.parse(text);
-      // Recalculate match score: (Exact + 0.5 × Partial) / Total × 100
-      const exactCount = parsed.matched?.length || 0;
-      const partialCount = parsed.partialMatches?.length || 0;
+      // Recalculate match score: (matched keywords / total JD keywords) × 100
+      const matchedCount = parsed.matched?.length || 0;
       const missingCount = parsed.missing?.length || 0;
-      const totalJDKeywords = exactCount + partialCount + missingCount;
-      parsed.matchScore = totalJDKeywords > 0 ? Math.round(((exactCount + 0.5 * partialCount) / totalJDKeywords) * 100) : 0;
+      const totalJDKeywords = parsed.totalJDKeywords || (matchedCount + missingCount);
+      parsed.matchScore = totalJDKeywords > 0 ? Math.round((matchedCount / totalJDKeywords) * 100) : 0;
+      parsed.totalJDKeywords = totalJDKeywords;
       setAnalysis(parsed);
       setStatus("done");
     } catch (err) { setErrorMsg(err.message || "Analysis failed."); setStatus("error"); }
@@ -936,6 +969,35 @@ Always respond with ONLY valid JSON.` },
   const addAll = () => {
     if (!analysis?.missing) return;
     analysis.missing.forEach(m => addKeyword(m.keyword, m.category));
+  };
+
+  const applyExperienceOptimization = (optExp) => {
+    setData(prev => {
+      const e = [...prev.experience];
+      const idx = e.findIndex(x => x.company === optExp.company && x.role === optExp.role);
+      if (idx !== -1) {
+        e[idx] = { ...e[idx], bullets: optExp.optimizedBullets };
+      }
+      return { ...prev, experience: e };
+    });
+    setAppliedExp(prev => ({ ...prev, [`${optExp.company}_${optExp.role}`]: true }));
+  };
+
+  const applyProjectOptimization = (optProj) => {
+    setData(prev => {
+      const p = [...prev.projects];
+      const idx = p.findIndex(x => x.name === optProj.name);
+      if (idx !== -1) {
+        p[idx] = { ...p[idx], bullets: optProj.optimizedBullets };
+      }
+      return { ...prev, projects: p };
+    });
+    setAppliedProj(prev => ({ ...prev, [optProj.name]: true }));
+  };
+
+  const applySummaryOptimization = (optSummary) => {
+    setData(prev => ({ ...prev, summary: optSummary }));
+    setAppliedSummary(true);
   };
 
   const allAdded = analysis?.missing?.length > 0 && analysis.missing.every(m => added[m.keyword]);
@@ -1111,7 +1173,7 @@ Always respond with ONLY valid JSON.` },
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 800, color: sc.c }}>{analysis.matchScore >= 75 ? "Great Match!" : analysis.matchScore >= 50 ? "Decent Match" : "Needs Work"}</div>
                       {analysis.jobTitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>JD: {analysis.jobTitle}</div>}
-                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{analysis.matched?.length || 0} matched · {analysis.partialMatches?.length || 0} partial · {analysis.missing?.length || 0} missing</div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{analysis.matched?.length || 0} matched · {analysis.missing?.length || 0} missing · {analysis.totalJDKeywords || 0} total JD keywords</div>
                     </div>
                   </div>
 
@@ -1147,32 +1209,7 @@ Always respond with ONLY valid JSON.` },
                                   {isAdded ? "✓ Added" : "+ Add"}
                                 </button>
                                 {isAdded && <span style={{ fontSize: 9, color: "#15803d" }}>✅ Added to Skills → {isAdded}</span>}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Partial Matches */}
-                  {analysis.partialMatches?.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>🔶 Partial Matches ({analysis.partialMatches.length})</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {analysis.partialMatches.map((pm, i) => {
-                          const ic = impColor(pm.importance);
-                          return (
-                            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", background: "#fffbeb", border: "1px solid #fde68a", borderLeft: "4px solid #f59e0b", borderRadius: 8 }}>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{pm.keyword}</span>
-                                  <span style={{ fontSize: 9, fontWeight: 700, color: ic.c, background: ic.bg, padding: "2px 8px", borderRadius: 20 }}>{pm.importance}</span>
-                                  <span style={{ fontSize: 9, color: "#94a3b8" }}>{pm.category}</span>
-                                </div>
-                                <div style={{ fontSize: 10, color: "#92400e" }}>
-                                  <span style={{ fontWeight: 600 }}>Resume has:</span> {pm.resumeEquivalent} <span style={{ color: "#b45309", fontWeight: 600 }}>({pm.matchType})</span>
-                                </div>
+                                {m.suggestion && !isAdded && <span style={{ fontSize: 9, color: "#64748b", fontStyle: "italic", marginTop: 2 }}>{m.suggestion}</span>}
                               </div>
                             </div>
                           );
@@ -1201,6 +1238,74 @@ Always respond with ONLY valid JSON.` },
                         {analysis.softSkills.map((s, i) => (
                           <span key={i} style={{ fontSize: 11, fontWeight: 600, color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", padding: "4px 12px", borderRadius: 20, textTransform: "capitalize" }}>{s}</span>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Optimized Summary */}
+                  {analysis.optimizedSummary && (
+                    <div style={{ marginTop: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>✍️ Optimized Summary <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#7c3aed", padding: "2px 6px", borderRadius: 12 }}>AI Suggestion</span></div>
+                      <div style={{ padding: "12px", background: appliedSummary ? "#f0fdf4" : "#f8fafc", border: `1px solid ${appliedSummary ? "#86efac" : "#cbd5e1"}`, borderRadius: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                          <div style={{ fontSize: 11, color: "#334155", lineHeight: 1.5, flex: 1, paddingRight: 10 }}>{analysis.optimizedSummary}</div>
+                          <button onClick={() => applySummaryOptimization(analysis.optimizedSummary)} disabled={appliedSummary} style={{ padding: "5px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: appliedSummary ? "default" : "pointer", background: appliedSummary ? "#dcfce7" : "#3b82f6", color: appliedSummary ? "#15803d" : "#fff", transition: "all 0.2s", whiteSpace: "nowrap" }}>
+                            {appliedSummary ? "✓ Applied" : "Apply to Resume"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Optimized Experience */}
+                  {analysis.optimizedExperience?.length > 0 && (
+                    <div style={{ marginTop: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>✨ Optimized Experience Bullets <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#7c3aed", padding: "2px 6px", borderRadius: 12 }}>AI Suggestion</span></div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {analysis.optimizedExperience.map((opt, i) => {
+                          const isApplied = appliedExp[`${opt.company}_${opt.role}`];
+                          return (
+                            <div key={i} style={{ padding: "12px", background: isApplied ? "#f0fdf4" : "#f8fafc", border: `1px solid ${isApplied ? "#86efac" : "#cbd5e1"}`, borderRadius: 10 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                                <div>
+                                  <div style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>{opt.role}</div>
+                                  <div style={{ fontSize: 10, color: "#64748b", fontStyle: "italic" }}>@ {opt.company}</div>
+                                </div>
+                                <button onClick={() => applyExperienceOptimization(opt)} disabled={isApplied} style={{ padding: "5px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: isApplied ? "default" : "pointer", background: isApplied ? "#dcfce7" : "#3b82f6", color: isApplied ? "#15803d" : "#fff", transition: "all 0.2s" }}>
+                                  {isApplied ? "✓ Applied" : "Apply to Resume"}
+                                </button>
+                              </div>
+                              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: "#334155", lineHeight: 1.5 }}>
+                                {opt.optimizedBullets?.map((b, j) => <li key={j} style={{ marginBottom: 4 }}>{b}</li>)}
+                              </ul>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Optimized Projects */}
+                  {analysis.optimizedProjects?.length > 0 && (
+                    <div style={{ marginTop: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>🚀 Optimized Project Bullets <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#7c3aed", padding: "2px 6px", borderRadius: 12 }}>AI Suggestion</span></div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {analysis.optimizedProjects.map((opt, i) => {
+                          const isApplied = appliedProj[opt.name];
+                          return (
+                            <div key={i} style={{ padding: "12px", background: isApplied ? "#f0fdf4" : "#f8fafc", border: `1px solid ${isApplied ? "#86efac" : "#cbd5e1"}`, borderRadius: 10 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                <div style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>{opt.name}</div>
+                                <button onClick={() => applyProjectOptimization(opt)} disabled={isApplied} style={{ padding: "5px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: isApplied ? "default" : "pointer", background: isApplied ? "#dcfce7" : "#3b82f6", color: isApplied ? "#15803d" : "#fff", transition: "all 0.2s" }}>
+                                  {isApplied ? "✓ Applied" : "Apply to Resume"}
+                                </button>
+                              </div>
+                              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: "#334155", lineHeight: 1.5 }}>
+                                {opt.optimizedBullets?.map((b, j) => <li key={j} style={{ marginBottom: 4 }}>{b}</li>)}
+                              </ul>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1364,7 +1469,7 @@ function ResumeBuilder() {
       setShowUpload(true);
       window.history.replaceState({}, document.title);
     }
-  }, []);
+  }, [location.state]);
 
   const [showJD, setShowJD] = useState(false);
   const previewRef = useRef(null);
@@ -1444,7 +1549,7 @@ function ResumeBuilder() {
       }
 
       if (parsed.certifications?.some(c => c.name)) merged.certifications = parsed.certifications;
-      if (!merged.hobbies && parsed.hobbies) merged.hobbies = parsed.hobbies;
+      if (parsed.achievements?.some(a => a.title)) merged.achievements = parsed.achievements;
 
       return merged;
     });
@@ -1485,7 +1590,7 @@ function ResumeBuilder() {
     { id: "experience", label: "Experience", icon: icons.briefcase },
     { id: "projects", label: "Projects", icon: icons.globe },
     { id: "certifications", label: "Certs", icon: icons.award },
-    { id: "hobbies", label: "Hobbies", icon: icons.heart },
+    { id: "achievements", label: "Awards", icon: icons.award },
   ];
 
   const IS = { width: "100%", padding: "11px 14px", background: "#f8fafc", border: `1px solid #cbd5e1`, borderRadius: 10, color: C.text, fontSize: 13, outline: "none", boxSizing: "border-box", transition: "all 0.2s ease", boxShadow: "inset 0 3px 6px rgba(0,0,0,0.06), inset 0 0 4px rgba(0,0,0,0.02), 0 1px 0 rgba(255,255,255,0.8)" };
@@ -1568,7 +1673,7 @@ function ResumeBuilder() {
         <div style={{ padding: "16px 20px 14px", borderBottom: `1px solid ${C.border}`, fontFamily: "'Sora', sans-serif" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 6 }}>Resume<em style={{ color: C.accent, fontStyle: "normal" }}>Forge</em></div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 6 }}>ATS<em style={{ color: C.accent, fontStyle: "normal" }}>Forge</em></div>
               <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>AI-powered ATS optimized</div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
@@ -1615,7 +1720,7 @@ function ResumeBuilder() {
           {activeSection === "experience" && <ExperienceForm experience={data.experience} setData={setData} IS={IS} CS={CS} />}
           {activeSection === "projects" && <ProjectsForm projects={data.projects} setData={setData} IS={IS} CS={CS} />}
           {activeSection === "certifications" && <CertsForm certifications={data.certifications} setData={setData} IS={IS} CS={CS} />}
-          {activeSection === "hobbies" && <HobbiesForm hobbies={data.hobbies} update={update} IS={IS} />}
+          {activeSection === "achievements" && <AchievementsForm achievements={data.achievements} setData={setData} IS={IS} CS={CS} />}
           {activeSection === "coverLetter" && <CoverLetterForm clJD={clJD} setClJD={setClJD} clTone={clTone} setClTone={setClTone} clLength={clLength} setClLength={setClLength} clHiringManager={clHiringManager} setClHiringManager={setClHiringManager} clCompany={clCompany} setClCompany={setClCompany} clJobTitle={clJobTitle} setClJobTitle={setClJobTitle} detectedJobTitle={detectedJobTitle} clLoading={clLoading} clError={clError} onGenerate={generateCoverLetter} IS={IS} />}
         </div>
       </div>
@@ -2057,15 +2162,33 @@ function CertsForm({ certifications, setData, IS, CS }) {
   );
 }
 
-function HobbiesForm({ hobbies, update, IS }) {
+function AchievementsForm({ achievements, setData, IS, CS }) {
+  const update = (idx, field, val) => setData(prev => {
+    const a = [...prev.achievements]; a[idx] = { ...a[idx], [field]: val }; return { ...prev, achievements: a };
+  });
+  const add = () => setData(prev => ({ ...prev, achievements: [...prev.achievements, { title: "", url: "" }] }));
+  const remove = (idx) => setData(prev => ({ ...prev, achievements: prev.achievements.filter((_, i) => i !== idx) }));
   return (
     <div>
-      <SH title="Hobbies & Interests" icon={icons.heart} />
-      <FL>Hobbies</FL>
-      <textarea value={hobbies} onChange={e => update("hobbies", e.target.value)} placeholder="Reading tech blogs, Open source, Chess, Photography..." rows={4} style={{ ...IS, resize: "vertical" }}
-        onFocus={e => { e.currentTarget.style.border = "1px solid #000000"; e.currentTarget.style.background = "#ffffff"; }}
-        onBlur={e => { e.currentTarget.style.border = `1px solid ${C.inputBorder}`; e.currentTarget.style.background = "#f8f9fa"; }} />
-      <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>Separate multiple hobbies with commas.</div>
+      <SH title="Achievements & Awards" icon={icons.award} />
+      {achievements.map((a, i) => (
+        <div key={i} style={CS}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>Achievement #{i + 1}</span>
+            {achievements.length > 1 && <button onClick={() => remove(i)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✕ Remove</button>}
+          </div>
+          <FL>Achievement / Award Title</FL>
+          <input value={a.title} onChange={e => update(i, "title", e.target.value)} placeholder="e.g. Winner of Smart India Hackathon 2024" style={IS}
+            onFocus={e => { e.currentTarget.style.border = "1px solid #000000"; e.currentTarget.style.background = "#ffffff"; }}
+            onBlur={e => { e.currentTarget.style.border = `1px solid ${C.inputBorder}`; e.currentTarget.style.background = "#f8f9fa"; }} />
+          <div style={{ height: 10 }} />
+          <FL>URL / Certificate Link (Optional)</FL>
+          <input value={a.url || ""} onChange={e => update(i, "url", e.target.value)} placeholder="https://certificate-link.com" style={IS}
+            onFocus={e => { e.currentTarget.style.border = "1px solid #000000"; e.currentTarget.style.background = "#ffffff"; }}
+            onBlur={e => { e.currentTarget.style.border = `1px solid ${C.inputBorder}`; e.currentTarget.style.background = "#f8f9fa"; }} />
+        </div>
+      ))}
+      <AB onClick={add} label="Add Achievement" />
     </div>
   );
 }

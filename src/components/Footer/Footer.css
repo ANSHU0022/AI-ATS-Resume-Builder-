@@ -36,30 +36,10 @@
     cursor: pointer;
 }
 
-.footer-logo-icon {
-    width: 42px;
-    height: 42px;
-    background: #6B4DB0;
-    border-radius: 9px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-weight: 900;
-    font-size: 20px;
-    flex-shrink: 0;
-}
-
-.footer-logo-text {
-    font-family: 'DM Serif Display', serif;
-    font-size: 28px;
-    font-weight: 400;
-    color: #111111;
-}
-
-.footer-logo-text em {
-    color: #6B4DB0;
-    font-style: normal;
+.footer-logo-img {
+    height: 54px;
+    width: auto;
+    object-fit: contain;
 }
 
 .footer-tagline {
@@ -94,7 +74,7 @@
 }
 
 .footer-col-link:hover {
-    color: #e2e8f0;
+    color: #9333ea; /* Purple */
 }
 
 /* ── Bottom bar ── */

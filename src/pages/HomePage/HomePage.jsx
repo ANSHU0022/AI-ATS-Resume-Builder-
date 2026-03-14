@@ -1,268 +1,111 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './HomePage.css';
 import Features from '../../components/Features.jsx';
 import Steps from '../../components/Steps.jsx';
 
-function TemplateOne() {
-    return (
-        <div className="t1" style={{ height: '100%' }}>
-            <div className="t1-head">
-                <div className="t1-avatar">A</div>
-                <div>
-                    <div className="t1-name">Anshu Prasad</div>
-                    <div className="t1-role">Senior Data Analyst</div>
-                    <div className="t1-contacts">
-                        <span className="t1-contact">✉ anshu@email.com</span>
-                        <span className="t1-contact">☎ +91 98765 43210</span>
-                        <span className="t1-contact">📍 Bangalore, IN</span>
-                    </div>
-                </div>
-            </div>
-            <div className="t1-body">
-                <div className="t1-main">
-                    <div className="t1-sec">Experience</div>
-                    <div className="t1-job">
-                        <div className="t1-jt">Lead Data Analyst</div>
-                        <div className="t1-jc">Google · 2021–Present</div>
-                        <div className="sk w95" />
-                        <div className="sk w80" />
-                        <div className="sk w75" />
-                    </div>
-                    <div className="t1-job">
-                        <div className="t1-jt">Data Scientist</div>
-                        <div className="t1-jc">Infosys · 2018–2021</div>
-                        <div className="sk w88" />
-                        <div className="sk w70" />
-                    </div>
-                    <div className="t1-job">
-                        <div className="t1-jt">Analyst Intern</div>
-                        <div className="t1-jc">Wipro · 2017–2018</div>
-                        <div className="sk w75" />
-                    </div>
-                    <div className="t1-sec">Education</div>
-                    <div className="sk w80" />
-                    <div className="sk w65" />
-                    <div className="t1-sec">Skills</div>
-                    <div className="sbar">
-                        <span className="sbar-n">Python</span>
-                        <div className="sbar-t"><div className="sbar-f" style={{ width: '92%' }} /></div>
-                    </div>
-                    <div className="sbar">
-                        <span className="sbar-n">SQL</span>
-                        <div className="sbar-t"><div className="sbar-f" style={{ width: '87%' }} /></div>
-                    </div>
-                    <div className="sbar">
-                        <span className="sbar-n">Power BI</span>
-                        <div className="sbar-t"><div className="sbar-f" style={{ width: '78%' }} /></div>
-                    </div>
-                    <div className="sbar">
-                        <span className="sbar-n">TensorFlow</span>
-                        <div className="sbar-t"><div className="sbar-f" style={{ width: '70%' }} /></div>
-                    </div>
-                </div>
-                <div className="t1-side">
-                    <div className="t1-sec">Achievements</div>
-                    <div className="sk w95" />
-                    <div className="sk w80" />
-                    <div className="sk w88" />
-                    <div className="sk w70" />
-                    <div className="t1-sec">My Time</div>
-                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'conic-gradient(#7c5cbf 0% 60%, #c8963e 60% 80%, #eee 80% 100%)', margin: '6px 0 10px' }} />
-                    <div className="sk w88" />
-                    <div className="sk w65" />
-                    <div className="t1-sec">Training</div>
-                    <div className="sk w95" />
-                    <div className="sk w80" />
-                    <div className="sk w70" />
-                    <div className="t1-sec">Passions</div>
-                    <div className="sk w75" />
-                    <div className="sk w55" />
-                </div>
-            </div>
+const RESUME_IMAGES = [
+    '/Anshu_Prasad _EuropassCV._page-0001.jpg',
+    '/Anshu_Prasad_Resume_page-0001.jpg',
+    '/Anshu Prasad (2)_pages-to-jpg-0001.jpg',
+];
 
-
-        </div>
-    );
-}
-
-function TemplateTwo() {
-    return (
-        <div className="t2" style={{ height: '100%' }}>
-            <div className="t2-sidebar">
-                <div className="t2-avatar">A</div>
-                <div className="t2-name">Anshu Prasad</div>
-                <div className="t2-role">Data Analyst</div>
-                <div className="t2-sec">Contact</div>
-                <div className="t2-contact-item">✉ anshu@email.com</div>
-                <div className="t2-contact-item">☎ +91 98765 43210</div>
-                <div className="t2-contact-item">📍 Bangalore, IN</div>
-                <div className="t2-sec">Skills</div>
-                <div className="t2-skill">Python</div>
-                <div className="t2-dot-bar"><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot" /></div>
-                <div className="t2-skill">SQL</div>
-                <div className="t2-dot-bar"><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot" /></div>
-                <div className="t2-skill">Power BI</div>
-                <div className="t2-dot-bar"><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot" /><div className="t2-dot" /></div>
-                <div className="t2-skill">TensorFlow</div>
-                <div className="t2-dot-bar"><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot" /><div className="t2-dot" /></div>
-                <div className="t2-skill">Pandas</div>
-                <div className="t2-dot-bar"><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot on" /><div className="t2-dot on" /></div>
-                <div className="t2-sec">Education</div>
-                <div className="sk-dark w90" />
-                <div className="sk-dark w75" />
-                <div className="sk-dark w60" />
-            </div>
-            <div className="t2-main">
-                <div className="t2-msec">Experience</div>
-                <div className="t2-job">
-                    <div className="t2-jt">Lead Data Analyst</div>
-                    <div className="t2-jc">Google · 2021 – Present</div>
-                    <div className="sk w95" />
-                    <div className="sk w80" />
-                    <div className="sk w70" />
-                </div>
-                <div className="t2-job">
-                    <div className="t2-jt">Data Scientist</div>
-                    <div className="t2-jc">Infosys · 2018 – 2021</div>
-                    <div className="sk w88" />
-                    <div className="sk w72" />
-                </div>
-                <div className="t2-job">
-                    <div className="t2-jt">Analyst Intern</div>
-                    <div className="t2-jc">Wipro · 2017 – 2018</div>
-                    <div className="sk w75" />
-                </div>
-                <div className="t2-msec">Key Projects</div>
-                <div className="t2-job">
-                    <div className="t2-jt">Demand Forecasting Engine</div>
-                    <div style={{ marginTop: 4 }}>
-                        <span className="t2-tag">Python</span>
-                        <span className="t2-tag">ML</span>
-                        <span className="t2-tag">BigQuery</span>
-                    </div>
-                    <div className="sk w88" style={{ marginTop: 5 }} />
-                    <div className="sk w70" />
-                </div>
-                <div className="t2-msec">Certifications</div>
-                <div className="sk w80" />
-                <div className="sk w65" />
-            </div>
-
-
-        </div>
-    );
-}
-
-function TemplateThree() {
-    return (
-        <div className="t3" style={{ height: '100%' }}>
-            <div className="t3-top-bar" />
-            <div className="t3-head">
-                <div className="t3-name">Anshu Prasad</div>
-                <div className="t3-role">Senior Data Analyst · AI Enthusiast</div>
-                <div className="t3-contact-row">
-                    <span className="t3-ct">✉ anshu@email.com</span>
-                    <span className="t3-ct">☎ +91 98765 43210</span>
-                    <span className="t3-ct">📍 Bangalore, IN</span>
-                    <span className="t3-ct">in/anshuprasad</span>
-                </div>
-            </div>
-            <div className="t3-body">
-                <div className="t3-sec">Experience</div>
-                <div className="t3-job">
-                    <div className="t3-dot-col"><div className="t3-circ" /><div className="t3-line-v" /></div>
-                    <div className="t3-jcontent">
-                        <div className="t3-jt">Lead Data Analyst</div>
-                        <div className="t3-jc">Google · 2021 – Present</div>
-                        <div className="sk w88" />
-                        <div className="sk w75" />
-                        <div className="t3-tags"><span className="t3-tag">Python</span><span className="t3-tag">BigQuery</span><span className="t3-tag">ML</span></div>
-                    </div>
-                </div>
-                <div className="t3-job">
-                    <div className="t3-dot-col"><div className="t3-circ" /><div className="t3-line-v" /></div>
-                    <div className="t3-jcontent">
-                        <div className="t3-jt">Data Scientist</div>
-                        <div className="t3-jc">Infosys · 2018 – 2021</div>
-                        <div className="sk w80" />
-                        <div className="sk w65" />
-                        <div className="t3-tags"><span className="t3-tag">TensorFlow</span><span className="t3-tag">Pandas</span></div>
-                    </div>
-                </div>
-                <div className="t3-job">
-                    <div className="t3-dot-col"><div className="t3-circ" /></div>
-                    <div className="t3-jcontent">
-                        <div className="t3-jt">Analyst Intern</div>
-                        <div className="t3-jc">Wipro · 2017 – 2018</div>
-                        <div className="sk w70" />
-                    </div>
-                </div>
-                <div className="t3-sec">Skills</div>
-                <div className="t3-skills-grid">
-                    <div className="t3-skill-item"><div className="t3-sn">Python</div><div className="t3-sb"><div className="t3-sf" style={{ width: '92%' }} /></div></div>
-                    <div className="t3-skill-item"><div className="t3-sn">SQL</div><div className="t3-sb"><div className="t3-sf" style={{ width: '87%' }} /></div></div>
-                    <div className="t3-skill-item"><div className="t3-sn">Power BI</div><div className="t3-sb"><div className="t3-sf" style={{ width: '78%' }} /></div></div>
-                    <div className="t3-skill-item"><div className="t3-sn">TensorFlow</div><div className="t3-sb"><div className="t3-sf" style={{ width: '71%' }} /></div></div>
-                    <div className="t3-skill-item"><div className="t3-sn">Pandas</div><div className="t3-sb"><div className="t3-sf" style={{ width: '88%' }} /></div></div>
-                    <div className="t3-skill-item"><div className="t3-sn">React</div><div className="t3-sb"><div className="t3-sf" style={{ width: '62%' }} /></div></div>
-                </div>
-                <div className="t3-sec">Education</div>
-                <div className="sk w80" />
-                <div className="sk w60" />
-                <div className="t3-sec">Certifications</div>
-                <div className="sk w75" />
-                <div className="sk w55" />
-            </div>
-
-
-        </div>
-    );
-}
-
-const templates = [TemplateOne, TemplateTwo, TemplateThree];
-
-export default function HomePage() {
-    const navigate = useNavigate();
-    const [flipState, setFlipState] = useState({
-        current: 0,
-        isFlipped: false,
-        faceA: 0,
-        faceB: 1,
-    });
+function ResumeCard3D() {
+    const cardRef = useRef(null);
+    const [activeImg, setActiveImg] = useState(0);
+    const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0, glareX: 50, glareY: 50 });
+    const [isHovering, setIsHovering] = useState(false);
+    const [animDone, setAnimDone] = useState(false);
+    const rafRef = useRef(null);
 
     useEffect(() => {
         const id = setInterval(() => {
-            setFlipState(prev => {
-                const next = (prev.current + 1) % 3;
-                const nextIsFlipped = !prev.isFlipped;
-                const nextFaceA = prev.isFlipped ? next : prev.faceA;
-                const nextFaceB = prev.isFlipped ? prev.faceB : next;
-                return {
-                    current: next,
-                    isFlipped: nextIsFlipped,
-                    faceA: nextFaceA,
-                    faceB: nextFaceB,
-                };
-            });
-        }, 3000);
-
+            setActiveImg(prev => (prev + 1) % RESUME_IMAGES.length);
+        }, 6000);
         return () => clearInterval(id);
     }, []);
 
-    const FaceA = templates[flipState.faceA];
-    const FaceB = templates[flipState.faceB];
+    useEffect(() => {
+        const t = setTimeout(() => setAnimDone(true), 950);
+        return () => clearTimeout(t);
+    }, []);
 
-    const marqueeItems = [
-        'ATS Resume Builder',
-        'Real-Time ATS Score',
-        'JD Keyword Matching',
-        'Cover Letter Generator',
-        'LaTeX Editor & Compiler',
-        'AI Resume Analysis',
-        'One-Click PDF Export',
-        '3 Pro Templates',
-    ];
+    const handleMouseMove = useCallback((e) => {
+        if (!cardRef.current) return;
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(() => {
+            const rect = cardRef.current.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const rotateY = ((x - centerX) / centerX) * 18;
+            const rotateX = ((centerY - y) / centerY) * 14;
+            setTilt({
+                rotateX,
+                rotateY,
+                glareX: (x / rect.width) * 100,
+                glareY: (y / rect.height) * 100,
+            });
+        });
+    }, []);
+
+    const handleMouseEnter = useCallback(() => setIsHovering(true), []);
+
+    const handleMouseLeave = useCallback(() => {
+        setIsHovering(false);
+        setTilt({ rotateX: 0, rotateY: 0, glareX: 50, glareY: 50 });
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    }, []);
+
+    const cardStyle = animDone ? {
+        transform: `rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale(${isHovering ? 1.04 : 1})`,
+        transition: isHovering ? 'transform 0.08s ease-out' : 'transform 0.5s cubic-bezier(0.23, 1, 0.32, 1)',
+        animation: 'none',
+    } : {};
+
+    return (
+        <div
+            className="resume3d-wrapper"
+            ref={cardRef}
+            onMouseMove={handleMouseMove}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            style={cardStyle}
+        >
+            <div className="resume3d-inner">
+                {RESUME_IMAGES.map((src, i) => (
+                    <img
+                        key={i}
+                        src={src}
+                        alt={`Resume template ${i + 1}`}
+                        className={`resume3d-img${activeImg === i ? ' active' : ''}`}
+                        draggable={false}
+                    />
+                ))}
+                <div
+                    className="resume3d-glare"
+                    style={{
+                        background: `radial-gradient(circle at ${tilt.glareX}% ${tilt.glareY}%, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 40%, transparent 70%)`,
+                        opacity: isHovering ? 1 : 0,
+                    }}
+                />
+            </div>
+            <div className="resume3d-shadow" style={{
+                transform: `translateX(${tilt.rotateY * 1.2}px) translateY(${-tilt.rotateX * 0.8 + 12}px)`,
+                opacity: isHovering ? 0.22 : 0.12,
+            }} />
+            <div className="resume3d-dots">
+                {RESUME_IMAGES.map((_, i) => (
+                    <div key={i} className={`resume3d-dot${activeImg === i ? ' active' : ''}`} />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+export default function HomePage() {
+    const navigate = useNavigate();
 
     return (
         <div className="hero-page">
@@ -397,18 +240,7 @@ export default function HomePage() {
                             </div>
                         </div>
 
-                        <div className="flip-wrapper">
-                            <div className={`flip-card${flipState.isFlipped ? ' flipping' : ''}`}>
-                                <div className="card-face front"><FaceA /></div>
-                                <div className="card-face back"><FaceB /></div>
-                            </div>
-
-                            <div className="template-dots">
-                                {[0, 1, 2].map(i => (
-                                    <div key={i} className={`tdot${flipState.current === i ? ' active' : ''}`} />
-                                ))}
-                            </div>
-                        </div>
+                        <ResumeCard3D />
 
                         <div className="chip chip-hired">
                             <span className="h-text">✓ Hired</span>
@@ -417,7 +249,6 @@ export default function HomePage() {
                         <div className="chip chip-photo" aria-label="Profile highlight">
                             <img src="/IMG_20260304_193723.png" alt="Profile" />
                         </div>
-
 
                         <div className="chip chip-jd">
                             <div className="jd-top">

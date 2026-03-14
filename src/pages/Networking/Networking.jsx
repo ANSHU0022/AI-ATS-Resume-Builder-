@@ -24,6 +24,7 @@ const Networking = () => {
 
     const [copiedEmail, setCopiedEmail] = useState(false);
     const [copiedDm, setCopiedDm] = useState(false);
+    const [dmLength, setDmLength] = useState("medium"); // short | medium | long
 
     const cvInputRef = useRef(null);
 
@@ -56,22 +57,85 @@ const Networking = () => {
 
         isLoading(true);
 
-        const context = {
-            company,
-            role,
-            recipient,
-            jd,
-            resume: resumeData || "No resume data found. Focus on general professional tone."
-        };
+        // Extract user's real name from saved resume data
+        const userName = resumeData?.personal?.name || "";
+        const userTitle = resumeData?.personal?.title || "";
+        const userEmail = resumeData?.personal?.email || "";
+        const userPhone = resumeData?.personal?.phone || "";
+        const userLinkedin = resumeData?.personal?.linkedin || "";
+
+        // Build resume skills and experience summary for context
+        const skillsSummary = resumeData?.skills?.map(s => `${s.category}: ${s.items}`).join("; ") || "";
+        const experienceSummary = resumeData?.experience?.filter(e => e.role).map(e => `${e.role} at ${e.company} — ${(e.bullets || []).join(", ")}`).join("; ") || "";
+        const projectsSummary = resumeData?.projects?.filter(p => p.name).map(p => `${p.name} (${p.tech || ""}) — ${(p.bullets || []).join(", ")}`).join("; ") || "";
 
         const prompt = type === 'email'
-            ? `Write a professional cold email to ${context.recipient || 'a Hiring Manager'} at ${context.company || 'their company'} for a ${context.role || 'Software Engineer'} role. 
-               ${context.jd ? `Job Description: ${context.jd}` : ""}
-               Use the following resume details: ${JSON.stringify(context.resume)}
-               Keep it short, punchy, and highlight 2-3 specific matching skills. Provide a clear subject line.`
-            : `Write a punchy LinkedIn DM to ${context.recipient || 'a connection'} at ${context.company || 'their company'} regarding a ${context.role || 'Software Engineer'} position.
-               Use the following resume details: ${JSON.stringify(context.resume)}
-               Keep it under 300 characters. Friendly but professional.`;
+            ? `You are a professional cold email writer for job seekers who want a REFERRAL. Write a high-conversion cold email asking for a referral.
+
+CONTEXT:
+- Sender Name: ${userName || "[Your Name]"}
+- Sender Title: ${userTitle || "Professional"}
+- Sender Email: ${userEmail || ""}
+- Sender Phone: ${userPhone || ""}
+- Target Company: ${company || "the company"}
+- Target Role: ${role || "a relevant position"}
+- Recipient Name: ${recipient || "Hiring Manager"}
+${jd ? `\nJOB DESCRIPTION:\n${jd}` : ""}
+
+SENDER'S RESUME SKILLS: ${skillsSummary || "Not provided"}
+SENDER'S EXPERIENCE: ${experienceSummary || "Not provided"}
+SENDER'S PROJECTS: ${projectsSummary || "Not provided"}
+
+INSTRUCTIONS:
+1. Start with a compelling subject line.
+2. Open with a warm, respectful greeting. Show genuine interest in the recipient and their work at the company.
+3. Clearly state that you are reaching out because you are interested in the "${role || "a position"}" role at ${company || "their company"} and would greatly appreciate a referral.
+4. Highlight 2-3 specific skills/experience/projects from the sender's resume that DIRECTLY match the Job Description. Show WHY you are a strong fit for the role.
+5. If a JD is provided, analyze it and reference specific keywords/requirements to demonstrate alignment.
+6. Politely ask if the recipient would be open to referring you or connecting you with the hiring team.
+7. Sign off with "Best Regards," followed by the sender's actual name: "${userName || "[Your Name]"}"${userEmail ? `, email: ${userEmail}` : ""}${userPhone ? `, phone: ${userPhone}` : ""}${userLinkedin ? `, LinkedIn: ${userLinkedin}` : ""}.
+8. Keep the email concise (150-220 words), professional, warm, and action-oriented.
+9. Do NOT use generic filler. Every sentence should demonstrate value and fit for the role.
+10. The tone should be confident but humble — you are requesting a favor, not demanding.
+
+Output ONLY the email text (including Subject line). No explanations.`
+            : (() => {
+                const lengthGuide = dmLength === 'short'
+                    ? 'Write exactly 2-3 lines. Keep it crisp and to the point. Under 50 words total.'
+                    : dmLength === 'long'
+                    ? 'Write 7-8 lines. Go into detail about your matching skills, experience, and relevant projects. Around 120-150 words.'
+                    : 'Write 4-5 lines. Balance brevity with detail. Around 70-90 words.';
+
+                return `You are a LinkedIn DM expert for job seekers seeking REFERRALS. Write a personalized LinkedIn direct message asking for a referral.
+
+CONTEXT:
+- Sender Name: ${userName || "[Your Name]"}
+- Sender Title: ${userTitle || "Professional"}
+- Target Company: ${company || "the company"}
+- Target Role: ${role || "a relevant position"}
+- Recipient Name: ${recipient || "a professional"}
+${jd ? `\nJOB DESCRIPTION:\n${jd}` : ""}
+
+SENDER'S KEY SKILLS: ${skillsSummary || "Not provided"}
+SENDER'S EXPERIENCE: ${experienceSummary || "Not provided"}
+SENDER'S PROJECTS: ${projectsSummary || "Not provided"}
+
+LENGTH: ${dmLength.toUpperCase()}
+${lengthGuide}
+
+INSTRUCTIONS:
+1. Start with a friendly, respectful greeting using the recipient's name if provided.
+2. Mention that you came across the "${role || "a position"}" role at ${company || "their company"} and are very interested in it.
+3. Highlight your strongest skills, experience, or projects that directly match the role/JD requirements. Show you are a strong fit for the role.
+4. Politely ask if the recipient would be willing to refer you or share any insights about the role.
+5. STRICTLY follow the LENGTH instruction above. ${dmLength === 'short' ? '2-3 lines only.' : dmLength === 'long' ? '7-8 detailed lines.' : '4-5 lines.'}
+6. Be warm, genuine, and professional. Show respect for their time.
+7. End with a clear but polite ask for a referral.
+8. Sign off with "Best regards,\n${userName || "[Your Name]"}".
+9. Do NOT use placeholder names like "[Your Name]". Always use the actual sender name.
+
+Output ONLY the DM text. No explanations.`;
+            })();
 
         try {
             const resp = await fetch("/api/groq", {
@@ -79,11 +143,23 @@ const Networking = () => {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     model: "llama-3.3-70b-versatile",
-                    messages: [{ role: "user", content: prompt }]
+                    temperature: 0.7,
+                    max_tokens: 1500,
+                    messages: [
+                        { role: "system", content: "You are an expert job networking assistant. You write compelling, personalized outreach messages that get responses. Never use placeholder text like [Your Name] — always use the actual sender name provided." },
+                        { role: "user", content: prompt }
+                    ]
                 })
             });
             const json = await resp.json();
-            setOutput(json.choices?.[0]?.message?.content || "Failed to generate.");
+            let output = json.choices?.[0]?.message?.content || "Failed to generate.";
+            // Replace any remaining placeholders with actual name
+            if (userName) {
+                output = output.replace(/\[Your Name\]/gi, userName);
+                output = output.replace(/\[Your Full Name\]/gi, userName);
+                output = output.replace(/\[Name\]/gi, userName);
+            }
+            setOutput(output);
         } catch (err) {
             setOutput("Error connecting to AI. Please try again.");
         } finally {
@@ -193,9 +269,22 @@ const Networking = () => {
                         <div className="nw-card nw-3d-card outreach-section">
                             <div className="nw-section-header">
                                 <h2 className="nw-card-title">LinkedIn & Other DMs</h2>
-                                <button className="nw-btn-primary nw-3d-btn" onClick={() => generateOutreach('dm')} disabled={loadingDm}>
-                                    {loadingDm ? "Writing..." : "Generate DM"}
-                                </button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <div className="nw-length-toggle">
+                                        {['short', 'medium', 'long'].map(len => (
+                                            <button
+                                                key={len}
+                                                className={`nw-length-btn${dmLength === len ? ' active' : ''}`}
+                                                onClick={() => setDmLength(len)}
+                                            >
+                                                {len.charAt(0).toUpperCase() + len.slice(1)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button className="nw-btn-primary nw-3d-btn" onClick={() => generateOutreach('dm')} disabled={loadingDm}>
+                                        {loadingDm ? "Writing..." : "Generate DM"}
+                                    </button>
+                                </div>
                             </div>
                             <div className="nw-output-area">
                                 {dmEditMode ? (

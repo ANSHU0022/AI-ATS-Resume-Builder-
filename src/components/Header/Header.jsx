@@ -49,8 +49,7 @@ export default function Header() {
         <nav className="rf-nav">
             <div className="rf-nav-container">
                 <button className="rf-logo" type="button" onClick={() => navigate('/')}>
-                    <span className="rf-logo-icon">A</span>
-                    <span className="rf-logo-text">ATS<em>Forge</em></span>
+                    <img src="/high-resolution-color-logo.png" alt="ATSForge Logo" className="rf-logo-img" />
                 </button>
 
                 {/* Desktop Nav */}
@@ -116,8 +115,7 @@ export default function Header() {
                         >
                             <div className="rf-sidebar-header">
                                 <button className="rf-logo" type="button" onClick={() => { navigate('/'); closeMenu(); }}>
-                                    <span className="rf-logo-icon">A</span>
-                                    <span className="rf-logo-text">ATS<em>Forge</em></span>
+                                    <img src="/high-resolution-color-logo.png" alt="ATSForge Logo" className="rf-logo-img" />
                                 </button>
                                 <button className="rf-close-btn" onClick={closeMenu}>
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>

@@ -7,17 +7,22 @@ const columns = [
         links: [
             { label: 'Resume Builder', path: '/builder' },
             { label: 'LaTeX Editor', path: '/latex-editor' },
-            { label: 'CV Upload & Auto-fill', path: '/builder' },
+            { label: 'CV Upload & Auto-fill', path: '/builder', state: { openUpload: true } },
             { label: 'Cover Letter Generator', path: '/cover-letter' },
+            { label: 'Job Description Keyword Match', path: '/builder', state: { openJDPanel: true } },
+            { label: 'Networking', path: '/networking' },
         ],
     },
     {
         title: 'Features',
         links: [
-            { label: 'ATS Score Checker' },
-            { label: 'AI Summary Generator' },
-            { label: 'JD Keyword Match' },
-            { label: 'PDF Export' },
+            { label: 'ATS Score Checker', path: '/builder' },
+            { label: 'AI Summary Generator', path: '/builder' },
+            { label: 'JD Keyword Match', path: '/builder', state: { openJDPanel: true } },
+            { label: 'PDF Export', path: '/builder' },
+            { label: 'Cold Email', path: '/networking' },
+            { label: 'Cold DM', path: '/networking' },
+            { label: '100+ Job Portals', path: '/job-portals' },
         ],
     },
     {
@@ -42,8 +47,7 @@ export default function Footer() {
                 {/* Brand column */}
                 <div className="footer-brand">
                     <div className="footer-logo" onClick={() => navigate('/')}>
-                        <div className="footer-logo-icon">A</div>
-                        <span className="footer-logo-text">ATS<em>Forge</em></span>
+                        <img src="/high-resolution-color-logo.png" alt="ATSForge Logo" className="footer-logo-img" />
                     </div>
                     <p className="footer-tagline">
                         Build professional, ATS-optimized resumes in minutes.<br />
@@ -59,7 +63,7 @@ export default function Footer() {
                             <span
                                 key={link.label}
                                 className="footer-col-link"
-                                onClick={link.path ? () => navigate(link.path) : undefined}
+                                onClick={link.path ? () => navigate(link.path, { state: link.state }) : undefined}
                             >
                                 {link.label}
                             </span>

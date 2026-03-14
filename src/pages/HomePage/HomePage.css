@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap');
 
 .hero-page {
   --black: #111111;
@@ -238,25 +238,25 @@
 }
 
 .blob-1 {
-  width: 440px;
-  height: 360px;
-  background: rgba(150, 80, 230, 0.30);
+  width: 480px;
+  height: 400px;
+  background: rgba(150, 80, 230, 0.52);
   top: 5%;
   right: -5%;
 }
 
 .blob-2 {
-  width: 360px;
-  height: 340px;
-  background: rgba(190, 100, 250, 0.26);
+  width: 400px;
+  height: 380px;
+  background: rgba(190, 100, 250, 0.45);
   bottom: 0%;
   right: 8%;
 }
 
 .blob-3 {
-  width: 280px;
-  height: 260px;
-  background: rgba(255, 175, 80, 0.20);
+  width: 320px;
+  height: 300px;
+  background: rgba(255, 175, 80, 0.35);
   top: 18%;
   right: 32%;
 }
@@ -264,8 +264,8 @@
 .mockup-scene {
   position: relative;
   perspective: 1400px;
-  width: 500px;
-  height: 560px;
+  width: 540px;
+  height: 600px;
   transform: scale(1.02);
   transform-origin: center top;
 }
@@ -916,6 +916,118 @@
 .tdot.active {
   background: #7c5cbf;
   transform: scale(1.3);
+}
+
+/* ─── 3D Resume Card ─── */
+.resume3d-wrapper {
+  position: absolute;
+  right: 0;
+  top: 10px;
+  width: 410px;
+  height: 570px;
+  z-index: 4;
+  cursor: grab;
+  transform-style: preserve-3d;
+  will-change: transform;
+  animation: resume3dEntry 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.resume3d-wrapper:active {
+  cursor: grabbing;
+}
+
+@keyframes resume3dEntry {
+  from {
+    opacity: 0;
+    transform: rotateY(-25deg) rotateX(6deg) translateY(40px) scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: rotateY(0deg) rotateX(0deg) translateY(0) scale(1);
+  }
+}
+
+.resume3d-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.04),
+    0 14px 36px rgba(0, 0, 0, 0.12),
+    0 36px 70px rgba(0, 0, 0, 0.08);
+}
+
+.resume3d-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: top center;
+  background: #fff;
+  opacity: 0;
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  user-select: none;
+  image-rendering: -webkit-optimize-contrast;
+}
+
+.resume3d-img.active {
+  opacity: 1;
+}
+
+.resume3d-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+  z-index: 2;
+  mix-blend-mode: overlay;
+}
+
+.resume3d-shadow {
+  position: absolute;
+  bottom: -18px;
+  left: 8%;
+  width: 84%;
+  height: 40px;
+  background: radial-gradient(ellipse at center, rgba(80, 50, 140, 0.35) 0%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(12px);
+  pointer-events: none;
+  transition: all 0.3s ease;
+  z-index: -1;
+}
+
+.resume3d-dots {
+  position: absolute;
+  bottom: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 20;
+}
+
+.resume3d-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(124, 92, 191, 0.2);
+  transition: all 0.4s ease;
+  cursor: default;
+}
+
+.resume3d-dot.active {
+  background: #7c5cbf;
+  transform: scale(1.4);
+  box-shadow: 0 0 8px rgba(124, 92, 191, 0.4);
 }
 
 .chip {
