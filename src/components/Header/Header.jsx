@@ -25,6 +25,8 @@ export default function Header() {
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
+        // Clear application cache immediately
+        localStorage.removeItem("resume-data-cache");
         setIsMenuOpen(false);
         navigate('/');
     };

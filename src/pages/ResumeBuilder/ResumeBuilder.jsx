@@ -49,7 +49,7 @@ const initialData = {
   summary: "",
   skills: [{ category: "Programming Languages", items: "" }, { category: "Tools & Technologies", items: "" }, { category: "Soft Skills", items: "" }],
   education: [{ degree: "", institution: "", location: "", year: "", cgpa: "" }],
-  experience: [{ role: "", company: "", location: "", duration: "", bullets: [""] }],
+  experience: [{ role: "", company: "", location: "", duration: "", bullets: [""], link: "" }],
   projects: [{ name: "", tech: "", link: "", bullets: [""] }],
   certifications: [{ name: "", issuer: "", year: "" }],
   achievements: [{ title: "", url: "" }],
@@ -300,6 +300,25 @@ function PaginatedResume({ data, template, exportRef, headingFont, bodyFont, fon
   );
 }
 
+const LinkIconSVG = () => (
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 3, verticalAlign: "middle" }}>
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
+  </svg>
+);
+
+const WithLinkIcon = ({ url, text, color = "#1a1a1a", dec = "none" }) => {
+  if (!url) return <span style={{ color }}>{text}</span>;
+  const href = url.startsWith("http") ? url : `https://${url}`;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color, textDecoration: dec, display: "inline-flex", alignItems: "center" }} title={url}>
+      <span>{text}</span>
+      <LinkIconSVG />
+    </a>
+  );
+};
+
 // ── Template A (Classic) ──────────────────────────────────────────────────────
 function TemplateA({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.45 }) {
   const hf = headingFont?.family || "'Segoe UI', sans-serif";
@@ -342,7 +361,7 @@ function TemplateA({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
         <RS title="EXPERIENCE" headingFontFamily={hf}>
           {experience.filter(e => e.role).map((e, i) => (
             <div key={i} style={{ marginBottom: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}><strong style={{ fontFamily: hf }}>{e.company}</strong><span style={{ fontSize: "9pt", color: "#555" }}>{e.duration}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}><strong style={{ fontFamily: hf }}><WithLinkIcon url={e.link} text={e.company} /></strong><span style={{ fontSize: "9pt", color: "#555" }}>{e.duration}</span></div>
               <div style={{ display: "flex", justifyContent: "space-between" }}><em style={{ fontFamily: hf }}>Role - {e.role}</em><span style={{ fontSize: "9pt", color: "#555" }}>{e.location}</span></div>
               {e.bullets?.filter(b => b?.trim()).length > 0 && (
                 <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
@@ -358,7 +377,9 @@ function TemplateA({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
           {projects.filter(p => p.name).map((proj, i) => (
             <div key={i} style={{ marginBottom: 7 }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <strong style={{ fontFamily: hf }}>{proj.link ? <a href={proj.link.startsWith("http") ? proj.link : `https://${proj.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "none" }}>{proj.name}</a> : proj.name}</strong>
+                <strong style={{ fontFamily: hf }}>
+                  <WithLinkIcon url={proj.link} text={proj.name} />
+                </strong>
               </div>
               {proj.tech && <div style={{ fontSize: "9pt", color: "#555" }}>Tech: {proj.tech}</div>}
               {proj.bullets?.filter(b => b?.trim()).length > 0 && (
@@ -377,7 +398,7 @@ function TemplateA({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
               <li key={i} style={{ marginBottom: 2 }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span>
-                    {c.link ? <a href={c.link.startsWith("http") ? c.link : `https://${c.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "underline" }}>{c.name}</a> : c.name}
+                    <WithLinkIcon url={c.link} text={c.name} dec="underline" />
                     {c.issuer ? ` - ${c.issuer}` : ""}
                   </span>
                   {c.year && <span>{c.year}</span>}
@@ -392,8 +413,7 @@ function TemplateA({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
           <ul style={{ margin: 0, padding: "0 0 0 18px", listStyle: "disc" }}>
             {achievements.filter(a => a.title).map((a, i) => (
               <li key={i} style={{ marginBottom: 2 }}>
-                {a.title}
-                {a.url && <> <a href={a.url.startsWith("http") ? a.url : `https://${a.url}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", marginLeft: 4 }} title={a.url}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "middle" }}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg></a></>}
+                <WithLinkIcon url={a.url} text={a.title} />
               </li>
             ))}
           </ul>
@@ -417,9 +437,9 @@ function TemplateB({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
           {p.email && <div style={{ fontSize: "8.5pt", marginBottom: 4, wordBreak: "break-all" }}>{p.email}</div>}
           {p.phone && <div style={{ fontSize: "8.5pt", marginBottom: 4 }}>{p.phone}</div>}
           {p.location && <div style={{ fontSize: "8.5pt", marginBottom: 4 }}>{p.location}</div>}
-          {p.linkedin && <div style={{ fontSize: "8.5pt", marginBottom: 4 }}><a href={p.linkedin.startsWith("http") ? p.linkedin : `https://${p.linkedin}`} target="_blank" rel="noopener noreferrer" style={{ color: "#7fb3d3", textDecoration: "underline" }}>LinkedIn</a></div>}
-          {p.github && <div style={{ fontSize: "8.5pt", marginBottom: 4 }}><a href={p.github.startsWith("http") ? p.github : `https://${p.github}`} target="_blank" rel="noopener noreferrer" style={{ color: "#7fb3d3", textDecoration: "underline" }}>Github</a></div>}
-          {p.portfolio && <div style={{ fontSize: "8.5pt", marginBottom: 4 }}><a href={p.portfolio.startsWith("http") ? p.portfolio : `https://${p.portfolio}`} target="_blank" rel="noopener noreferrer" style={{ color: "#7fb3d3", textDecoration: "underline" }}>Portfolio</a></div>}
+          {p.linkedin && <div style={{ fontSize: "8.5pt", marginBottom: 4 }}><WithLinkIcon url={p.linkedin} text="LinkedIn" color="#7fb3d3" dec="underline" /></div>}
+          {p.github && <div style={{ fontSize: "8.5pt", marginBottom: 4 }}><WithLinkIcon url={p.github} text="Github" color="#7fb3d3" dec="underline" /></div>}
+          {p.portfolio && <div style={{ fontSize: "8.5pt", marginBottom: 4 }}><WithLinkIcon url={p.portfolio} text="Portfolio" color="#7fb3d3" dec="underline" /></div>}
         </SS>
         {skills.some(s => s.items) && (
           <SS title="SKILLS" headingFontFamily={hf}>
@@ -437,7 +457,7 @@ function TemplateB({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
               <div key={i} style={{ marginBottom: 5, fontSize: "9pt", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
                   <div style={{ color: "#ecf0f1" }}>
-                    {c.link ? <a href={c.link.startsWith("http") ? c.link : `https://${c.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#ecf0f1", textDecoration: "underline" }}>{c.name}</a> : c.name}
+                    <WithLinkIcon url={c.link} text={c.name} color="#ecf0f1" dec="underline" />
                   </div>
                   {c.issuer && <div style={{ color: "#bdc3c7", fontSize: "8pt" }}>{c.issuer}</div>}
                 </div>
@@ -451,8 +471,7 @@ function TemplateB({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
             <ul style={{ margin: 0, padding: "0 0 0 14px", listStyle: "disc", fontSize: "9pt", lineHeight: 1.6 }}>
               {achievements.filter(a => a.title).map((a, i) => (
                 <li key={i} style={{ marginBottom: 2 }}>
-                  {a.title}
-                  {a.url && <> <a href={a.url.startsWith("http") ? a.url : `https://${a.url}`} target="_blank" rel="noopener noreferrer" style={{ color: "#ecf0f1", marginLeft: 4 }} title={a.url}><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "middle" }}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg></a></>}
+                  <WithLinkIcon url={a.url} text={a.title} color="#ecf0f1" />
                 </li>
               ))}
             </ul>
@@ -475,7 +494,7 @@ function TemplateB({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
           <RS title="EXPERIENCE" accent="#2c3e50" headingFontFamily={hf}>
             {experience.filter(e => e.role).map((e, i) => (
               <div key={i} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}><strong style={{ fontFamily: hf }}>{e.role}</strong><span style={{ fontSize: "9pt", color: "#555" }}>{e.duration}</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><strong style={{ fontFamily: hf }}><WithLinkIcon url={e.link} text={e.role} color={C.accent} /></strong><span style={{ fontSize: "9pt", color: "#555" }}>{e.duration}</span></div>
                 <div style={{ color: "#2c3e50", fontStyle: "italic", fontFamily: hf }}>{e.company}{e.location ? ` Â· ${e.location}` : ""}</div>
                 {e.bullets?.filter(b => b?.trim()).length > 0 && (
                   <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
@@ -490,7 +509,7 @@ function TemplateB({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
           <RS title="PROJECTS" accent="#2c3e50" headingFontFamily={hf}>
             {projects.filter(p => p.name).map((proj, i) => (
               <div key={i} style={{ marginBottom: 7 }}>
-                <strong style={{ fontFamily: hf }}>{proj.link ? <a href={proj.link.startsWith("http") ? proj.link : `https://${proj.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "none" }}>{proj.name}</a> : proj.name}</strong>{proj.tech && <span style={{ fontSize: "9pt", color: "#555" }}> Â· {proj.tech}</span>}
+                <strong style={{ fontFamily: hf }}><WithLinkIcon url={proj.link} text={proj.name} /></strong>{proj.tech && <span style={{ fontSize: "9pt", color: "#555" }}> Â· {proj.tech}</span>}
                 {proj.bullets?.filter(b => b?.trim()).length > 0 && (
                   <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
                     {proj.bullets.filter(b => b?.trim()).map((b, j) => <li key={j} style={{ marginBottom: 2 }}>{b}</li>)}
@@ -516,15 +535,15 @@ function TemplateC({ data, headingFont, bodyFont, fontSize = 9.5, lineHeight = 1
       {p.title && <div style={{ fontSize: "11pt", color: "#555", marginBottom: 8 }}>{p.title}</div>}
       <div style={{ fontSize: "8.5pt", color: "#444", marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
         {[p.email, p.phone, p.location].filter(Boolean).map((v, i) => <span key={i}>{v}</span>)}
-        {p.linkedin && <a href={p.linkedin.startsWith("http") ? p.linkedin : `https://${p.linkedin}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", textDecoration: "underline" }}>LinkedIn</a>}
-        {p.github && <a href={p.github.startsWith("http") ? p.github : `https://${p.github}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", textDecoration: "underline" }}>Github</a>}
-        {p.portfolio && <a href={p.portfolio.startsWith("http") ? p.portfolio : `https://${p.portfolio}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", textDecoration: "underline" }}>Portfolio</a>}
+        {p.linkedin && <WithLinkIcon url={p.linkedin} text="LinkedIn" color="#111" dec="underline" />}
+        {p.github && <WithLinkIcon url={p.github} text="Github" color="#111" dec="underline" />}
+        {p.portfolio && <WithLinkIcon url={p.portfolio} text="Portfolio" color="#111" dec="underline" />}
       </div>
       {summary && <><MH title="SUMMARY" headingFontFamily={hf} /><p style={{ margin: "0 0 10px 0", borderLeft: "3px solid #111", paddingLeft: 10 }}>{summary}</p></>}
       {skills.some(s => s.items) && (<><MH title="SKILLS" headingFontFamily={hf} />{skills.filter(s => s.items).map((s, i) => <div key={i} style={{ marginBottom: 3 }}><strong>{s.category}:</strong> {s.items}</div>)}<div style={{ marginBottom: 10 }} /></>)}
       {experience.some(e => e.role) && (<><MH title="EXPERIENCE" headingFontFamily={hf} />{experience.filter(e => e.role).map((e, i) => (
         <div key={i} style={{ marginBottom: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}><span><strong style={{ fontFamily: hf }}>{e.role}</strong> @ <span style={{ fontFamily: hf }}>{e.company}</span></span><strong>{e.duration}</strong></div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}><span><strong style={{ fontFamily: hf }}><WithLinkIcon url={e.link} text={e.role} color="#111" /></strong> @ <span style={{ fontFamily: hf }}>{e.company}</span></span><strong>{e.duration}</strong></div>
           {e.bullets?.filter(b => b?.trim()).map((b, j) => <div key={j} style={{ paddingLeft: 12 }}>• {b}</div>)}
         </div>
       ))}</>)}
@@ -536,21 +555,21 @@ function TemplateC({ data, headingFont, bodyFont, fontSize = 9.5, lineHeight = 1
       ))}</>)}
       {projects.some(p => p.name) && (<><MH title="PROJECTS" headingFontFamily={hf} />{projects.filter(p => p.name).map((proj, i) => (
         <div key={i} style={{ marginBottom: 6 }}>
-          <strong style={{ fontFamily: hf }}>{proj.link ? <a href={proj.link.startsWith("http") ? proj.link : `https://${proj.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", textDecoration: "none" }}>{proj.name}</a> : proj.name}</strong>{proj.tech ? ` [${proj.tech}]` : ""}
+          <strong style={{ fontFamily: hf }}><WithLinkIcon url={proj.link} text={proj.name} color="#111" /></strong>{proj.tech ? ` [${proj.tech}]` : ""}
           {proj.bullets?.filter(b => b?.trim()).map((b, j) => <div key={j} style={{ paddingLeft: 12 }}>• {b}</div>)}
         </div>
       ))}</>)}
       {certifications.some(c => c.name) && (<><MH title="CERTIFICATIONS" headingFontFamily={hf} />{certifications.filter(c => c.name).map((c, i) => (
         <div key={i} style={{ marginBottom: 3, display: "flex", justifyContent: "space-between" }}>
           <span>
-            {c.link ? <a href={c.link.startsWith("http") ? c.link : `https://${c.link}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", textDecoration: "underline" }}>{c.name}</a> : c.name}
+            <WithLinkIcon url={c.link} text={c.name} color="#111" dec="underline" />
             {c.issuer ? ` — ${c.issuer}` : ""}
           </span>
           {c.year && <span>{c.year}</span>}
         </div>
       ))}</>)}
       {achievements?.some(a => a.title) && (<><MH title="ACHIEVEMENTS & AWARDS" headingFontFamily={hf} />{achievements.filter(a => a.title).map((a, i) => (
-        <div key={i} style={{ marginBottom: 3, paddingLeft: 12 }}>• {a.title}{a.url && <> <a href={a.url.startsWith("http") ? a.url : `https://${a.url}`} target="_blank" rel="noopener noreferrer" style={{ color: "#111", marginLeft: 4 }} title={a.url}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "middle" }}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg></a></>}</div>
+        <div key={i} style={{ marginBottom: 3, paddingLeft: 12 }}>• <WithLinkIcon url={a.url} text={a.title} color="#111" /></div>
       ))}</>)}
     </div>
   );
@@ -1385,45 +1404,112 @@ function ResumeBuilder() {
 
   const [user, setUser] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const fetchLockRef = useRef(null); // To prevent concurrent same-user fetches
+
+  // Robust helper to fetch from DB with a timeout
+  const fetchResumeFromDB = async (userId) => {
+    if (!userId) return;
+    
+    // Deduplicate: If we fetched successfully in the last 10 seconds, skip redundant triggers
+    const now = Date.now();
+    if (fetchLockRef.current && fetchLockRef.current.userId === userId && (now - fetchLockRef.current.ts < 10000)) {
+       return;
+    }
+
+    setIsFetching(true);
+    try {
+      // 30s timeout to handle Supabase cold starts/slow regions
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Database Timeout (30s)")), 30000));
+      const query = supabase.from('resume_data').select('resume_data').eq('user_id', userId).maybeSingle();
+      
+      const { data: dbData, error } = await Promise.race([query, timeout]);
+      
+      if (error) throw error;
+      if (dbData) {
+        loadResumeData(dbData);
+        // Mark as successfully fetched recently
+        fetchLockRef.current = { userId, ts: Date.now() };
+      }
+    } catch (err) {
+      console.error("Fetch failure:", err.message);
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  const loadResumeData = (dbData) => {
+    if (dbData?.resume_data) {
+      let parsed = dbData.resume_data;
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch (e) { }
+      }
+      if (parsed && typeof parsed === 'object') {
+        // Save to cache for next load
+        localStorage.setItem("resume-data-cache", JSON.stringify(parsed));
+        
+        setData((prev) => {
+          const next = { 
+            ...prev, 
+            ...parsed, 
+            personal: { ...prev.personal, ...(parsed.personal || {}) } 
+          };
+          ['education', 'experience', 'projects', 'certifications', 'achievements', 'skills'].forEach(f => {
+             if (!next[f] || !Array.isArray(next[f])) next[f] = prev[f] || [];
+          });
+          return next;
+        });
+      }
+    }
+  };
 
   // Check auth and load saved resume
   useEffect(() => {
-    const fetchSessionAndData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
+    let isMounted = true;
 
-        // Fetch saved resume
-        const { data: dbData, error } = await supabase
-          .from('resume_data')
-          .select('resume_data')
-          .eq('user_id', session.user.id)
-          .single();
-
-        if (dbData?.resume_data && !error) {
-          // Merge with initial data to ensure all structural keys (e.g. arrays for projects) exist
-          setData((prev) => ({ ...prev, ...dbData.resume_data }));
-        }
+    // 1. Initial manual check & Cache Restore
+    (async () => {
+      // Immediate Cache Restore for "Instant Load" feel
+      const cache = localStorage.getItem("resume-data-cache");
+      if (cache) {
+        try {
+          const parsedCache = JSON.parse(cache);
+          if (parsedCache && typeof parsedCache === 'object') {
+             setData(prev => ({ ...prev, ...parsedCache }));
+          }
+        } catch (e) {}
       }
-    };
-    fetchSessionAndData();
 
-    // Listen to login/logout events cleanly
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!isMounted) return;
       if (session?.user) {
         setUser(session.user);
-        const { data: dbData } = await supabase.from('resume_data').select('resume_data').eq('user_id', session.user.id).single();
-        if (dbData?.resume_data) {
-          setData((prev) => ({ ...prev, ...dbData.resume_data }));
+        await fetchResumeFromDB(session.user.id);
+      }
+    })();
+
+    // 2. Auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+
+      if (session?.user) {
+        setUser(session.user);
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+           await fetchResumeFromDB(session.user.id);
         }
       } else {
+        // Any state where user is missing should clear the sensitive data
         setUser(null);
-        setData(initialData); // Reset to blank if logged out
+        setData(initialData);
+        localStorage.removeItem("resume-data-cache");
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSaveToDb = async () => {
@@ -1431,23 +1517,40 @@ function ResumeBuilder() {
       alert("Please sign in or create an account to save your resume seamlessly.");
       return;
     }
+    if (isSaving) return; // Prevent multiple concurrent clicks
 
     setIsSaving(true);
     try {
-      const { error } = await supabase.from('resume_data').upsert({
+      // Create a 10-second timeout promise to prevent infinite freezes
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Network Timeout: Request took more than 10 seconds")), 10000));
+      
+      // Upsert the data explicitly and ask for the row back (.select()) to guarantee it was written
+      const savePromise = supabase.from('resume_data').upsert({
         user_id: user.id,
         resume_data: data,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id' });
+      }, { onConflict: 'user_id' }).select();
 
-      if (error) throw error;
+      const { data: savedRows, error } = await Promise.race([savePromise, timeoutPromise]);
+
+      if (error) {
+         throw error;
+      }
+      
+      // If no error but no rows returned, RLS physically blocked the write
+      if (!savedRows || savedRows.length === 0) {
+         throw new Error("Supabase returned no updated rows. Database RLS policy likely rejected the update.");
+      }
+
+      // Update cache on success
+      localStorage.setItem("resume-data-cache", JSON.stringify(data));
 
       setSaveMessage("Saved!");
       setTimeout(() => setSaveMessage(""), 2500);
     } catch (err) {
-      console.error(err);
-      setSaveMessage("Failed to save");
-      setTimeout(() => setSaveMessage(""), 3000);
+      console.error("Save error:", err);
+      setSaveMessage("Err: " + (err.message || "Failed"));
+      setTimeout(() => setSaveMessage(""), 4000);
     } finally {
       setIsSaving(false);
     }
@@ -1597,7 +1700,16 @@ function ResumeBuilder() {
   const CS = { background: "#ffffff", border: `1px solid #e2e8f0`, borderRadius: 14, padding: 18, marginBottom: 16, boxShadow: "0 4px 10px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.03), inset 0 2px 0 rgba(255,255,255,1), inset 0 -2px 0 rgba(0,0,0,0.02)" };
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: C.appBg, fontFamily: "'Sora', sans-serif", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100vh", background: C.appBg, fontFamily: "'Sora', sans-serif", overflow: "hidden", position: "relative" }}>
+      {/* Loading Overlay for Initial Fetch */}
+      {isFetching && !data.personal.name && (
+        <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.85)", zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}>
+          <div style={{ width: 44, height: 44, border: `3.5px solid ${C.accentLight}`, borderTop: `3.5px solid ${C.accent}`, borderRadius: "50%", animation: "resume-fetch-spin 1s linear infinite", marginBottom: 18 }} />
+          <style>{`@keyframes resume-fetch-spin { to { transform: rotate(360deg); } }`}</style>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.accent, letterSpacing: 0.5 }}>Syncing your resume...</div>
+          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6, fontWeight: 500 }}>Connecting to secure database</div>
+        </div>
+      )}
 
       {showJD && <JDAnalyzerModal onClose={() => setShowJD(false)} data={data} setData={setData} />}
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} onParsed={handleParsed} />}
@@ -1678,12 +1790,14 @@ function ResumeBuilder() {
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               {/* Save Button */}
-              <button onClick={handleSaveToDb}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#fff", border: `1.5px solid ${C.inputBorder}`, borderRadius: 8, color: C.textMuted, fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}>
+              <button onClick={handleSaveToDb} disabled={isSaving}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#fff", border: `1.5px solid ${C.inputBorder}`, borderRadius: 8, color: C.textMuted, fontSize: 11, fontWeight: 700, cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.7 : 1, transition: "all 0.2s" }}>
                 {isSaving ? (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg>
                 ) : saveMessage === "Saved!" ? (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#15803d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                ) : saveMessage.startsWith("Err:") ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 ) : (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                 )} {saveMessage || "Save"}
@@ -2017,16 +2131,22 @@ function BulletEditor({ bullets, onUpdate, onAdd, onRemove, IS, placeholder }) {
 
 // ── Form Sections ─────────────────────────────────────────────────────────────
 function PersonalForm({ data, update, IS }) {
+  // Use a safer lookup for the values
+  const getValue = (path) => {
+    const key = path.split(".")[1];
+    return data[key] || "";
+  };
+
   return (
     <div>
       <SH title="Personal Details" icon={icons.user} />
       {[["Full Name", "personal.name", "Anshu Prasad"], ["Job Title", "personal.title", "Data Analyst | AI Automation"], ["Email", "personal.email", "you@email.com"], ["Phone", "personal.phone", "+91-9876543210"], ["Location", "personal.location", "Noida, India"]].map(([lbl, path, ph]) => (
-        <div key={path} style={{ marginBottom: 9 }}><FL>{lbl}</FL><input value={data[path.split(".")[1]] || ""} onChange={e => update(path, e.target.value)} placeholder={ph} style={IS} /></div>
+        <div key={path} style={{ marginBottom: 9 }}><FL>{lbl}</FL><input value={getValue(path)} onChange={e => update(path, e.target.value)} placeholder={ph} style={IS} /></div>
       ))}
       <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10, marginTop: 6 }}>
         <div style={{ fontSize: 10.5, fontWeight: 700, color: C.accent, marginBottom: 8 }}>🔗 Links <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 10 }}>(clickable in resume)</span></div>
         {[["LinkedIn URL", "personal.linkedin", "https://linkedin.com/in/yourname"], ["GitHub URL", "personal.github", "https://github.com/yourname"], ["Portfolio URL", "personal.portfolio", "https://yourportfolio.com"]].map(([lbl, path, ph]) => (
-          <div key={path} style={{ marginBottom: 9 }}><FL>{lbl}</FL><input value={data[path.split(".")[1]] || ""} onChange={e => update(path, e.target.value)} placeholder={ph} style={IS} /></div>
+          <div key={path} style={{ marginBottom: 9 }}><FL>{lbl}</FL><input value={getValue(path)} onChange={e => update(path, e.target.value)} placeholder={ph} style={IS} /></div>
         ))}
       </div>
     </div>
@@ -2104,8 +2224,8 @@ function ExperienceForm({ experience, setData, IS, CS }) {
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted }}>Experience #{i + 1}</span><RB onClick={() => del(i)} />
           </div>
-          {[["Job Title / Role", "role"], ["Company", "company"], ["Location", "location"], ["Duration", "duration"]].map(([lbl, k]) => (
-            <div key={k} style={{ marginBottom: 7 }}><FL>{lbl}</FL><input value={e[k]} onChange={el => upd(i, k, el.target.value)} placeholder={k === "duration" ? "Jan 2025 - Present" : ""} style={IS} /></div>
+          {[["Job Title / Role", "role"], ["Company", "company"], ["Location", "location"], ["Duration", "duration"], ["Certification URL", "link"]].map(([lbl, k]) => (
+            <div key={k} style={{ marginBottom: 7 }}><FL>{lbl}</FL><input value={e[k] || ""} onChange={el => upd(i, k, el.target.value)} placeholder={k === "duration" ? "Jan 2025 - Present" : k === "link" ? "https://..." : ""} style={IS} /></div>
           ))}
           <BulletEditor bullets={e.bullets} onUpdate={(j, v) => updB(i, j, v)} onAdd={() => addB(i)} onRemove={(j) => delB(i, j)} IS={IS} placeholder="Built 3+ AI-driven apps improving efficiency by 30%" />
         </div>
@@ -2130,7 +2250,7 @@ function ProjectsForm({ projects, setData, IS, CS }) {
             <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted }}>Project #{i + 1}</span><RB onClick={() => del(i)} />
           </div>
           {[["Project Name", "name"], ["Tech Stack", "tech"], ["Project Link", "link"]].map(([lbl, k]) => (
-            <div key={k} style={{ marginBottom: 7 }}><FL>{lbl}</FL><input value={proj[k]} onChange={e => upd(i, k, e.target.value)} style={IS} /></div>
+            <div key={k} style={{ marginBottom: 7 }}><FL>{lbl}</FL><input value={proj[k] || ""} onChange={e => upd(i, k, e.target.value)} style={IS} /></div>
           ))}
           <BulletEditor bullets={proj.bullets} onUpdate={(j, v) => updB(i, j, v)} onAdd={() => addB(i)} onRemove={(j) => delB(i, j)} IS={IS} placeholder="Built AI-powered dashboard with 10K+ real-time records" />
         </div>
