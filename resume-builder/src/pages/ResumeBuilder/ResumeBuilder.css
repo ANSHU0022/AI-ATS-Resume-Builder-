@@ -1,0 +1,387 @@
+.resume-container {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    background: white;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+}
+
+@page { size: A4; margin: 0; }
+
+@media print {
+    body { background: white !important; }
+    .resume-container {
+        box-shadow: none !important;
+        padding-top: 10mm;
+        padding-bottom: 10mm;
+        box-sizing: border-box;
+        width: 210mm !important;
+        margin: 0 !important;
+    }
+}
+
+/* Glassmorphism card */
+.card {
+    backdrop-filter: blur(16px) saturate(200%);
+    -webkit-backdrop-filter: blur(16px) saturate(200%);
+    background-color: rgba(107, 83, 128, 0.55);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.custom-scroll::-webkit-scrollbar { width: 4px; }
+.custom-scroll::-webkit-scrollbar-track { background: transparent; }
+.custom-scroll::-webkit-scrollbar-thumb { background: rgba(203,213,225,0.8); border-radius: 4px; }
+.custom-scroll::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.9); }
+
+.modal-enter { animation: modalFadeIn 0.22s cubic-bezier(.25,.46,.45,.94); }
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.96) translateY(10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── ATS Score Card — compact horizontal layout ── */
+.rb-ats-score {
+    width: 92% !important;
+    margin-bottom: 8px !important;
+    box-sizing: border-box;
+}
+.rb-ats-score > div:first-child {
+    flex-direction: row !important;
+    align-items: center !important;
+    padding: 5px 10px !important;
+    gap: 8px !important;
+    border-radius: 10px !important;
+    width: 100% !important;
+    box-sizing: border-box;
+    justify-content: flex-start !important;
+}
+/* SVG circle wrapper — shrink */
+.rb-ats-score > div:first-child > div:first-child {
+    width: 42px !important;
+    height: 42px !important;
+    flex-shrink: 0 !important;
+}
+.rb-ats-score > div:first-child > div:first-child svg {
+    width: 42px !important;
+    height: 42px !important;
+}
+/* Score number */
+.rb-ats-score > div:first-child > div:first-child > div {
+    font-size: 12px !important;
+}
+/* Tips button — sits to the right */
+.rb-ats-score > div:first-child > button {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 2px !important;
+    font-size: 10px !important;
+    flex: 1;
+}
+/* ATS SCORE label above the card */
+.rb-ats-label {
+    display: block !important;
+    font-size: 9px !important;
+    font-weight: 800;
+    color: #111;
+    letter-spacing: 1.2px;
+    text-align: center;
+    margin-bottom: 4px !important;
+    margin-top: 0 !important;
+}
+
+/* Reduce top padding of sidebar so ATS card sits higher */
+.rb-sidebar {
+    padding-top: 14px !important;
+}
+
+/* ── Mobile ATS strip — hidden by default, shown on tablet/mobile ── */
+.rb-mobile-ats { display: none; }
+
+/* ── Preview toggle — hidden by default ── */
+.rb-preview-toggle { display: none; }
+
+/* ── Bottom nav — hidden by default ── */
+.rb-bottom-nav { display: none; }
+
+/* ── Section drawer — hidden by default ── */
+.rb-section-drawer { display: none; }
+
+/* ═══════════════════════════════════════════════════
+   TABLET  (≤ 1024px)
+═══════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+    .rb-layout {
+        flex-direction: column !important;
+        height: auto !important;
+        min-height: 100vh;
+        overflow: auto !important;
+    }
+    .rb-sidebar {
+        width: 100% !important;
+        flex-direction: row !important;
+        padding: 8px 10px !important;
+        gap: 6px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        align-items: center !important;
+        border-right: none !important;
+        border-bottom: 1px solid #e5e7eb !important;
+        flex-shrink: 0 !important;
+        flex-wrap: nowrap !important;
+        scrollbar-width: none;
+    }
+    .rb-sidebar::-webkit-scrollbar { display: none; }
+    .rb-ats-score { display: none !important; }
+    .rb-ats-label { display: none !important; }
+    .rb-sidebar button {
+        width: auto !important;
+        height: 34px !important;
+        padding: 0 12px !important;
+        border-radius: 20px !important;
+        font-size: 12px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        margin-bottom: 0 !important;
+    }
+    .rb-form-panel {
+        width: 100% !important;
+        flex-shrink: unset !important;
+        border-right: none !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    .rb-resizer { display: none !important; }
+    .rb-preview-panel { width: 100% !important; min-height: 600px; }
+    .rb-toolbar { flex-wrap: wrap !important; gap: 6px !important; padding: 8px 12px !important; }
+    .rb-preview-area { padding: 16px 8px 40px !important; align-items: center !important; }
+    .jd-modal-inner { width: 96vw !important; max-width: 96vw !important; max-height: 92vh !important; border-radius: 12px !important; }
+    .jd-modal-body { flex-direction: column !important; overflow-y: auto !important; }
+    .jd-modal-left { width: 100% !important; border-right: none !important; border-bottom: 1px solid #e5e7eb !important; flex-shrink: 0 !important; }
+    .jd-modal-right { min-height: 300px; }
+    .rb-mobile-ats {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 16px;
+        background: #f8f5ff;
+        border-bottom: 1px solid rgba(107,77,176,0.12);
+        font-size: 11px;
+        font-weight: 700;
+        color: #6B4DB0;
+    }
+}
+
+/* ═══════════════════════════════════════════════════
+   MOBILE  (≤ 640px)
+═══════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+    .rb-layout {
+        padding-bottom: 72px;
+    }
+
+    /* Hide desktop sidebar */
+    .rb-sidebar { display: none !important; }
+
+    /* Show bottom nav */
+    .rb-bottom-nav { display: flex !important; }
+
+    /* ── Header buttons: equal width, right-shifted, no wrap ── */
+    .rb-form-header-buttons {
+        flex-wrap: nowrap !important;
+        gap: 5px !important;
+        justify-content: flex-end !important;
+    }
+    .rb-form-header-buttons button {
+        font-size: 10px !important;
+        padding: 6px 8px !important;
+        gap: 3px !important;
+        flex: 1 !important;
+        min-width: 0 !important;
+        justify-content: center !important;
+        white-space: nowrap !important;
+    }
+
+    /* Toolbar */
+    .rb-toolbar { padding: 6px 10px !important; gap: 5px !important; row-gap: 6px !important; }
+    .rb-toolbar button, .rb-toolbar span { font-size: 11px !important; }
+
+    /* Preview */
+    .rb-preview-panel { min-height: 500px; }
+    .rb-preview-area {
+        padding: 12px 4px 40px !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* ── JD Modal: full screen, stacked, centered ── */
+    .jd-modal-inner {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        max-height: 100vh !important;
+        height: 100vh !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+    }
+    .jd-modal-body {
+        flex-direction: column !important;
+        overflow-y: auto !important;
+    }
+    .jd-modal-left {
+        width: 100% !important;
+        border-right: none !important;
+        border-bottom: 1px solid #e5e7eb !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        padding: 14px 16px !important;
+        box-sizing: border-box !important;
+    }
+    .jd-modal-left label {
+        text-align: center !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        margin-bottom: 8px !important;
+        display: block !important;
+    }
+    .jd-modal-left textarea {
+        width: 100% !important;
+        min-height: 160px !important;
+        box-sizing: border-box !important;
+    }
+    /* Analyze Keywords button — full width, centered */
+    .jd-modal-left > button {
+        width: 100% !important;
+        justify-content: center !important;
+        text-align: center !important;
+        box-sizing: border-box !important;
+    }
+    .jd-modal-right {
+        min-height: 280px;
+        padding: 14px 16px !important;
+    }
+
+    /* ── Font panel: anchored, fits screen, not overflow ── */
+    .rb-font-panel-wrap-trigger > div {
+        position: fixed !important;
+        top: 54px !important;
+        right: 8px !important;
+        left: 8px !important;
+        width: auto !important;
+        max-height: 68vh !important;
+        overflow-y: auto !important;
+        border-radius: 14px !important;
+        z-index: 9999 !important;
+        padding: 12px 10px !important;
+    }
+    .rb-font-cols {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+    .rb-font-divider { display: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════
+   BOTTOM NAV — 3D style + curved top corners
+═══════════════════════════════════════════════════ */
+.rb-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: linear-gradient(180deg, #faf8ff 0%, #f0ecfa 100%);
+    border-top: 1.5px solid rgba(107,77,176,0.15);
+    border-radius: 20px 20px 0 0;
+    z-index: 200;
+    align-items: center;
+    padding: 0 6px;
+    box-shadow:
+        0 -4px 24px rgba(107,77,176,0.12),
+        0 -1px 0 rgba(255,255,255,0.9) inset;
+}
+.rb-bottom-nav button {
+    flex: 1;
+    border: none;
+    background: linear-gradient(160deg, #ffffff 0%, #f5f2fc 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 7px 4px;
+    transition: color 0.15s, background 0.15s, transform 0.1s, box-shadow 0.1s;
+    letter-spacing: 0.3px;
+    border-radius: 12px;
+    margin: 5px 3px;
+    box-shadow:
+        0 3px 6px rgba(0,0,0,0.08),
+        0 1px 2px rgba(0,0,0,0.04),
+        inset 0 1px 0 rgba(255,255,255,1),
+        inset 0 -2px 0 rgba(0,0,0,0.05);
+}
+.rb-bottom-nav button:active {
+    transform: translateY(2px);
+    box-shadow:
+        0 1px 2px rgba(0,0,0,0.06),
+        inset 0 2px 4px rgba(0,0,0,0.10);
+}
+.rb-bottom-nav button.active {
+    color: #6B4DB0;
+    background: linear-gradient(160deg, #ede8f8 0%, #ddd4f5 100%);
+    box-shadow:
+        0 3px 10px rgba(107,77,176,0.20),
+        inset 0 1px 0 rgba(255,255,255,0.9),
+        inset 0 -2px 0 rgba(107,77,176,0.15);
+}
+.rb-bottom-nav button svg { flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════════════
+   SECTION DRAWER
+═══════════════════════════════════════════════════ */
+.rb-section-drawer {
+    position: fixed;
+    bottom: 64px;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
+    z-index: 190;
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 7px;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.10);
+    max-height: 50vh;
+    overflow-y: auto;
+    animation: drawerUp 0.22s cubic-bezier(.25,.46,.45,.94);
+}
+.rb-section-drawer.open { display: flex; }
+@keyframes drawerUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+}
+.rb-section-drawer button {
+    flex: 0 0 auto;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1.5px solid #e5e7eb;
+    background: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    color: #4b5563;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+}
+.rb-section-drawer button.active {
+    border-color: #6B4DB0;
+    background: rgba(107,77,176,0.08);
+    color: #6B4DB0;
+}
