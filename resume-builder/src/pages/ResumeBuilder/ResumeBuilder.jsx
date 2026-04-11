@@ -7,6 +7,8 @@ import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.js?url";
 import LatexEditor from "../latex-editor/pages";
 import FontPickerPanel from "../../components/FontPickerPanel/FontPickerPanel";
 import { supabase } from "../../lib/supabase";
+import Template4 from "./templates/Template4";
+import Template5Preview from "./components/Template5Preview";
 import "./ResumeBuilder.css";
 // Set the workerSrc for PDF.js globally
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
@@ -180,7 +182,7 @@ const FONT_PAIRS = [
 
 
 function PaginatedResume({ data, template, exportRef, headingFont, bodyFont, fontSize = 10, lineHeight = 1.45 }) {
-  const TemplateComp = template === "A" ? TemplateA : template === "B" ? TemplateB : TemplateC;
+  const TemplateComp = template === "A" ? TemplateA : template === "B" ? TemplateB : template === "C" ? TemplateC : Template4;
 
   const measureRef = useRef(null);
   const [totalH, setTotalH] = useState(PAGE_H);
@@ -327,7 +329,7 @@ function TemplateA({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
   return (
     <div style={{ fontSize: `${fontSize}pt`, color: "#1a1a1a", padding: "28px 32px", lineHeight: lineHeight, fontFamily: bf, background: "#fff" }}>
       <div style={{ textAlign: "center", marginBottom: 10 }}>
-        {p.name && <div style={{ fontSize: "22pt", fontWeight: 700, fontFamily: hf, letterSpacing: 1, marginBottom: 2 }}>{p.name}</div>}
+        {p.name && <div style={{ fontSize: "22pt", fontWeight: 600, fontFamily: hf, letterSpacing: 1, marginBottom: 2 }}>{p.name}</div>}
         {p.title && <div style={{ fontSize: "11pt", color: "#444", marginBottom: 7 }}>{p.title}</div>}
         <div style={{ fontSize: "9pt", color: "#333", display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "10px", alignItems: "center" }}>
           {p.phone && <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><BIcon path={icons.phone} />{p.phone}</span>}
@@ -338,7 +340,6 @@ function TemplateA({ data, headingFont, bodyFont, fontSize = 10, lineHeight = 1.
           {p.portfolio && <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><BIcon path={icons.globe} /><RLink href={p.portfolio} label="Portfolio" /></span>}
         </div>
       </div>
-      <hr style={{ border: "none", borderTop: "2px solid #1a1a1a", margin: "8px 0" }} />
       {summary && <RS title="SUMMARY" headingFontFamily={hf}><p style={{ margin: 0 }}>{summary}</p></RS>}
       {education.some(e => e.degree) && (
         <RS title="EDUCATION" headingFontFamily={hf}>
@@ -579,36 +580,131 @@ function TemplateC({ data, headingFont, bodyFont, fontSize = 9.5, lineHeight = 1
 
 function TemplateModal({ onClose, activeTemplate, onSelect }) {
   const templates = [
-    { id: "A", label: "Classic", desc: "Traditional layout optimized for strict ATS systems." },
-    { id: "B", label: "Modern", desc: "Contemporary look with a distinct sidebar for contact and skills." },
-    { id: "C", label: "Minimal", desc: "Clean and sparse design focusing purely on content." }
+    {
+      id: "A",
+      label: "Classic",
+      desc: "Traditional ATS-safe layout with clear sections and familiar hierarchy.",
+      badge: "ATS Safe",
+      audience: "General roles",
+      accent: "#4f46e5",
+      soft: "linear-gradient(180deg, #eef2ff 0%, #ffffff 100%)",
+      icon: icons.file,
+      layout: "classic",
+    },
+    {
+      id: "B",
+      label: "Modern",
+      desc: "Contemporary split layout with a stronger visual presence for mid-career resumes.",
+      badge: "Balanced",
+      audience: "Product, ops, business",
+      accent: "#0f766e",
+      soft: "linear-gradient(180deg, #ecfeff 0%, #ffffff 100%)",
+      icon: icons.layers,
+      layout: "sidebar",
+    },
+    {
+      id: "C",
+      label: "Minimal",
+      desc: "Clean compact layout that puts content first with minimal visual decoration.",
+      badge: "Minimal",
+      audience: "Simple applications",
+      accent: "#334155",
+      soft: "linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)",
+      icon: icons.book,
+      layout: "minimal",
+    },
+    {
+      id: "4",
+      label: "Template 4",
+      desc: "LaTeX-style builder template with a formal academic and analyst-friendly feel.",
+      badge: "Structured",
+      audience: "Analyst, academic, ops",
+      accent: "#7c3aed",
+      soft: "linear-gradient(180deg, #f5f3ff 0%, #ffffff 100%)",
+      icon: icons.award,
+      layout: "formal",
+    },
+    {
+      id: "5",
+      label: "Template 5",
+      desc: "Best for software engineer, AI, ML, data science, and developer-focused applications.",
+      badge: "Tech Recommended",
+      audience: "Software, AI, Data, ML",
+      accent: "#0f766e",
+      soft: "linear-gradient(135deg, #ecfeff 0%, #f0fdf4 45%, #ffffff 100%)",
+      icon: icons.code,
+      layout: "tech",
+    }
   ];
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10000, backdropFilter: "blur(4px)" }}>
-      <div className="modal-enter card" style={{ background: "#fff", width: 440, borderRadius: 20, padding: 32, boxShadow: "0 24px 48px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.1) inset", position: "relative" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 10000, backdropFilter: "blur(4px)", paddingTop: 96, paddingBottom: 16 }}>
+      <div className="modal-enter card" style={{ background: "#fff", width: "min(520px, calc(100vw - 20px))", maxHeight: "min(680px, calc(100vh - 20px))", borderRadius: 20, padding: 18, boxShadow: "0 24px 56px rgba(2, 6, 23, 0.22)", position: "relative", overflowY: "auto" }}>
         <button onClick={onClose} style={{ position: "absolute", top: 20, right: 20, width: 32, height: 32, background: "#f1f5f9", border: "none", borderRadius: "50%", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
-        <h2 style={{ margin: "0 0 24px 0", fontSize: 20, fontWeight: 800, color: "#0f172a", letterSpacing: -0.5 }}>Choose Template</h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {templates.map(t => (
-            <div key={t.id} onClick={() => { onSelect(t.id); onClose(); }}
-              style={{ padding: "16px 20px", borderRadius: 16, border: `2px solid ${activeTemplate === t.id ? '#6366f1' : '#f1f5f9'}`, background: activeTemplate === t.id ? '#eef2ff' : '#fff', cursor: "pointer", display: "flex", alignItems: "center", gap: 16, transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)", boxShadow: activeTemplate === t.id ? "0 4px 12px rgba(99, 102, 241, 0.15)" : "0 2px 4px transparent" }}>
-              <div style={{ width: 40, height: 52, background: activeTemplate === t.id ? '#fff' : '#f8fafc', border: `1px solid ${activeTemplate === t.id ? '#c7d2fe' : '#e2e8f0'}`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-                <span style={{ fontSize: 18, fontWeight: 900, color: activeTemplate === t.id ? '#6366f1' : '#94a3b8' }}>{t.id}</span>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: activeTemplate === t.id ? '#4f46e5' : '#1e293b', marginBottom: 4 }}>{t.label}</div>
-                <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.4 }}>{t.desc}</div>
-              </div>
-              {activeTemplate === t.id && (
-                <div style={{ width: 24, height: 24, background: "#6366f1", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+        <div style={{ marginBottom: 14, paddingRight: 34 }}>
+          <h2 style={{ margin: "0 0 5px 0", fontSize: 20, fontWeight: 900, color: "#0f172a", letterSpacing: -0.5 }}>Choose Template</h2>
+          <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.55 }}>
+            Template 5 is best for software, AI, ML, and data roles.
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {templates.map((t) => {
+            const isActive = activeTemplate === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => { onSelect(t.id); onClose(); }}
+                style={{
+                  textAlign: "left",
+                  padding: 0,
+                  borderRadius: 16,
+                  border: `2px solid ${isActive ? t.accent : "#e2e8f0"}`,
+                  background: isActive ? t.soft : "#fff",
+                  cursor: "pointer",
+                  transition: "transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease",
+                  boxShadow: isActive ? `0 12px 22px ${t.accent}18` : "0 4px 12px rgba(15, 23, 42, 0.04)",
+                  overflow: "hidden",
+                  position: "relative",
+                }}
+              >
+                <div style={{ padding: 14, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 12, flex: 1, minWidth: 0 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 12, background: isActive ? t.accent : "#f8fafc", border: `1px solid ${isActive ? `${t.accent}55` : "#e2e8f0"}`, display: "flex", alignItems: "center", justifyContent: "center", color: isActive ? "#fff" : t.accent, flexShrink: 0 }}>
+                      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d={t.icon} /></svg>
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, minWidth: 0 }}>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>{t.label}</span>
+                        {t.id === "5" && (
+                          <span style={{ padding: "3px 7px", borderRadius: 999, background: `${t.accent}18`, border: `1px solid ${t.accent}40`, color: t.accent, fontSize: 9, fontWeight: 800, letterSpacing: 0.3, whiteSpace: "nowrap" }}>
+                            Tech Focus
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#475569", lineHeight: 1.45, marginBottom: 6 }}>{t.desc}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 10, color: t.accent, fontWeight: 800, letterSpacing: 0.3 }}>{t.badge}</span>
+                        <span style={{ fontSize: 10, color: "#94a3b8" }}>•</span>
+                        <span style={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>{t.audience}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {isActive ? (
+                    <div style={{ width: 24, height: 24, borderRadius: "50%", background: t.accent, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0 }}>
+                      <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    </div>
+                  ) : (
+                    <div style={{ padding: "3px 7px", borderRadius: 999, background: "#f8fafc", border: "1px solid #e2e8f0", color: "#94a3b8", fontSize: 9, fontWeight: 800, flexShrink: 0 }}>
+                      {t.id}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -1446,6 +1542,8 @@ import Footer from '../../components/Footer/Footer.jsx';
 import Steps from '../../components/Steps.jsx';
 import Networking from '../Networking/Networking.jsx';
 import JobPortals from '../JobPortals/JobPortals.jsx';
+import PrivacyPolicy from '../Legal/PrivacyPolicy.jsx';
+import TermsAndConditions from '../Legal/TermsAndConditions.jsx';
 
 function App() {
   const location = useLocation();
@@ -1462,6 +1560,8 @@ function App() {
         <Route path="/steps" element={<Steps />} />
         <Route path="/networking" element={<Networking />} />
         <Route path="/job-portals" element={<JobPortals />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
       </Routes>
       {!hideFooter && <Footer />}
     </>
@@ -1667,9 +1767,10 @@ function ResumeBuilder() {
   const [showJD, setShowJD] = useState(false);
   const previewRef = useRef(null);
   const [numPages, setNumPages] = useState(1);
-  const [zoom, setZoom] = useState(80);
-  const [resumeFontSize, setResumeFontSize] = useState(10);
+  const [zoom, setZoom] = useState(100);
+  const [resumeFontSize, setResumeFontSize] = useState(9);
   const [resumeLineHeight, setResumeLineHeight] = useState(1.45);
+  const [template5Preview, setTemplate5Preview] = useState({ pdfUrl: null, isCompiling: false, errors: [], latexCode: "" });
 
   const [formWidth, setFormWidth] = useState(480);
   const [isDragging, setIsDragging] = useState(false);
@@ -1780,6 +1881,22 @@ function ResumeBuilder() {
 
   const atsColor = ats.score >= 75 ? "#15803d" : ats.score >= 50 ? "#b45309" : "#b91c1c";
   const atsBar = ats.score >= 75 ? "#22c55e" : ats.score >= 50 ? "#f59e0b" : "#ef4444";
+  const activeTemplateLabel = activeTemplate === "A" ? "Classic" : activeTemplate === "B" ? "Modern" : activeTemplate === "C" ? "Minimal" : activeTemplate === "4" ? "Template 4" : "Template 5";
+
+  const handleResumeDownload = () => {
+    if (activeTemplate === "5") {
+      if (!template5Preview.pdfUrl) return;
+      const link = document.createElement("a");
+      link.href = template5Preview.pdfUrl;
+      link.download = `${data.personal.name || "Resume"}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    exportPDF(previewRef, data.personal.name);
+  };
 
 
 
@@ -2114,7 +2231,7 @@ function ResumeBuilder() {
               <button onClick={() => setShowTemplateModal(true)}
                 style={{ padding: "5px 14px", border: `1.5px solid ${C.border}`, borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, background: "#fff", color: C.textLight, transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6 }}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg>
-                {activeTemplate === "A" ? "Classic" : activeTemplate === "B" ? "Modern" : "Minimal"}
+                {activeTemplateLabel}
               </button>
               <div style={{ flex: 1 }} />
 
@@ -2170,15 +2287,17 @@ function ResumeBuilder() {
                 </button>
               </div>
               {/* Export button */}
-              <button disabled={aiLoading} onClick={() => exportPDF(previewRef, data.personal.name)}
+              <button disabled={aiLoading || (activeTemplate === "5" && template5Preview.isCompiling)} onClick={handleResumeDownload}
                 style={{ height: 32, padding: "0 14px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.download} /></svg>
-                PDF
+                {activeTemplate === "5" && template5Preview.isCompiling ? "Compiling..." : "PDF"}
               </button>
             </div>
 
             <div className="rb-preview-area" style={{ flex: 1, overflowY: "auto", background: C.previewBg, padding: "28px 0 60px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-              {(() => {
+              {activeTemplate === "5" ? (
+                <Template5Preview data={data} onPreviewChange={setTemplate5Preview} />
+              ) : (() => {
                 const scale = windowWidth <= 640
                   ? Math.max(0.3, (windowWidth - 16) / PAGE_W)
                   : windowWidth <= 1024
@@ -2243,9 +2362,9 @@ function ResumeBuilder() {
           <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           Preview
         </button>
-        <button onClick={() => exportPDF(previewRef, data.personal.name)}>
+        <button onClick={handleResumeDownload} disabled={activeTemplate === "5" && template5Preview.isCompiling}>
           <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={icons.download} /></svg>
-          PDF
+          {activeTemplate === "5" && template5Preview.isCompiling ? "Compiling" : "PDF"}
         </button>
       </nav>
     </div>

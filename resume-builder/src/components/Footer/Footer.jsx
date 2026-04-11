@@ -78,9 +78,9 @@ export default function Footer() {
                 <div className="footer-bottom-links">
                     <span>Free to use</span>
                     <span className="footer-dot">·</span>
-                    <span>No data stored</span>
+                    <span className="footer-bottom-link" onClick={() => navigate('/privacy-policy')}>Privacy Policy</span>
                     <span className="footer-dot">·</span>
-                    <span>Open source friendly</span>
+                    <span className="footer-bottom-link" onClick={() => navigate('/terms-and-conditions')}>Terms & Conditions</span>
                 </div>
             </div>
         </footer>

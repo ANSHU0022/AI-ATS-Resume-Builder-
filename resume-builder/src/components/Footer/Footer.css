@@ -95,6 +95,16 @@
     gap: 8px;
 }
 
+.footer-bottom-link {
+    color: #111111;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.footer-bottom-link:hover {
+    color: #9333ea;
+}
+
 .footer-dot {
     color: #111111;
 }

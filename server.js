@@ -51,6 +51,9 @@ app.post("/api/groq", async (req, res) => {
 // Health check
 app.get("/api/health", (_, res) => res.json({ status: "ok", service: "Groq Proxy" }));
 
+// ── Proxy endpoint: /api/latex ─────────────────────────────────────────────────
+app.use('/api/latex', require('./resume-builder/backend/latex-editor/routes/latexRoutes.cjs'));
+
 // Fallback: serve React app for all other routes (SPA routing)
 app.get("*", (_, res) => res.sendFile(path.join(DIST_DIR, "index.html")));
 

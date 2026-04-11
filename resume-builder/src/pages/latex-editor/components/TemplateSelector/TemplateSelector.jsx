@@ -1,68 +1,28 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import styles from './TemplateSelector.module.css';
 
-// Import raw latex strings from the feature-local templates folder
-import { jakesResume } from '../../templates/jakesResume';
-import { altaCV } from '../../templates/altaCV';
-import { modernCV } from '../../templates/modernCV';
-import { awesomeCV } from '../../templates/awesomeCV';
 import { faangResume } from '../../templates/faangResume';
 
-const TEMPLATES = [
-    { id: 'faang', name: "FAANG Industry", description: "Single column, professional & ATS-optimized", content: faangResume }
-];
-
 export default function TemplateSelector({ onSelectTemplate }) {
-    const [isOpen, setIsOpen] = useState(false);
-    const dropdownRef = useRef(null);
-
-    // Close dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const handleSelect = (template) => {
+    const handleSelect = () => {
         // Basic confirmation dialog before overwriting
-        if (window.confirm(`Are you sure you want to load the ${template.name} template? This will overwrite your current code.`)) {
-            onSelectTemplate(template.content);
-            setIsOpen(false);
+        if (window.confirm('Are you sure you want to load the FAANG Industry template? This will overwrite your current code.')) {
+            onSelectTemplate(faangResume);
         }
     };
 
     return (
-        <div className={styles.selectorContainer} ref={dropdownRef}>
+        <div className={styles.selectorContainer}>
             <button
                 className={styles.dropdownButton}
-                onClick={() => setIsOpen(!isOpen)}
-                title="FAANG Industry Template"
+                onClick={handleSelect}
+                title="Load FAANG Industry Template"
             >
                 FAANG Industry
-                <svg className={`${styles.chevron} ${isOpen ? styles.open : ''}`} viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="6 9 12 15 18 9"></polyline>
+                <svg className={styles.chevron} viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="7 13 12 8 17 13"></polyline>
                 </svg>
             </button>
-
-            {/* Dropdown menu removed as there's only one option and it's a direct action */}
-            {/* {isOpen && (
-                <div className={styles.dropdownMenu}>
-                    {TEMPLATES.map((tpl) => (
-                        <div
-                            key={tpl.id}
-                            className={styles.templateItem}
-                            onClick={() => handleSelect(tpl)}
-                        >
-                            <div className={styles.templateName}>{tpl.name}</div>
-                            <div className={styles.templateDesc}>{tpl.description}</div>
-                        </div>
-                    ))}
-                </div>
-            )} */}
         </div>
     );
 }

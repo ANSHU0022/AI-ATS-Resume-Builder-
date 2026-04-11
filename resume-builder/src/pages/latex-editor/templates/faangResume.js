@@ -92,9 +92,9 @@ export const faangResume = `\\documentclass[letterpaper,11pt]{article}
 \\begin{center}
     \\textbf{\\Huge \\scshape First Last} \\\\ \\vspace{1pt}
     \\small City, State $|$ 123-456-7890 $|$ \\href{mailto:email@example.com}{\\underline{email@example.com}} $|$ 
-    \\href{https://linkedin.com/in/username}{\\underline{linkedin.com/in/username}} $|$
-    \\href{https://github.com/username}{\\underline{github.com/username}} $|$
-    \\href{https://portfolio.com}{\\underline{portfolio.com}}
+    \\href{https://linkedin.com/in/username}{\\underline{Linkedin}} $|$
+    \\href{https://github.com/username}{\\underline{Github}} $|$
+    \\href{https://portfolio.com}{\\underline{Portfolio}}
 \\end{center}
 
 %-----------SUMMARY-----------
