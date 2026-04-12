@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import html2pdf from "html2pdf.js";
 import * as pdfjsLib from "pdfjs-dist";
 // Use Vite's ?url syntax to get the worker path statically
@@ -626,10 +626,10 @@ function TemplateModal({ onClose, activeTemplate, onSelect }) {
     },
     {
       id: "5",
-      label: "Template 5",
-      desc: "Best for software engineer, AI, ML, data science, and developer-focused applications.",
-      badge: "Tech Recommended",
-      audience: "Software, AI, Data, ML",
+      label: "Template 5 - Tech Roles",
+      desc: "Optimized for software engineering, data science, AI, ML, and other technical job applications.",
+      badge: "Best for Tech Roles",
+      audience: "Software Engineer, Data Science, AI, ML",
       accent: "#0f766e",
       soft: "linear-gradient(135deg, #ecfeff 0%, #f0fdf4 45%, #ffffff 100%)",
       icon: icons.code,
@@ -646,7 +646,7 @@ function TemplateModal({ onClose, activeTemplate, onSelect }) {
         <div style={{ marginBottom: 14, paddingRight: 34 }}>
           <h2 style={{ margin: "0 0 5px 0", fontSize: 20, fontWeight: 900, color: "#0f172a", letterSpacing: -0.5 }}>Choose Template</h2>
           <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.55 }}>
-            Template 5 is best for software, AI, ML, and data roles.
+            Template 5 is the dedicated template for software engineering, data science, AI, and ML roles.
           </div>
         </div>
 
@@ -1539,6 +1539,7 @@ import HomePage from '../HomePage/HomePage.jsx';
 import CoverLetterBuilder from '../CoverLetterBuilder/CoverLetterBuilder.jsx';
 import Header from '../../components/Header/Header.jsx';
 import Footer from '../../components/Footer/Footer.jsx';
+import SEOHead from '../../components/SEO/SEOHead.jsx';
 import Steps from '../../components/Steps.jsx';
 import Networking from '../Networking/Networking.jsx';
 import JobPortals from '../JobPortals/JobPortals.jsx';
@@ -1547,21 +1548,57 @@ import TermsAndConditions from '../Legal/TermsAndConditions.jsx';
 
 function App() {
   const location = useLocation();
-  const hideFooter = location.pathname === "/builder" || location.pathname === "/cover-letter";
+  const hideFooter = (location.pathname === "/builder" || location.pathname === "/ats-resume-builder" || location.pathname === "/cover-letter");
+  const siteUrl = import.meta.env.VITE_SITE_URL || "https://atsforge.co.in";
+  const homeSchema = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "ATSForge",
+      url: siteUrl,
+      logo: `${siteUrl}/high-resolution-color-logo.png`,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "ATSForge",
+      url: siteUrl,
+      potentialAction: {
+        "@type": "SearchAction",
+        target: `${siteUrl}/job-portals`,
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      name: "ATSForge",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+      description: "ATS-friendly resume builder, professional cover letter generator, personalized cold email and cold DM generator, LaTeX editor, and 100+ job portal directory.",
+    },
+  ];
 
   return (
     <>
       <Header />
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/builder" element={<ResumeBuilder />} />
-        <Route path="/cover-letter" element={<CoverLetterBuilder />} />
-        <Route path="/latex-editor" element={<LatexEditor />} />
-        <Route path="/steps" element={<Steps />} />
-        <Route path="/networking" element={<Networking />} />
-        <Route path="/job-portals" element={<JobPortals />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+        <Route path="/" element={<><SEOHead title="ATS Resume Builder, Cover Letter, Cold Email and 100+ Job Portals" description="ATSForge is a job-search suite with an ATS friendly resume builder, professional cover letter generator, personalized cold email and cold DM tools, LaTeX editor, and 100+ job portal links." path="/" keywords="ATS resume builder, ATS friendly resume builder, professional cover letter generator, cold email generator, cold DM generator, personalized outreach, 100+ job portals" schema={homeSchema} /><HomePage /></>} />
+        <Route path="/ats-resume-builder" element={<><SEOHead title="ATS Friendly Resume Builder" description="Create ATS-friendly resumes with templates, resume upload auto-fill, keyword optimization, PDF export, and professional formatting for modern hiring systems." path="/ats-resume-builder" keywords="ATS friendly resume builder, ATS resume builder, resume templates, resume upload autofill, professional resume builder" /><ResumeBuilder /></>} />
+        <Route path="/builder" element={<Navigate to="/ats-resume-builder" replace state={location.state} />} />
+        <Route path="/cover-letter" element={<><SEOHead title="Professional Cover Letter Generator" description="Generate professional cover letters tailored to your resume and target role with editable output, formatting controls, and PDF export support." path="/cover-letter" keywords="professional cover letter generator, AI cover letter, cover letter builder, job application cover letter" /><CoverLetterBuilder /></>} />
+        <Route path="/latex-editor" element={<><SEOHead title="LaTeX Resume Editor" description="Write, edit, and compile LaTeX resumes with ready-made templates, live preview, and downloadable PDF output for technical and academic applications." path="/latex-editor" keywords="LaTeX resume editor, LaTeX CV builder, LaTeX resume templates, technical resume editor" /><LatexEditor /></>} />
+        <Route path="/steps" element={<><SEOHead title="How ATSForge Works" description="See the simple step-by-step workflow for building ATS-optimized resumes, cover letters, and job-search assets with ATSForge." path="/steps" keywords="how ATS resume builder works, resume builder steps, ATSForge workflow" /><Steps /></>} />
+        <Route path="/network-outreach" element={<><SEOHead title="Cold DM and Cold Email Generator" description="Create personalized cold DMs and cold emails based on your profile, target company, and role to improve networking outreach and referral requests." path="/network-outreach" keywords="cold DM generator, cold email generator, personalized outreach, referral email generator, networking message generator" /><Networking /></>} />
+        <Route path="/networking" element={<Navigate to="/network-outreach" replace state={location.state} />} />
+        <Route path="/job-portals" element={<><SEOHead title="100+ Job Portal Links" description="Explore 100+ job portals across India, global markets, remote work, tech jobs, internships, freelance roles, and region-specific hiring platforms." path="/job-portals" keywords="100+ job portals, job portal links, job sites, tech job portals, remote job boards, internship platforms" /><JobPortals /></>} />
+        <Route path="/privacy-policy" element={<><SEOHead title="Privacy Policy" description="Read the ATSForge Privacy Policy to understand how information is handled when using the resume builder, cover letter generator, LaTeX editor, and networking tools." path="/privacy-policy" keywords="ATSForge privacy policy, privacy policy" /><PrivacyPolicy /></>} />
+        <Route path="/terms-and-conditions" element={<><SEOHead title="Terms and Conditions" description="Read the ATSForge Terms and Conditions for the resume builder, cover letter generator, LaTeX editor, networking features, and job portal resources." path="/terms-and-conditions" keywords="ATSForge terms and conditions, terms and conditions" /><TermsAndConditions /></>} />
       </Routes>
       {!hideFooter && <Footer />}
     </>

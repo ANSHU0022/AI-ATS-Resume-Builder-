@@ -58,7 +58,7 @@ export default function LegalPageLayout({ title, lastUpdated, intro, sections })
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <Link to="/" style={navLinkStyle}>Home</Link>
-              <Link to="/builder" style={navLinkStyle}>Resume Builder</Link>
+              <Link to="/ats-resume-builder" style={navLinkStyle}>Resume Builder</Link>
             </div>
           </div>
           <p style={{ margin: "16px 0 0 0", color: "#475569", fontSize: 15, lineHeight: 1.7, maxWidth: 760 }}>{intro}</p>

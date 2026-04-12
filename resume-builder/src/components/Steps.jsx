@@ -271,7 +271,7 @@ export default function ATSForgeHowItWorks() {
               <div style={{ marginTop: 38 }}>
                 <a
                   href="#"
-                  onClick={e => { e.preventDefault(); navigate('/builder'); }}
+                  onClick={e => { e.preventDefault(); navigate('/ats-resume-builder'); }}
                   style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: "#7c5cbf", textDecoration: "none", borderBottom: "2px solid rgba(124,92,191,0.3)", paddingBottom: 2, fontFamily: "'Sora',sans-serif", cursor: "pointer" }}
                   onMouseEnter={e => { e.currentTarget.style.color = "#5a3fa0"; e.currentTarget.style.borderColor = "#5a3fa0"; }}
                   onMouseLeave={e => { e.currentTarget.style.color = "#7c5cbf"; e.currentTarget.style.borderColor = "rgba(124,92,191,0.3)"; }}

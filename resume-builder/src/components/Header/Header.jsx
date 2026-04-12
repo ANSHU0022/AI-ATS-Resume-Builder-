@@ -94,10 +94,10 @@ export default function Header() {
     };
 
     const navItems = [
-        { label: 'Resume', path: '/builder' },
+        { label: 'Resume', path: '/ats-resume-builder' },
         { label: 'Cover Letter', path: '/cover-letter' },
         { label: 'LaTeX Editor', path: '/latex-editor' },
-        { label: 'Networking', path: '/networking' },
+        { label: 'Networking', path: '/network-outreach' },
         { label: 'Job Portals', path: '/job-portals' },
     ];
 
@@ -138,7 +138,7 @@ export default function Header() {
                     ) : (
                         <div className="desktop-auth-actions">
                             <button className="btn-signin" type="button" onClick={() => navigate('/auth')}>Sign in</button>
-                            <button className="btn-start desktop-only" type="button" onClick={() => navigate('/builder')}>Get Started</button>
+                            <button className="btn-start desktop-only" type="button" onClick={() => navigate('/ats-resume-builder')}>Get Started</button>
                         </div>
                     )}
 
@@ -259,7 +259,7 @@ export default function Header() {
                                             </button>
                                         </>
                                     ) : (
-                                        <button className="btn-start full-width" onClick={() => { navigate('/builder'); closeMenu(); }}>
+                                        <button className="btn-start full-width" onClick={() => { navigate('/ats-resume-builder'); closeMenu(); }}>
                                             Get Started Free
                                         </button>
                                     )}

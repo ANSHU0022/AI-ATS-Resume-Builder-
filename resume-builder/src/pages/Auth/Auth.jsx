@@ -44,8 +44,9 @@ export default function Auth() {
                     }
                 });
                 if (error) throw error;
-                // On success you can show a verify message or just login
-                setErrorMsg('Success! Please check your email to verify your account.');
+                setIsLogin(true);
+                setPassword('');
+                setErrorMsg('Success! Your account has been created. Please log in.');
             }
         } catch (error) {
             setErrorMsg(error.message || 'An error occurred during authentication.');

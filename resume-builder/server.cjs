@@ -47,6 +47,7 @@ app.post("/api/groq", async (req, res) => {
   }
 });
 
+
 // ── New endpoint: /api/latex ──────────────────────────────────────────────────
 const latexRoutes = require('./backend/latex-editor/routes/latexRoutes.cjs');
 app.use('/api/latex', latexRoutes);
