@@ -226,7 +226,7 @@ export default function HomePage() {
                         </div>
                         <div className="stat-sep" />
                         <div className="stat">
-                            <div className="stat-n">3<sup>+</sup></div>
+                            <div className="stat-n">5<sup>+</sup></div>
                             <div className="stat-l">ATS Templates</div>
                         </div>
                         <div className="stat-sep" />

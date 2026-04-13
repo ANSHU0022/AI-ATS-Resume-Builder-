@@ -91,6 +91,7 @@ export default function Template5Preview({ data, onPreviewChange }) {
       try {
         const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
         const containerWidth = Math.max(280, previewContainerRef.current?.clientWidth || windowWidth - 32);
+        const deviceScale = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
         const pageImages = [];
 
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
@@ -98,17 +99,25 @@ export default function Template5Preview({ data, onPreviewChange }) {
 
           const page = await pdf.getPage(pageNumber);
           const baseViewport = page.getViewport({ scale: 1 });
-          const scale = Math.min(1.35, containerWidth / baseViewport.width);
-          const viewport = page.getViewport({ scale });
+          const fitScale = Math.max(0.8, containerWidth / baseViewport.width);
+          const renderScale = Math.min(3, Math.max(1.8, fitScale * deviceScale * 1.35));
+          const viewport = page.getViewport({ scale: fitScale });
+          const renderViewport = page.getViewport({ scale: renderScale });
           const canvas = document.createElement("canvas");
           const context = canvas.getContext("2d");
 
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
+          canvas.width = Math.ceil(renderViewport.width);
+          canvas.height = Math.ceil(renderViewport.height);
+          canvas.style.width = `${Math.ceil(viewport.width)}px`;
+          canvas.style.height = `${Math.ceil(viewport.height)}px`;
+
+          if (!context) {
+            continue;
+          }
 
           await page.render({
             canvasContext: context,
-            viewport,
+            viewport: renderViewport,
           }).promise;
 
           pageImages.push({
@@ -171,7 +180,7 @@ export default function Template5Preview({ data, onPreviewChange }) {
                     <img
                       src={page.src}
                       alt={`Template 5 page ${page.pageNumber}`}
-                      style={{ display: "block", width: "100%", height: "auto", background: "#fff" }}
+                      style={{ display: "block", width: "100%", height: "auto", background: "#fff", imageRendering: "auto" }}
                     />
                   </div>
                 ))}
