@@ -93,6 +93,9 @@
 /* Reduce top padding of sidebar so ATS card sits higher */
 .rb-sidebar {
     padding-top: 14px !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
 }
 
 /* ── Mobile ATS strip — hidden by default, shown on tablet/mobile ── */
@@ -247,6 +250,35 @@
     white-space: nowrap;
 }
 
+.jd-page-header-main {
+    min-width: 0;
+}
+
+.jd-page-header-title {
+    min-width: 0;
+    flex: 1;
+}
+
+.jd-page-header-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.jd-mobile-tabs {
+    display: none;
+}
+
+.jd-bottom-nav {
+    display: none;
+}
+
+.jd-analyzing-state,
+.jd-results-stack {
+    width: 100%;
+}
+
 /* ═══════════════════════════════════════════════════
    TABLET  (≤ 1024px)
 ═══════════════════════════════════════════════════ */
@@ -257,6 +289,7 @@
         height: auto !important;
         min-height: calc(100dvh - 66px);
         overflow: auto !important;
+        padding-bottom: 76px;
     }
     .jd-page-sidebar {
         width: 100% !important;
@@ -267,6 +300,11 @@
     }
     .jd-page-sidebar-body {
         padding-top: 0 !important;
+        align-items: center;
+    }
+    .jd-page-sidebar.jd-mobile-hidden,
+    .jd-page-preview.jd-mobile-hidden {
+        display: none !important;
     }
     .jd-top-cards {
         grid-template-columns: 1fr !important;
@@ -290,6 +328,71 @@
     .jd-analyzer-actions {
         width: 100%;
         justify-content: flex-end;
+    }
+    .jd-page-header {
+        padding: 14px 18px 12px !important;
+    }
+    .jd-page-header-main {
+        flex-wrap: wrap;
+        align-items: flex-start !important;
+    }
+    .jd-page-header-buttons {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+    .jd-page-header-buttons button {
+        flex: 1 1 180px;
+    }
+    .jd-mobile-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+        padding: 4px;
+        border: 1px solid rgba(226,232,240,0.95);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #faf7ff, #f8fafc);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.95);
+    }
+    .jd-mobile-tabs button {
+        min-height: 38px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        background: transparent;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .jd-mobile-tabs button.active {
+        background: linear-gradient(135deg, #ffffff, #f5f3ff);
+        border-color: rgba(107,77,176,0.18);
+        color: #6b4db0;
+        box-shadow: 0 8px 18px rgba(107,77,176,0.12);
+    }
+    .jd-score-cards-grid,
+    .jd-metrics-grid,
+    .jd-summary-grid,
+    .jd-score-explainer-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .jd-analyzing-state,
+    .jd-results-stack {
+        max-width: 680px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .jd-score-weight-row,
+    .jd-importance-row {
+        grid-template-columns: minmax(0, 1fr) auto !important;
+    }
+    .jd-inline-actions {
+        justify-content: stretch !important;
+    }
+    .jd-inline-actions > button {
+        width: 100%;
     }
     .rb-layout {
         flex-direction: column !important;
@@ -359,6 +462,9 @@
     .jd-top-cards {
         grid-template-columns: 1fr !important;
     }
+    .jd-page-header-main {
+        gap: 10px !important;
+    }
     .jd-analyzer-actions {
         width: 100%;
         justify-content: space-between;
@@ -371,11 +477,52 @@
     .jd-page-header {
         padding: 16px 16px 14px !important;
     }
+    .jd-page-header-title > div {
+        font-size: 14px !important;
+    }
+    .jd-mobile-tabs,
+    .jd-page-header-buttons {
+        display: none !important;
+    }
     .jd-page-sidebar-body {
-        padding: 16px !important;
+        padding: 16px 16px 90px !important;
+    }
+    .jd-analyzing-state,
+    .jd-results-stack {
+        max-width: 100%;
+        margin-left: 0;
+        margin-right: 0;
     }
     .jd-page-preview {
         min-height: 500px;
+    }
+    .jd-page-preview .rb-preview-panel {
+        padding-bottom: 90px;
+    }
+    .jd-score-cards-grid,
+    .jd-metrics-grid,
+    .jd-summary-grid,
+    .jd-score-explainer-grid {
+        grid-template-columns: 1fr !important;
+        width: 100%;
+        justify-items: stretch;
+    }
+    .jd-score-weight-row {
+        grid-template-columns: 1fr !important;
+    }
+    .jd-importance-row {
+        grid-template-columns: 1fr auto !important;
+    }
+    .jd-score-cards-grid > *,
+    .jd-metrics-grid > *,
+    .jd-summary-grid > * {
+        width: 100%;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        box-sizing: border-box;
+    }
+    .jd-bottom-nav {
+        display: flex !important;
     }
     .rb-layout {
         padding-bottom: 72px;
@@ -541,6 +688,57 @@
         inset 0 -2px 0 rgba(107,77,176,0.15);
 }
 .rb-bottom-nav button svg { flex-shrink: 0; }
+
+.jd-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: linear-gradient(180deg, #faf8ff 0%, #f0ecfa 100%);
+    border-top: 1.5px solid rgba(107,77,176,0.15);
+    border-radius: 20px 20px 0 0;
+    z-index: 210;
+    align-items: center;
+    padding: 0 6px;
+    box-shadow:
+        0 -4px 24px rgba(107,77,176,0.12),
+        0 -1px 0 rgba(255,255,255,0.9) inset;
+}
+
+.jd-bottom-nav button {
+    flex: 1;
+    border: none;
+    background: linear-gradient(160deg, #ffffff 0%, #f5f2fc 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #9ca3af;
+    cursor: pointer;
+    height: 50px;
+    border-radius: 14px;
+    margin: 0 3px;
+    box-shadow:
+        0 1px 0 rgba(255,255,255,0.95) inset,
+        0 2px 6px rgba(107,77,176,0.08);
+    transition: all 0.16s ease;
+}
+
+.jd-bottom-nav button.active {
+    color: #6B4DB0;
+    background: linear-gradient(180deg, #ffffff 0%, #ede7fb 100%);
+    box-shadow:
+        0 1px 0 rgba(255,255,255,0.98) inset,
+        0 4px 12px rgba(107,77,176,0.14);
+}
+
+.jd-bottom-nav button svg {
+    flex-shrink: 0;
+}
 
 /* ═══════════════════════════════════════════════════
    SECTION DRAWER

@@ -24,15 +24,14 @@ const PLACEHOLDERS = [
   "lorem ipsum", "your summary", "write summary", "add summary", "bullet point", "project name", "company name"
 ];
 
-const SECTION_WEIGHTS = {
-  personal: 15,
+const ATS_SECTION_WEIGHTS = {
+  personal: 18,
   summary: 10,
-  skills: 12,
-  experience: 25,
-  education: 12,
-  projects: 10,
-  certifications: 8,
-  achievements: 8,
+  skills: 15,
+  experience: 28,
+  education: 8,
+  projects: 15,
+  credentials: 6,
 };
 
 const JD_IMPORTANCE_WEIGHTS = { must: 3, preferred: 2, nice: 1 };
@@ -234,148 +233,342 @@ function hasPlaceholder(value) {
   return PLACEHOLDERS.some((token) => normalized.includes(token));
 }
 
-function coverageCompletion(snapshot) {
-  const personalFields = ["name", "email", "phone", "location"].filter((field) => text(snapshot.personal[field])).length;
-  const linkedinBonus = text(snapshot.personal.linkedin) ? 0.2 : 0;
+function hasMeaningfulResumeContent(snapshot) {
+  return !!(
+    text(snapshot.personal.name) ||
+    text(snapshot.personal.email) ||
+    text(snapshot.personal.phone) ||
+    text(snapshot.personal.linkedin) ||
+    text(snapshot.summary) ||
+    snapshot.skillEntries.length > 0 ||
+    snapshot.expEntries.some((item) => item.role || item.company || (item.bullets || []).some(Boolean)) ||
+    snapshot.educationEntries.some((item) => item.degree || item.institution) ||
+    snapshot.projectEntries.some((item) => item.name || item.tech || (item.bullets || []).some(Boolean)) ||
+    snapshot.certificationEntries.some((item) => item.name) ||
+    snapshot.achievementEntries.some((item) => item.title)
+  );
+}
+
+function scoreSectionCompleteness(snapshot) {
+  const personalFields = ["name", "email", "phone", "linkedin"].filter((field) => text(snapshot.personal[field])).length;
+  const hasLocation = !!text(snapshot.personal.location);
+  const skillsCount = snapshot.skillEntries.length;
+  const validExperienceEntries = snapshot.expEntries.filter((item) => item.role && item.company);
+  const hasEducation = snapshot.educationEntries.some((item) => item.degree && item.institution);
+  const hasProjects = snapshot.projectEntries.some((item) => item.name);
+  const hasCertifications = snapshot.certificationEntries.some((item) => item.name);
+  const hasAchievements = snapshot.achievementEntries.some((item) => item.title && item.title.length > 3);
+  const summaryWordCount = words(snapshot.summary).length;
+
   const sections = {
-    personal: personalFields >= 4 ? clamp((personalFields / 4) + linkedinBonus, 0, 1) : personalFields >= 2 ? 0.5 : 0,
+    personal: personalFields >= 4 ? (hasLocation ? 1 : 0.9) : personalFields >= 3 ? 0.5 : 0,
     summary: snapshot.summary && !hasPlaceholder(snapshot.summary)
-      ? (words(snapshot.summary).length >= 45 && words(snapshot.summary).length <= 90 ? 1 : 0.5)
+      ? (summaryWordCount >= 40 && summaryWordCount <= 90 ? 1 : 0.5)
       : 0,
-    skills: snapshot.skillEntries.length >= 8 || (snapshot.skillEntries.length >= 4 && (snapshot.skillEntries.length >= 2 || (snapshot.skillEntries.length && snapshot.skillEntries.length >= 2)))
-      ? 1
-      : snapshot.skillEntries.length >= 3 ? 0.5 : 0,
-    experience: snapshot.expEntries.some((item) => item.role && item.company)
+    skills: skillsCount >= 8 ? 1 : skillsCount >= 4 ? 0.5 : 0,
+    experience: validExperienceEntries.length >= 1
       ? (snapshot.experienceBullets.length >= 2 ? 1 : 0.5)
       : 0,
-    education: snapshot.educationEntries.some((item) => item.degree && item.institution) ? 1 : 0,
-    projects: snapshot.projectEntries.some((item) => item.name && (item.tech || item.bullets.length)) ? 1 : snapshot.projectEntries.some((item) => item.name) ? 0.5 : 0,
-    certifications: snapshot.certificationEntries.some((item) => item.name) ? 1 : 0,
-    achievements: snapshot.achievementEntries.some((item) => item.title && item.title.length > 6) ? 1 : 0,
+    education: hasEducation ? 1 : 0,
+    projects: hasProjects ? 1 : 0,
+    credentials: hasCertifications || hasAchievements ? 1 : 0,
   };
-  const score = Object.entries(SECTION_WEIGHTS).reduce((sum, [key, weight]) => sum + weight * sections[key], 0);
+
+  const score = Object.entries(ATS_SECTION_WEIGHTS).reduce((sum, [key, weight]) => sum + weight * (sections[key] || 0), 0);
   return { score: clamp(score), sections };
 }
 
-function impactScore(snapshot) {
+function scoreActionEvidence(snapshot) {
   const bullets = snapshot.allBullets;
   const uniqueBullets = unique(bullets.map(sentenceLike));
-  const quantBullets = uniqueBullets.filter((bullet) => /(\d+%|\$\d+|\d+\+|\b\d+\s*(hours|days|weeks|months|years|users|clients|projects|features|pipelines|models|tickets)\b)/i.test(bullet));
-  const verbBullets = uniqueBullets.filter((bullet) => ACTION_VERBS.some((verb) => new RegExp(`^${verb}\\b|\\b${verb}\\b`, "i").test(bullet.split(/\s+/).slice(0, 4).join(" "))));
+  const quantBullets = uniqueBullets.filter((bullet) => /(\d+%|\$\d+|\b\d+(?:\.\d+)?\s*(?:x|k|m|b)\b|\b\d+\+|\b\d+\s*(hours|days|weeks|months|years|users|clients|projects|features|pipelines|models|tickets|records|reports|dashboards)\b|\b(?:cut|reduced|saved|improved)\s+\w+\s+by\s+\d+%)/i.test(bullet));
+  const verbBullets = uniqueBullets.filter((bullet) => ACTION_VERBS.some((verb) => new RegExp(`^${verb}\\b`, "i").test(bullet.trim())));
   const resultBullets = uniqueBullets.filter((bullet) => RESULT_TERMS.some((term) => bullet.includes(term)));
 
   const quantifiedImpact = clamp((quantBullets.length / 4) * 100);
-  const actionVerbQuality = clamp((verbBullets.length / 6) * 100);
+  const actionVerbQuality = clamp((verbBullets.length / 8) * 100);
   const outcomeLanguage = clamp((resultBullets.length / 5) * 100);
 
-  const score = (quantifiedImpact * 0.4) + (actionVerbQuality * 0.35) + (outcomeLanguage * 0.25);
+  const score = (quantifiedImpact * 0.38) + (actionVerbQuality * 0.32) + (outcomeLanguage * 0.3);
   return {
     score: clamp(score),
     details: { quantifiedImpact, actionVerbQuality, outcomeLanguage, quantBullets: quantBullets.length, verbBullets: verbBullets.length },
   };
 }
 
-function structureScore(snapshot, parseMeta = {}) {
+function inferRoleFamily(snapshot) {
+  const roleText = sentenceLike([
+    snapshot.title,
+    ...snapshot.expEntries.map((item) => item.role),
+    ...snapshot.projectEntries.map((item) => item.name),
+    ...snapshot.skillEntries,
+  ].join(" "));
+
+  if (/\b(machine learning|ml|llm|nlp|ai engineer|ai trainer|data annotation|evaluation|prompt|model|dataset|rag)\b/.test(roleText)) return "ai_ml";
+  if (/\b(data analyst|analytics|business intelligence|power bi|tableau|sql|dashboard|reporting|kpi)\b/.test(roleText)) return "data_analytics";
+  if (/\b(?:software|frontend|backend|full stack|developer|engineer|react|node|api|microservice|devops|cloud)\b/.test(roleText)) return "software_engineering";
+  return "general";
+}
+
+function buildSignalKeywordInventory(snapshot, roleFamily = "general") {
+  const stopwords = new Set(["and", "with", "for", "the", "using", "built", "designed", "developed", "analysis", "experience", "project", "role"]);
+  const seeds = [
+    ...snapshot.skillEntries,
+    ...snapshot.projectEntries.flatMap((item) => [item.name, item.tech, ...(item.bullets || [])]),
+    ...snapshot.expEntries.flatMap((item) => [item.role, ...(item.bullets || [])]),
+    snapshot.title,
+    snapshot.summary,
+  ];
+
+  const candidates = new Set();
+  seeds.forEach((seed) => {
+    const normalizedSeed = sentenceLike(seed);
+    if (!normalizedSeed) return;
+    if (normalizedSeed.split(" ").length <= 4 && normalizedSeed.length >= 2 && !stopwords.has(normalizedSeed)) {
+      candidates.add(normalizedSeed);
+    }
+    normalizedSeed.split(" ").forEach((token) => {
+      if (token.length >= 2 && !stopwords.has(token)) candidates.add(token);
+    });
+  });
+
+  const roleHints = {
+    software_engineering: ["javascript", "typescript", "react", "node", "api", "docker", "kubernetes", "ci cd", "backend", "frontend"],
+    data_analytics: ["sql", "power bi", "tableau", "dashboard", "analytics", "reporting", "kpi", "etl", "python"],
+    ai_ml: ["machine learning", "llm", "prompt", "evaluation", "dataset", "model", "training", "nlp", "rag", "annotation"],
+    general: [],
+  };
+
+  roleHints[roleFamily].forEach((hint) => candidates.add(hint));
+  return [...candidates].filter(Boolean);
+}
+
+function scoreKeywordSpread(snapshot, roleFamily = "general") {
+  const keywords = buildSignalKeywordInventory(snapshot, roleFamily);
+  const textBlocks = {
+    title: sentenceLike(snapshot.title),
+    summary: sentenceLike(snapshot.summary),
+    skills: sentenceLike(snapshot.skillEntries.join(" ")),
+    experience: sentenceLike(snapshot.expEntries.map((item) => `${item.role} ${(item.bullets || []).join(" ")}`).join(" ")),
+    projects: sentenceLike(snapshot.projectEntries.map((item) => `${item.name} ${item.tech} ${(item.bullets || []).join(" ")}`).join(" ")),
+  };
+
+  const tracked = keywords.map((keyword) => {
+    const presentIn = Object.entries(textBlocks)
+      .filter(([, block]) => hasWholeTerm(block, keyword))
+      .map(([section]) => section);
+    if (!presentIn.length) return null;
+
+    const sectionCount = presentIn.length;
+    let spreadCredit = 0.35;
+    if (presentIn.includes("skills") && (presentIn.includes("experience") || presentIn.includes("projects"))) spreadCredit = 1;
+    else if (presentIn.includes("experience") && presentIn.includes("projects")) spreadCredit = 0.9;
+    else if (presentIn.includes("skills")) spreadCredit = 0.5;
+    else if (presentIn.includes("experience") || presentIn.includes("projects")) spreadCredit = 0.65;
+
+    if (sectionCount > 2) spreadCredit *= 0.9;
+
+    return { keyword, presentIn, spreadCredit };
+  }).filter(Boolean);
+
+  const distinctKeywords = tracked.length;
+  const densityScore = clamp((distinctKeywords / 18) * 100);
+  const spreadScore = tracked.length ? clamp((tracked.reduce((sum, item) => sum + item.spreadCredit, 0) / tracked.length) * 100) : 0;
+  const score = clamp((densityScore * 0.55) + (spreadScore * 0.45));
+
+  return {
+    score,
+    details: {
+      distinctKeywords,
+      densityScore: round(densityScore),
+      spreadScore: round(spreadScore),
+      trackedKeywords: tracked.slice(0, 24),
+    },
+  };
+}
+
+function scoreParseSafety(snapshot, parseMeta = {}) {
   const datePatterns = unique([
     ...snapshot.expEntries.map((item) => getDatePattern(item.duration)),
     ...snapshot.educationEntries.map((item) => getDatePattern(item.year)),
   ].filter((value) => value !== "missing"));
 
-  const dateConsistency = datePatterns.length <= 2 ? 100 : 55;
-  const linkSignals = [snapshot.personal.linkedin, snapshot.personal.github, snapshot.personal.portfolio].filter((value) => isUrlLike(value)).length > 0 ? 100 : 45;
-  const cleanBullets = snapshot.allBullets.length > 0 && snapshot.allBullets.every((bullet) => bullet.length >= 8) ? 100 : snapshot.allBullets.length ? 65 : 30;
-  const wordCountScore = snapshot.wordCount >= 350 && snapshot.wordCount <= 900 ? 100 : snapshot.wordCount >= 250 && snapshot.wordCount <= 1100 ? 65 : 30;
-  const headingsScore = snapshot.expEntries.some((item) => item.role) && snapshot.educationEntries.some((item) => item.degree) ? 100 : 60;
+  const dateConsistency = datePatterns.length <= 2 ? 100 : 60;
+  const linkSignals = [snapshot.personal.linkedin, snapshot.personal.github, snapshot.personal.portfolio].filter((value) => isUrlLike(value)).length > 0 ? 100 : 55;
+  const bulletValidity = snapshot.allBullets.length > 0 && snapshot.allBullets.every((bullet) => words(bullet).length >= 2) ? 100 : snapshot.allBullets.length ? 60 : 30;
+  const wordCountScore = snapshot.wordCount >= 350 && snapshot.wordCount <= 900 ? 100 : snapshot.wordCount >= 250 && snapshot.wordCount <= 1100 ? 70 : 35;
+  const headingsScore = snapshot.expEntries.some((item) => item.role) && snapshot.educationEntries.some((item) => item.degree) && snapshot.projectEntries.some((item) => item.name) ? 100 : 65;
+  const hygieneScore = clamp((dateConsistency * 0.22) + (linkSignals * 0.16) + (bulletValidity * 0.2) + (wordCountScore * 0.22) + (headingsScore * 0.2));
 
   let parseConfidence = 100;
-  if (parseMeta?.source === "upload") {
+  const inputPath = parseMeta?.source === "upload" ? "upload" : "builder";
+  const meaningfulContent = hasMeaningfulResumeContent(snapshot);
+  if (!meaningfulContent) {
+    parseConfidence = 0;
+  } else if (inputPath === "builder") {
+    parseConfidence = 85;
+  } else {
+    const sectionFillRatio = [
+      !!snapshot.personal.name,
+      !!snapshot.summary,
+      snapshot.skillEntries.length > 0,
+      snapshot.expEntries.some((item) => item.role),
+      snapshot.educationEntries.some((item) => item.degree),
+      snapshot.projectEntries.some((item) => item.name),
+      snapshot.certificationEntries.some((item) => item.name),
+      snapshot.achievementEntries.some((item) => item.title),
+    ].filter(Boolean).length / 8;
     const fieldCount = [
       snapshot.personal.name, snapshot.personal.email, snapshot.personal.phone, snapshot.summary,
       snapshot.expEntries.some((item) => item.role), snapshot.educationEntries.some((item) => item.degree),
       snapshot.projectEntries.some((item) => item.name), snapshot.skillEntries.length > 0,
     ].filter(Boolean).length;
-    const textScore = parseMeta.extractedTextLength >= 1200 ? 100 : parseMeta.extractedTextLength >= 500 ? 70 : 40;
-    parseConfidence = clamp((fieldCount / 8) * 60 + (textScore * 0.4));
+    const textScore = parseMeta.extractedTextLength >= 1200 ? 100 : parseMeta.extractedTextLength >= 500 ? 70 : 35;
+    const dateParseScore = dateConsistency;
+    parseConfidence = clamp((sectionFillRatio * 35) + ((fieldCount / 8) * 25) + (textScore * 0.2) + (dateParseScore * 0.1) + (linkSignals * 0.1));
   }
 
-  const score = (dateConsistency * 0.2) + (linkSignals * 0.15) + (cleanBullets * 0.15) + (wordCountScore * 0.15) + (headingsScore * 0.15) + (parseConfidence * 0.2);
+  const score = clamp((parseConfidence * 0.55) + (hygieneScore * 0.45));
   return {
     score: clamp(score),
     parseConfidence: clamp(parseConfidence),
-    details: { dateConsistency, linkSignals, cleanBullets, wordCountScore, headingsScore },
+    details: { dateConsistency, linkSignals, bulletValidity, wordCountScore, headingsScore, hygieneScore: round(hygieneScore), inputPath },
   };
 }
 
-function roleClarityScore(snapshot, aiReview = null) {
-  const titlePresent = snapshot.title ? 100 : 35;
-  const groupedSkills = snapshot.skillEntries.length >= 8 ? 100 : snapshot.skillEntries.length >= 4 ? 70 : 35;
-  const supportedSkills = snapshot.skillEntries.filter((skill) => snapshot.fullTextNormalized.includes(skill)).length;
-  const supportScore = snapshot.skillEntries.length ? clamp((supportedSkills / Math.max(snapshot.skillEntries.length, 1)) * 100) : 20;
-  const projectOrExpBreadth = (snapshot.expEntries.some((item) => item.role) && snapshot.projectEntries.some((item) => item.name)) ? 100 : snapshot.expEntries.some((item) => item.role) ? 70 : 40;
-  let base = (titlePresent * 0.3) + (groupedSkills * 0.25) + (supportScore * 0.25) + (projectOrExpBreadth * 0.2);
-  if (aiReview?.roleClarityAdjustment) base = clamp(base + aiReview.roleClarityAdjustment, 0, 100);
-  return clamp(base);
-}
-
-function languageQualityScore(snapshot, aiReview = null) {
+function scoreLanguageQuality(snapshot, aiReview = null) {
   const bullets = snapshot.allBullets;
+  if (!hasMeaningfulResumeContent(snapshot)) {
+    return {
+      score: 0,
+      details: {
+        shortBullets: 0,
+        longBullets: 0,
+        duplicateRate: 0,
+        buzzwordHits: 0,
+        placeholderHits: 0,
+        vaguePhraseHits: 0,
+        localScore: 0,
+        aiShift: 0,
+      },
+      aiApplied: false,
+    };
+  }
   const normalizedBullets = bullets.map(sentenceLike);
   const shortBullets = bullets.filter((bullet) => words(bullet).length < 5).length;
-  const longBullets = bullets.filter((bullet) => words(bullet).length > 32).length;
+  const longBullets = bullets.filter((bullet) => words(bullet).length > 45).length;
   const duplicateRate = normalizedBullets.length ? 1 - (unique(normalizedBullets).length / normalizedBullets.length) : 0.5;
   const buzzwordHits = BUZZWORDS.filter((term) => snapshot.fullTextNormalized.includes(term)).length;
   const placeholderHits = PLACEHOLDERS.filter((term) => snapshot.fullTextNormalized.includes(term)).length;
+  const vaguePhraseHits = ["responsible for", "worked on", "helped with", "involved in"].filter((term) => snapshot.fullTextNormalized.includes(term)).length;
 
   let base = 100;
-  base -= shortBullets * 7;
+  base -= shortBullets * 8;
   base -= longBullets * 5;
-  base -= duplicateRate * 35;
+  base -= duplicateRate * 32;
   base -= buzzwordHits * 6;
   base -= placeholderHits * 12;
+  base -= vaguePhraseHits * 6;
 
-  if (aiReview?.languageQualityAdjustment) {
-    base = clamp(base + aiReview.languageQualityAdjustment, 0, 100);
-  }
-  return clamp(base);
+  const localScore = clamp(base);
+  const clarityScore = clamp(Number(aiReview?.clarityScore) || 0, 0, 10);
+  const specificityScore = clamp(Number(aiReview?.specificityScore) || 0, 0, 10);
+  const aiApplied = clarityScore > 0 || specificityScore > 0;
+  const aiShift = aiApplied ? clamp((((clarityScore + specificityScore) / 2) - 5) * 2, -10, 10) : 0;
+  const score = clamp(localScore + aiShift);
+
+  return {
+    score,
+    details: {
+      shortBullets,
+      longBullets,
+      duplicateRate: round(duplicateRate * 100),
+      buzzwordHits,
+      placeholderHits,
+      vaguePhraseHits,
+      localScore: round(localScore),
+      aiShift: round(aiShift),
+    },
+    aiApplied,
+  };
 }
 
 export function calculateResumeScore(data, options = {}) {
   const snapshot = buildResumeSnapshot(data);
-  const sectionCoverage = coverageCompletion(snapshot);
-  const impactAchievement = impactScore(snapshot);
-  const structuralIntegrity = structureScore(snapshot, options.parseMeta || {});
-  const roleClarity = roleClarityScore(snapshot, options.aiReview || null);
-  const languageQuality = languageQualityScore(snapshot, options.aiReview || null);
+  if (!hasMeaningfulResumeContent(snapshot)) {
+    return {
+      overall: 0,
+      label: "Needs Work",
+      factors: {
+        sectionCompleteness: 0,
+        actionEvidence: 0,
+        keywordSpread: 0,
+        parseSafety: 0,
+        languageQuality: 0,
+      },
+      tips: [
+        "Add your personal details and LinkedIn URL to start the ATS score.",
+        "Fill the 8 resume sections to unlock a meaningful ATS evaluation.",
+      ],
+      confidence: 0,
+      meta: {
+        inputPath: options.parseMeta?.source === "upload" ? "upload" : "builder",
+        aiLanguageApplied: false,
+        roleFamily: "general",
+      },
+      details: {},
+      snapshot,
+    };
+  }
+  const roleFamily = inferRoleFamily(snapshot);
+  const sectionCompleteness = scoreSectionCompleteness(snapshot);
+  const actionEvidence = scoreActionEvidence(snapshot);
+  const keywordSpread = scoreKeywordSpread(snapshot, roleFamily);
+  const parseSafety = scoreParseSafety(snapshot, options.parseMeta || {});
+  const languageQuality = scoreLanguageQuality(snapshot, options.aiReview || null);
 
   const overall = clamp(
-    (sectionCoverage.score * 0.25) +
-    (impactAchievement.score * 0.25) +
-    (structuralIntegrity.score * 0.2) +
-    (roleClarity * 0.15) +
-    (languageQuality * 0.15)
+    (sectionCompleteness.score * 0.22) +
+    (actionEvidence.score * 0.26) +
+    (keywordSpread.score * 0.18) +
+    (parseSafety.score * 0.18) +
+    (languageQuality.score * 0.16)
   );
 
   const tips = [];
-  if (sectionCoverage.sections.personal < 1) tips.push("Add your full contact details: name, email, phone, location, and LinkedIn.");
-  if (sectionCoverage.sections.summary < 1) tips.push("Add a short summary in 2-4 lines about your skills, experience, and target job.");
-  if (impactAchievement.details.quantBullets < 3) tips.push("Add numbers in your bullets, like %, time saved, users helped, or work completed.");
-  if (impactAchievement.details.verbBullets < 4) tips.push("Start your bullet points with strong words like Built, Led, Improved, or Created.");
-  if (structuralIntegrity.details.wordCountScore < 100) tips.push("Keep your resume clear and complete, usually around 1 page for students.");
-  if (languageQuality < 70) tips.push("Remove repeated words and make each bullet simple, clear, and specific.");
+  if (sectionCompleteness.sections.personal < 1) tips.push("Add name, email, phone, LinkedIn URL, and location to complete the core contact section.");
+  if (sectionCompleteness.sections.summary < 1) tips.push("Keep your summary between 40 and 90 words with a clear target-role focus.");
+  if (actionEvidence.details.quantBullets < 4) tips.push("Add more quantified bullets with %, counts, time saved, users, or business impact.");
+  if (actionEvidence.details.verbBullets < 5) tips.push("Begin more bullets with strong action verbs like Built, Designed, Automated, or Led.");
+  if (keywordSpread.details.distinctKeywords < 12) tips.push("Add more real stack and role keywords across skills, experience, and projects.");
+  if (parseSafety.parseConfidence < 80) tips.push("Improve ATS parse safety with cleaner dates, complete sections, and structured bullets.");
+  if (languageQuality.score < 70) tips.push("Reduce repeated phrasing and replace vague bullets like 'worked on' with specific outcomes.");
 
   const label = overall >= 85 ? "Excellent" : overall >= 70 ? "Strong" : overall >= 50 ? "Fair" : "Needs Work";
   return {
     overall: round(overall),
     label,
     factors: {
-      sectionCoverage: round(sectionCoverage.score),
-      impactAchievement: round(impactAchievement.score),
-      structuralIntegrity: round(structuralIntegrity.score),
-      roleClarity: round(roleClarity),
-      languageQuality: round(languageQuality),
+      sectionCompleteness: round(sectionCompleteness.score),
+      actionEvidence: round(actionEvidence.score),
+      keywordSpread: round(keywordSpread.score),
+      parseSafety: round(parseSafety.score),
+      languageQuality: round(languageQuality.score),
     },
     tips: tips.slice(0, 5),
-    confidence: round(structuralIntegrity.parseConfidence),
+    confidence: round(parseSafety.parseConfidence),
+    meta: {
+      inputPath: parseSafety.details.inputPath,
+      aiLanguageApplied: !!languageQuality.aiApplied,
+      roleFamily,
+    },
+    details: {
+      sectionCompleteness: sectionCompleteness.details || sectionCompleteness.sections,
+      actionEvidence: actionEvidence.details,
+      keywordSpread: keywordSpread.details,
+      parseSafety: parseSafety.details,
+      languageQuality: languageQuality.details,
+    },
     snapshot,
   };
 }
@@ -576,8 +769,9 @@ export function calculateJDScore(data, schema) {
 
 export function formatResumeReviewPayload(aiJson = {}) {
   return {
-    roleClarityAdjustment: clamp(Number(aiJson.roleClarityAdjustment) || 0, -20, 20),
-    languageQualityAdjustment: clamp(Number(aiJson.languageQualityAdjustment) || 0, -20, 20),
+    clarityScore: clamp(Number(aiJson.clarityScore) || 0, 0, 10),
+    specificityScore: clamp(Number(aiJson.specificityScore) || 0, 0, 10),
+    reason: text(aiJson.reason),
     notes: Array.isArray(aiJson.notes) ? aiJson.notes.map(text).filter(Boolean) : [],
   };
 }

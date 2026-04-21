@@ -1879,7 +1879,7 @@ Rules:
                     <div style={{ fontSize: 12, fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>JD Score Weights</div>
                     <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
                       {jdScoreWeights.map(([label, internal, weight], index) => (
-                        <div key={label} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 80px", gap: 10, padding: "10px 12px", background: index % 2 ? "#fff" : "#f8fafc", borderTop: index ? "1px solid #e5e7eb" : "none", fontSize: 11.5, color: "#334155" }}>
+                        <div key={label} className="jd-score-weight-row" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 80px", gap: 10, padding: "10px 12px", background: index % 2 ? "#fff" : "#f8fafc", borderTop: index ? "1px solid #e5e7eb" : "none", fontSize: 11.5, color: "#334155" }}>
                           <strong style={{ color: "#0f172a" }}>{label}</strong>
                           <span>{internal}</span>
                           <span style={{ fontWeight: 800, color: "#1d4ed8" }}>{weight}</span>
@@ -1888,12 +1888,12 @@ Rules:
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div className="jd-score-explainer-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>JD Requirement Weight</div>
                       <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
                         {jdImportanceWeights.map(([label, weight], index) => (
-                          <div key={label} style={{ display: "grid", gridTemplateColumns: "1fr 70px", gap: 10, padding: "10px 12px", background: index % 2 ? "#fff" : "#f8fafc", borderTop: index ? "1px solid #e5e7eb" : "none", fontSize: 11.5 }}>
+                          <div key={label} className="jd-importance-row" style={{ display: "grid", gridTemplateColumns: "1fr 70px", gap: 10, padding: "10px 12px", background: index % 2 ? "#fff" : "#f8fafc", borderTop: index ? "1px solid #e5e7eb" : "none", fontSize: 11.5 }}>
                             <strong style={{ color: "#0f172a" }}>{label}</strong>
                             <span style={{ fontWeight: 800, color: "#1d4ed8" }}>{weight}</span>
                           </div>
@@ -1922,7 +1922,7 @@ Rules:
             )}
 
             {status === "analyzing" && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: pageMode ? 320 : "100%", height: pageMode ? "auto" : "100%", gap: 16, padding: pageMode ? "56px 0 24px" : 0 }}>
+              <div className="jd-analyzing-state" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: pageMode ? 320 : "100%", height: pageMode ? "auto" : "100%", gap: 16, padding: pageMode ? "56px 0 24px" : 0 }}>
                 <div style={{ width: 48, height: 48, border: "4px solid #e5e7eb", borderTopColor: "#f55036", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                 <div style={{ fontSize: 14, fontWeight: 700, color: "#475569" }}>Analyzing with AI...</div>
                 <div style={{ fontSize: 11, color: "#94a3b8" }}>Smart keyword analysis is in progress</div>
@@ -1934,15 +1934,15 @@ Rules:
               const resumePalette = ringColors(resumeScore?.overall ?? 0, "orange");
               const jdPalette = ringColors(jdScore.overall, "blue");
               return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 28 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                <div className="jd-results-stack" style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 28 }}>
+                  <div className="jd-score-cards-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
                     <div style={{ background: `${resumePalette.bg}33`, border: `1.5px solid ${resumePalette.fg}33`, borderRadius: 12, padding: 16 }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: resumePalette.text, letterSpacing: 0.4 }}>RESUME QUALITY SCORE</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: resumePalette.text, letterSpacing: 0.4 }}>ATS SCORE</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 10 }}>
                         <RingScore score={resumeScore?.overall ?? 0} tone="orange" label="RQS" />
                         <div>
                           <div style={{ fontSize: 15, fontWeight: 800, color: resumePalette.text }}>{resumeScore?.label || "Needs Work"}</div>
-                          <div style={{ fontSize: 11, color: resumePalette.text, marginTop: 4, lineHeight: 1.5 }}>Shows how strong your resume is before matching it with this job.</div>
+                          <div style={{ fontSize: 11, color: resumePalette.text, marginTop: 4, lineHeight: 1.5 }}>Shows how ATS-ready your resume is before matching it with a job description.</div>
                         </div>
                       </div>
                     </div>
@@ -1959,7 +1959,7 @@ Rules:
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                  <div className="jd-metrics-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
                     {[
                       ["JD Keywords Found", jdScore.factors.weightedKeywordCoverage],
                       ["Related Skill Match", jdScore.factors.semanticEquivalence],
@@ -1985,7 +1985,7 @@ Rules:
                     })}
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1fr) minmax(260px, 2fr)", gap: 10, alignItems: "stretch" }}>
+                  <div className="jd-summary-grid" style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1fr) minmax(260px, 2fr)", gap: 10, alignItems: "stretch" }}>
                     {(() => {
                       const label = "Critical Requirements Covered";
                       const value = jdScore.factors.criticalRequirementRisk;
@@ -2025,7 +2025,7 @@ Rules:
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <div className="jd-inline-actions" style={{ display: "flex", justifyContent: "flex-end" }}>
                     <button onClick={() => setShowScoreExplainer(true)} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #dbeafe", background: "#eff6ff", color: "#1d4ed8", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>
                       How scoring works
                     </button>
@@ -2038,7 +2038,7 @@ Rules:
                     </div>
                   )}
 
-                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <div className="jd-inline-actions" style={{ display: "flex", justifyContent: "flex-end" }}>
                     <button
                       onClick={applyAllAISuggestions}
                       disabled={everythingApplied}
@@ -2316,6 +2316,7 @@ function JDMatchPage() {
   const [jdState, setJdState] = useState({ text: "", status: "idle", error: "", analysis: null });
   const [showInlineEditor, setShowInlineEditor] = useState(false);
   const [editorSection, setEditorSection] = useState("personal");
+  const [jdMobileTab, setJdMobileTab] = useState("match");
   const snapshot = buildResumeSnapshot(data);
   const hasResumeContent = snapshot.wordCount >= 20 || snapshot.expEntries.some(e => e.role) || snapshot.projectEntries.some(p => p.name);
   const jdScore = jdState.analysis ? calculateJDScore(data, jdState.analysis) : null;
@@ -2347,17 +2348,35 @@ function JDMatchPage() {
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} onParsed={handleParsed} />}
       {showTemplateModal && <TemplateModal onClose={() => setShowTemplateModal(false)} activeTemplate={activeTemplate} onSelect={setActiveTemplate} />}
 
-      <div className="jd-page-sidebar" style={{ width: 700, maxWidth: "100%", background: "#fff", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", minHeight: 0, flexShrink: 0 }}>
+      <div className={`jd-page-sidebar ${jdMobileTab === "preview" ? "jd-mobile-hidden" : ""}`} style={{ width: 700, maxWidth: "100%", background: "#fff", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", minHeight: 0, flexShrink: 0 }}>
         <div className="jd-page-header" style={{ padding: "14px 24px 12px", borderBottom: `1px solid ${C.border}`, background: "linear-gradient(180deg, #ffffff 0%, #fcfbff 100%)", boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.9), 0 10px 24px rgba(15,23,42,0.03)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: showJDSetup ? 10 : 0 }}>
-            <div>
+          <div className="jd-page-header-main" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: showJDSetup ? 10 : 0 }}>
+            <div className="jd-page-header-title">
               <div style={{ fontSize: 16, fontWeight: 800, color: C.text, lineHeight: 1.2 }}>{showInlineEditor ? "Edit Resume Details" : "Optimize Resume for This Job"}</div>
             </div>
-            <button
-              onClick={() => setShowInlineEditor((prev) => !prev)}
-              style={{ padding: "8px 14px", minWidth: 132, borderRadius: 999, border: `1px solid ${showInlineEditor ? "#bfdbfe" : "#d9e0ea"}`, background: showInlineEditor ? "linear-gradient(135deg, #eff6ff, #ffffff)" : "linear-gradient(135deg, #ffffff, #f8fafc)", color: showInlineEditor ? "#1d4ed8" : "#475569", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", boxShadow: showInlineEditor ? "0 8px 18px rgba(37,99,235,0.12)" : "0 6px 14px rgba(15,23,42,0.05)" }}
-            >
-              {showInlineEditor ? "Previous Score" : "Edit Resume"}
+            <div className="jd-page-header-buttons">
+              <button
+                onClick={() => setShowInlineEditor((prev) => !prev)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, minHeight: 34, padding: "8px 14px", background: "#fff", border: `1.5px solid ${showInlineEditor ? "#2563eb" : C.inputBorder}`, borderRadius: 8, color: showInlineEditor ? "#2563eb" : C.textMuted, fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap" }}
+              >
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                {showInlineEditor ? "Previous Score" : "Edit Resume"}
+              </button>
+              <button
+                onClick={() => setShowUpload(true)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, minHeight: 34, padding: "8px 14px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)", whiteSpace: "nowrap" }}
+              >
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d={icons.upload} /></svg>
+                Upload CV
+              </button>
+            </div>
+          </div>
+          <div className="jd-mobile-tabs">
+            <button className={jdMobileTab === "match" ? "active" : ""} onClick={() => setJdMobileTab("match")}>
+              {showInlineEditor ? "Edit Resume" : "Job Match"}
+            </button>
+            <button className={jdMobileTab === "preview" ? "active" : ""} onClick={() => setJdMobileTab("preview")}>
+              Preview
             </button>
           </div>
           {showJDSetup && <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginTop: 16 }} className="jd-top-cards">
@@ -2420,7 +2439,7 @@ function JDMatchPage() {
         </div>
       </div>
 
-      <div className="jd-page-preview">
+      <div className={`jd-page-preview ${jdMobileTab !== "preview" ? "jd-mobile-hidden" : ""}`}>
         <ResumePreviewPane
           data={data}
           activeTemplate={activeTemplate}
@@ -2445,6 +2464,25 @@ function JDMatchPage() {
           windowWidth={windowWidth}
         />
       </div>
+
+      <nav className="jd-bottom-nav">
+        <button className={!showInlineEditor && jdMobileTab === "match" ? "active" : ""} onClick={() => { setShowInlineEditor(false); setJdMobileTab("match"); }}>
+          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18" /><path d="M3 12h18" /><path d="M3 19h18" /></svg>
+          Match
+        </button>
+        <button className={showInlineEditor && jdMobileTab === "match" ? "active" : ""} onClick={() => { setShowInlineEditor(true); setJdMobileTab("match"); }}>
+          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" /></svg>
+          Edit
+        </button>
+        <button className={jdMobileTab === "preview" ? "active" : ""} onClick={() => setJdMobileTab("preview")}>
+          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Preview
+        </button>
+        <button onClick={() => { setShowUpload(true); setJdMobileTab("match"); }}>
+          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={icons.upload} /></svg>
+          Upload
+        </button>
+      </nav>
     </div>
   );
 }
@@ -2752,8 +2790,8 @@ function useResumeWorkspace() {
             max_tokens: 500,
             response_format: { type: "json_object" },
             messages: [
-              { role: "system", content: "You are a resume quality reviewer. Return only JSON. Review role clarity and language quality. Never return a final ATS score." },
-              { role: "user", content: `Review this resume and return JSON using this exact shape:\n{\n  "roleClarityAdjustment": 0,\n  "languageQualityAdjustment": 0,\n  "notes": ["Short note 1", "Short note 2"]\n}\n\nRules:\n- roleClarityAdjustment and languageQualityAdjustment must be integers from -20 to 20\n- reward strong specificity, coherence, and recruiter readability\n- penalize vague, repetitive, or buzzword-heavy language\n- do not invent facts\n- return JSON only\n\nRESUME:\n${snapshot.fullText}` }
+              { role: "system", content: "You are a resume language reviewer. Return only JSON. Review clarity and specificity of resume writing. Never return a final ATS score." },
+              { role: "user", content: `Review this resume and return JSON using this exact shape:\n{\n  "clarityScore": 0,\n  "specificityScore": 0,\n  "reason": "One short sentence",\n  "notes": ["Short note 1", "Short note 2"]\n}\n\nRules:\n- clarityScore and specificityScore must be numbers from 0 to 10\n- reward strong clarity, specificity, and recruiter readability\n- penalize vague, repetitive, generic, or buzzword-heavy language\n- keep reason short and factual\n- do not invent facts\n- return JSON only\n\nRESUME:\n${snapshot.fullText}` }
             ]
           })
         });
@@ -3169,21 +3207,23 @@ function ResumeBuilder() {
             messages: [
               {
                 role: "system",
-                content: "You are a resume quality reviewer. Return only JSON. Review role clarity and language quality. Never return a final ATS score."
+                content: "You are a resume language reviewer. Return only JSON. Review clarity and specificity of resume writing. Never return a final ATS score."
               },
               {
                 role: "user",
                 content: `Review this resume and return JSON using this exact shape:
 {
-  "roleClarityAdjustment": 0,
-  "languageQualityAdjustment": 0,
+  "clarityScore": 0,
+  "specificityScore": 0,
+  "reason": "One short sentence",
   "notes": ["Short note 1", "Short note 2"]
 }
 
 Rules:
-- roleClarityAdjustment and languageQualityAdjustment must be integers from -20 to 20
-- reward strong specificity, coherence, and recruiter readability
-- penalize vague, repetitive, or buzzword-heavy language
+- clarityScore and specificityScore must be numbers from 0 to 10
+- reward strong clarity, specificity, and recruiter readability
+- penalize vague, repetitive, generic, or buzzword-heavy language
+- keep reason short and factual
 - do not invent facts
 - return JSON only
 
@@ -3388,7 +3428,7 @@ ${clJD}`
       {/* ── Mobile ATS strip (tablet/mobile) ── */}
       <div className="rb-mobile-ats">
         <svg width={14} height={14} viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="transparent" stroke="#e5e7eb" strokeWidth="3"/><circle cx="18" cy="18" r="15.9" fill="transparent" stroke={C.accent} strokeWidth="3" strokeDasharray={`${resumeScore.overall}, 100`} strokeLinecap="round" style={{ transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}/></svg>
-        Resume Quality: <span style={{ fontSize: 13, color: resumeScore.overall >= 75 ? "#15803d" : resumeScore.overall >= 50 ? "#b45309" : "#b91c1c" }}>{resumeScore.overall}/100</span>
+        ATS Score: <span style={{ fontSize: 13, color: resumeScore.overall >= 75 ? "#15803d" : resumeScore.overall >= 50 ? "#b45309" : "#b91c1c" }}>{resumeScore.overall}/100</span>
         {resumeScore.tips.length > 0 && <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 400 }}>· {resumeScore.tips[0]}</span>}
       </div>
 
@@ -3397,7 +3437,7 @@ ${clJD}`
 
         {/* ATS Score Circular */}
         <div className="rb-ats-score" style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#000", letterSpacing: 1.2, marginBottom: 10, marginTop: -12 }} className="rb-ats-label">RESUME QUALITY</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#000", letterSpacing: 1.2, marginBottom: 10, marginTop: -12 }} className="rb-ats-label">ATS SCORE</div>
           <div style={{ background: "#ffffff", border: `1.5px solid ${C.accentBorder}`, borderRadius: 16, padding: "14px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, boxShadow: "0 4px 12px rgba(107,77,176,0.08)", width: "88%", boxSizing: "border-box" }}>
             <div style={{ position: "relative", width: 100, height: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="100" height="100" viewBox="0 0 36 36" style={{ transform: "rotate(-90deg)" }}>
@@ -3414,16 +3454,19 @@ ${clJD}`
             <div style={{ marginTop: 8, background: "#fff", borderRadius: 8, padding: "8px 10px", border: `1px solid ${C.border}`, width: "90%", boxSizing: "border-box", fontSize: 10 }}>
               <div style={{ display: "grid", gap: 4, marginBottom: resumeScore.tips.length ? 8 : 0 }}>
                 {[
-                  ["Details", resumeScore.factors.sectionCoverage],
-                  ["Achievements", resumeScore.factors.impactAchievement],
-                  ["Format", resumeScore.factors.structuralIntegrity],
-                  ["Job Fit", resumeScore.factors.roleClarity],
-                  ["Writing", resumeScore.factors.languageQuality],
+                  ["Section Completeness", resumeScore.factors.sectionCompleteness],
+                  ["Action & Evidence", resumeScore.factors.actionEvidence],
+                  ["Keyword Spread", resumeScore.factors.keywordSpread],
+                  ["ATS Parse Safety", resumeScore.factors.parseSafety],
+                  ["Language Quality", resumeScore.factors.languageQuality],
                 ].map(([label, value]) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", gap: 8, color: "#475569" }}>
                     <span>{label}</span><strong style={{ color: "#0f172a" }}>{value}</strong>
                   </div>
                 ))}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, color: "#475569", marginBottom: resumeScore.tips.length ? 8 : 0 }}>
+                <span>Parse Confidence</span><strong style={{ color: "#0f172a" }}>{resumeScore.confidence}</strong>
               </div>
               {resumeScore.tips.map((t, i) => (
                 <div key={i} style={{ color: "#92400e", marginBottom: 3, display: "flex", alignItems: "flex-start", gap: 5, lineHeight: 1.3 }}>
@@ -3494,7 +3537,6 @@ ${clJD}`
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <div style={{ fontSize: 17, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 6 }}>ATS<em style={{ color: C.accent, fontStyle: "normal" }}>Forge</em></div>
-              <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>AI-powered ATS optimized</div>
             </div>
             <div style={{ display: "flex", gap: 6 }} className="rb-form-header-buttons">
               {/* Save Button */}
@@ -3512,14 +3554,14 @@ ${clJD}`
               </button>
               {/* Match JD button */}
               <button onClick={() => navigate("/jd-match")}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}>
-                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+                style={{ display: "flex", alignItems: "center", gap: 7, minHeight: 34, padding: "8px 14px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
                 Match JD
               </button>
               {/* Upload Resume button */}
               <button onClick={() => setShowUpload(true)}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
-                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.upload} /></svg>
+                style={{ display: "flex", alignItems: "center", gap: 7, minHeight: 34, padding: "8px 14px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.upload} /></svg>
                 Upload CV
               </button>
             </div>
@@ -3911,9 +3953,10 @@ function PersonalForm({ data, update, IS }) {
       ))}
       <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10, marginTop: 6 }}>
         <div style={{ fontSize: 10.5, fontWeight: 700, color: C.accent, marginBottom: 8 }}>🔗 Links <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 10 }}>(clickable in resume)</span></div>
-        {[["LinkedIn URL", "personal.linkedin", "https://linkedin.com/in/yourname"], ["GitHub URL", "personal.github", "https://github.com/yourname"], ["Portfolio URL", "personal.portfolio", "https://yourportfolio.com"]].map(([lbl, path, ph]) => (
+        {[["LinkedIn URL *", "personal.linkedin", "https://linkedin.com/in/yourname"], ["GitHub URL", "personal.github", "https://github.com/yourname"], ["Portfolio URL", "personal.portfolio", "https://yourportfolio.com"]].map(([lbl, path, ph]) => (
           <div key={path} style={{ marginBottom: 9 }}><FL>{lbl}</FL><input value={getValue(path)} onChange={e => update(path, e.target.value)} placeholder={ph} style={IS} /></div>
         ))}
+        <div style={{ fontSize: 10, color: C.textMuted, marginTop: -2 }}>LinkedIn is required for full Section Completeness score. GitHub and Portfolio remain optional.</div>
       </div>
     </div>
   );

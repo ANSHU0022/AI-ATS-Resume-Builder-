@@ -6,13 +6,21 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const dotenv = require("dotenv");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DIST_DIR = path.join(__dirname, "resume-builder", "dist");
+const ENV_FILE = path.join(__dirname, "resume-builder", ".env");
 
-require("dotenv").config();
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+function getGroqApiKey() {
+  const result = dotenv.config({ path: ENV_FILE, override: true, quiet: true });
+  if (result.error) {
+    return "";
+  }
+
+  return (process.env.GROQ_API_KEY || "").trim();
+}
 
 app.use(cors()); // Allow all origins — browser can now call this server
 app.use(express.json({ limit: "10mb" })); // Allow large resume payloads
@@ -23,6 +31,11 @@ app.use(express.static(DIST_DIR));
 // ── Proxy endpoint: /api/groq ─────────────────────────────────────────────────
 app.post("/api/groq", async (req, res) => {
   try {
+    const GROQ_API_KEY = getGroqApiKey();
+    if (!GROQ_API_KEY) {
+      return res.status(500).json({ error: { message: `GROQ_API_KEY not found in ${ENV_FILE}` } });
+    }
+
     // Dynamic import of node-fetch (ESM compatible)
     const { default: fetch } = await import("node-fetch");
 

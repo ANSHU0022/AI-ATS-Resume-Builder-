@@ -2,15 +2,14 @@
 // Solves CORS: browser → this server → Groq API
 // Run: node server.js
 // Requires: npm install express cors node-fetch dotenv
-const dotenv = require("dotenv");
-dotenv.config({ quiet: true });
-
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const dotenv = require("dotenv");
 
 const app = express();
 const PORT = 3001;
+const ENV_FILE = path.join(__dirname, ".env");
 
 // ── Model Fallback Chain ──────────────────────────────────────────────────────
 // If the primary model hits a rate limit, we try the next one automatically.
@@ -21,16 +20,20 @@ const MODEL_FALLBACK_CHAIN = [
 ];
 
 function getGroqApiKey() {
-  // Refresh local .env values during development so key swaps take effect
-  // without requiring a server restart.
-  dotenv.config({ override: true, quiet: true });
+  // Always reload the app-local .env so key swaps take effect immediately
+  // and stale shell-level values do not win.
+  const result = dotenv.config({ path: ENV_FILE, override: true, quiet: true });
+  if (result.error) {
+    return "";
+  }
+
   return (process.env.GROQ_API_KEY || "").trim();
 }
 
 const initialGroqApiKey = getGroqApiKey();
 console.log(
   "GROQ_API_KEY status:",
-  initialGroqApiKey ? `Loaded (starts with ${initialGroqApiKey.slice(0, 7)}...)` : "Missing"
+  initialGroqApiKey ? `Loaded from ${ENV_FILE}` : `Missing from ${ENV_FILE}`
 );
 
 app.use(cors()); // Allow all origins — browser can now call this server
