@@ -140,9 +140,13 @@ function getDatePattern(value) {
   return "other";
 }
 
+function ensureArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 function distinctSkillList(data) {
   return unique(
-    (data.skills || [])
+    ensureArray(data?.skills)
       .flatMap((skill) => text(skill.items).split(","))
       .map((item) => sentenceLike(item))
   );
@@ -150,49 +154,56 @@ function distinctSkillList(data) {
 
 function allBullets(data) {
   return [
-    ...(data.experience || []).flatMap((item) => item.bullets || []),
-    ...(data.projects || []).flatMap((item) => item.bullets || []),
+    ...ensureArray(data?.experience).flatMap((item) => ensureArray(item?.bullets)),
+    ...ensureArray(data?.projects).flatMap((item) => ensureArray(item?.bullets)),
   ].map(text).filter(Boolean);
 }
 
 function experienceBullets(data) {
-  return (data.experience || []).flatMap((item) => item.bullets || []).map(text).filter(Boolean);
+  return ensureArray(data?.experience).flatMap((item) => ensureArray(item?.bullets)).map(text).filter(Boolean);
 }
 
 export function buildResumeSnapshot(data) {
-  const personal = data.personal || {};
-  const summary = text(data.summary);
+  const safeData = data && typeof data === "object" ? data : {};
+  const personal = safeData.personal && typeof safeData.personal === "object" ? safeData.personal : {};
+  const skills = ensureArray(safeData.skills);
+  const experience = ensureArray(safeData.experience);
+  const projects = ensureArray(safeData.projects);
+  const education = ensureArray(safeData.education);
+  const certifications = ensureArray(safeData.certifications);
+  const achievements = ensureArray(safeData.achievements);
+  const summary = text(safeData.summary);
   const title = text(personal.title);
-  const skillEntries = distinctSkillList(data);
-  const expEntries = (data.experience || []).map((item) => ({
+  const skillEntries = distinctSkillList(safeData);
+  const expEntries = experience.map((item) => ({
     ...item,
     role: text(item.role),
     company: text(item.company),
-    bullets: (item.bullets || []).map(text).filter(Boolean),
+    bullets: ensureArray(item?.bullets).map(text).filter(Boolean),
   }));
-  const projectEntries = (data.projects || []).map((item) => ({
+  const projectEntries = projects.map((item) => ({
     ...item,
     name: text(item.name),
     tech: text(item.tech),
-    bullets: (item.bullets || []).map(text).filter(Boolean),
+    bullets: ensureArray(item?.bullets).map(text).filter(Boolean),
   }));
-  const educationEntries = (data.education || []).map((item) => ({
+  const educationEntries = education.map((item) => ({
     ...item,
     degree: text(item.degree),
     institution: text(item.institution),
   }));
-  const certificationEntries = (data.certifications || []).map((item) => ({
+  const certificationEntries = certifications.map((item) => ({
     ...item,
     name: text(item.name),
   }));
-  const achievementEntries = (data.achievements || []).map((item) => ({
+  const achievementEntries = achievements.map((item) => ({
     ...item,
     title: text(item.title),
   }));
 
   const parts = [
     personal.name, title, summary,
-    (data.skills || []).map((skill) => `${text(skill.category)} ${text(skill.items)}`).join(" "),
+    skills.map((skill) => `${text(skill?.category)} ${text(skill?.items)}`).join(" "),
     expEntries.map((item) => [item.role, item.company, ...(item.bullets || [])].join(" ")).join(" "),
     projectEntries.map((item) => [item.name, item.tech, ...(item.bullets || [])].join(" ")).join(" "),
     educationEntries.map((item) => [item.degree, item.institution].join(" ")).join(" "),
@@ -209,8 +220,8 @@ export function buildResumeSnapshot(data) {
     educationEntries,
     certificationEntries,
     achievementEntries,
-    allBullets: allBullets(data),
-    experienceBullets: experienceBullets(data),
+    allBullets: allBullets(safeData),
+    experienceBullets: experienceBullets(safeData),
     fullText: parts.filter(Boolean).join("\n").trim(),
     fullTextNormalized: sentenceLike(parts.filter(Boolean).join(" ")),
     wordCount: words(parts.filter(Boolean).join(" ")).length,
@@ -430,19 +441,15 @@ function keywordEvidence(snapshot, requirement) {
     strictAliases.some((alias) => hasWholeTerm(textBlocks.misc, alias)) || hasWholeTerm(textBlocks.misc, phrase) ? 10 : 0,
   ].reduce((sum, value) => sum + value, 0);
 
-  const supportingBullet = snapshot.allBullets.find((bullet) => relaxedAliases.some((alias) => hasWholeTerm(sentenceLike(bullet), alias)) || relatedTokenCoverage(sentenceLike(bullet), phrase) >= (isMultiWord ? 0.85 : 0.75));
-  const evidenceStrength = supportingBullet
-    ? clamp(
-      (ACTION_VERBS.some((verb) => new RegExp(`^${verb}\\b`, "i").test(supportingBullet)) ? 40 : 10) +
-      (/\d/.test(supportingBullet) ? 35 : 10) +
-      (RESULT_TERMS.some((term) => normalize(supportingBullet).includes(term)) ? 25 : 10)
-    )
-    : (strictAliases.some((alias) => hasWholeTerm(textBlocks.skills, alias)) || hasWholeTerm(textBlocks.skills, phrase) ? 40 : 0);
+  const candidateBullets = snapshot.allBullets.filter((bullet) => {
+    const normalizedBullet = sentenceLike(bullet);
+    return relaxedAliases.some((alias) => hasWholeTerm(normalizedBullet, alias)) || relatedTokenCoverage(normalizedBullet, phrase) >= (isMultiWord ? 0.85 : 0.75);
+  });
+  const supportingBullet = candidateBullets[0] || "";
 
   return {
     matchQuality,
     placementScore,
-    evidenceStrength,
     supportingBullet,
     matchedAlias: matchedAlias || "",
   };
@@ -475,10 +482,8 @@ export function calculateJDScore(data, schema) {
       label: "Needs Work",
       factors: {
         weightedKeywordCoverage: 0,
-        keywordPlacement: 0,
-        evidenceAlignment: 0,
-        titleAlignment: 0,
         semanticEquivalence: 0,
+        titleAlignment: 0,
         criticalRequirementRisk: 0,
       },
       matched: [],
@@ -492,8 +497,6 @@ export function calculateJDScore(data, schema) {
 
   let totalWeight = 0;
   let matchedWeight = 0;
-  let placementAccumulator = 0;
-  let evidenceAccumulator = 0;
   let semanticAccumulator = 0;
   const matched = [];
   const related = [];
@@ -505,8 +508,6 @@ export function calculateJDScore(data, schema) {
     const evidence = keywordEvidence(snapshot, req);
     totalWeight += weight;
     matchedWeight += weight * evidence.matchQuality;
-    placementAccumulator += weight * evidence.placementScore;
-    evidenceAccumulator += weight * evidence.evidenceStrength;
     if (evidence.matchQuality >= 0.9) semanticAccumulator += weight * 100;
     else if (evidence.matchQuality >= 0.6) semanticAccumulator += weight * 60;
 
@@ -532,25 +533,19 @@ export function calculateJDScore(data, schema) {
   });
 
   const weightedKeywordCoverage = totalWeight ? (matchedWeight / totalWeight) * 100 : 0;
-  const keywordPlacement = totalWeight ? (placementAccumulator / (totalWeight * 100)) * 100 : 0;
-  const evidenceAlignment = totalWeight ? (evidenceAccumulator / (totalWeight * 100)) * 100 : 0;
   const titleAlignment = computeTitleAlignment(snapshot, schema);
   const semanticEquivalence = totalWeight ? (semanticAccumulator / (totalWeight * 100)) * 100 : 0;
   const criticalRequirementRisk = criticalGaps.length === 0 ? 100 : clamp(100 - (criticalGaps.length * 22));
 
   const overall = clamp(
-    (weightedKeywordCoverage * 0.4) +
-    (keywordPlacement * 0.2) +
-    (evidenceAlignment * 0.15) +
-    (titleAlignment * 0.1) +
-    (semanticEquivalence * 0.1) +
-    (criticalRequirementRisk * 0.05)
+    (weightedKeywordCoverage * 0.5) +
+    (semanticEquivalence * 0.2) +
+    (titleAlignment * 0.15) +
+    (criticalRequirementRisk * 0.15)
   );
 
   const recommendations = [];
   if (criticalGaps.length) recommendations.push(`Add or credibly support critical JD requirements: ${criticalGaps.slice(0, 3).join(", ")}.`);
-  if (keywordPlacement < 65) recommendations.push("Move high-priority keywords into the title, summary, and recent experience bullets.");
-  if (evidenceAlignment < 65) recommendations.push("Support matched skills with quantified bullets, outcomes, and real project or work evidence.");
   if (matched.length < Math.ceil(requirements.length * 0.45)) recommendations.push("Cover more must-have and preferred JD requirements to raise your match rate.");
   if (titleAlignment < 65) recommendations.push("Align the resume title and positioning more closely with the target role and seniority.");
 
@@ -560,10 +555,8 @@ export function calculateJDScore(data, schema) {
     label,
     factors: {
       weightedKeywordCoverage: round(weightedKeywordCoverage),
-      keywordPlacement: round(keywordPlacement),
-      evidenceAlignment: round(evidenceAlignment),
-      titleAlignment: round(titleAlignment),
       semanticEquivalence: round(semanticEquivalence),
+      titleAlignment: round(titleAlignment),
       criticalRequirementRisk: round(criticalRequirementRisk),
     },
     matched,

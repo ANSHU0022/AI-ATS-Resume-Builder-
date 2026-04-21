@@ -967,22 +967,26 @@ function JDAnalyzerModal({ onClose, data, setData, jdState, setJdState, jdScore,
   const [showGuide, setShowGuide] = useState(false);
   const [guideRead, setGuideRead] = useState(false);
   const [openMetric, setOpenMetric] = useState("");
+  const [showScoreExplainer, setShowScoreExplainer] = useState(false);
   const shouldShowSoftSkills = false;
   const applyAllLockedRef = useRef(false);
+  const jdScoreWeights = [
+    ["JD Keywords Found", "weightedKeywordCoverage", "50%"],
+    ["Related Skill Match", "semanticEquivalence", "20%"],
+    ["Job Title Match", "titleAlignment", "15%"],
+    ["Critical Requirements Covered", "criticalRequirementRisk", "15%"],
+  ];
+  const jdImportanceWeights = [
+    ["must", "3x"],
+    ["preferred", "2x"],
+    ["nice", "1x"],
+  ];
   const normalizeSkillText = (value = "") => value.toLowerCase().replace(/[^a-z0-9+#/\s]/g, " ").replace(/\s+/g, " ").trim();
   const tokenizeSkillText = (value = "") => normalizeSkillText(value).split(" ").filter(Boolean);
   const factorDescriptions = {
     "JD Keywords Found": {
       summary: "How many important JD keywords already appear clearly in your resume.",
       improve: "Add the most important missing JD words into your skills and recent work bullets."
-    },
-    "Proof in Resume": {
-      summary: "Shows whether your resume proves the skills with work, projects, or results.",
-      improve: "Add action verbs, tools used, and measurable outcomes in bullets."
-    },
-    "Keyword Placement": {
-      summary: "Checks if important words appear in the right places like title, summary, and recent experience.",
-      improve: "Place the top JD keywords in your title, summary, and latest experience."
     },
     "Related Skill Match": {
       summary: "Shows how well your resume uses exact or close JD terminology across sections.",
@@ -1130,6 +1134,72 @@ function JDAnalyzerModal({ onClose, data, setData, jdState, setJdState, jdScore,
     return normalizedValue.includes(normalizedKeyword);
   };
 
+  const limitBullets = (bullets = []) => bullets.filter(Boolean).slice(0, 3);
+
+  const stripCandidateNameFromSummary = (summary = "") => {
+    const candidateName = (data.personal?.name || "").trim();
+    const cleanSummary = (summary || "").trim();
+    if (!cleanSummary || !candidateName) return cleanSummary;
+
+    const escapedName = candidateName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    let next = cleanSummary
+      .replace(new RegExp(`^${escapedName}\\s+is\\s+(an?\\s+)?`, "i"), "")
+      .replace(new RegExp(`^${escapedName}\\s*,?\\s*`, "i"), "")
+      .trim();
+
+    if (next) {
+      next = next.charAt(0).toUpperCase() + next.slice(1);
+    }
+
+    return next;
+  };
+
+  const normalizeSuggestionText = (value = "") => value.replace(/\s+/g, " ").trim().toLowerCase();
+  const createNormalizedKey = (...parts) => parts.map((part) => normalizeSuggestionText(part || "")).filter(Boolean).join("::");
+  const actionVerbStarters = new Set([
+    "achieved", "analyzed", "architected", "automated", "boosted", "built", "collaborated",
+    "created", "delivered", "deployed", "designed", "developed", "drove", "enabled",
+    "engineered", "enhanced", "evaluated", "executed", "implemented", "improved",
+    "increased", "integrated", "launched", "led", "managed", "optimized", "orchestrated",
+    "produced", "reduced", "resolved", "streamlined", "supported", "trained", "validated"
+  ]);
+  const commonJobTitleWords = ["engineer", "scientist", "analyst", "developer", "specialist", "intern", "manager", "architect", "consultant", "researcher"];
+
+  const extractLikelyJobTitleFromJD = (value = "") => {
+    const lines = value
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 16);
+
+    for (const line of lines) {
+      const explicitMatch = line.match(/^(?:job title|role|position)\s*[:-]\s*(.+)$/i);
+      if (explicitMatch?.[1]) return explicitMatch[1].trim();
+    }
+
+    for (const line of lines) {
+      const normalizedLine = normalizeSuggestionText(line);
+      const looksLikeTitle = commonJobTitleWords.some((word) => normalizedLine.includes(word));
+      const looksLikeBodyCopy = line.length > 90 || /responsibilities|requirements|qualification|experience|about|you will|we are/i.test(line);
+      if (looksLikeTitle && !looksLikeBodyCopy) {
+        return line.replace(/^[•\-\d.)\s]+/, "").trim();
+      }
+    }
+
+    return "";
+  };
+
+  const resolveAnalysisJobTitle = (rawJobTitle = "", sourceJD = "") => {
+    const parsedTitle = (rawJobTitle || "").trim();
+    const inferredTitle = extractLikelyJobTitleFromJD(sourceJD);
+    const normalizedJD = normalizeSuggestionText(sourceJD);
+    const parsedFoundInJD = parsedTitle && normalizedJD.includes(normalizeSuggestionText(parsedTitle));
+
+    if (parsedFoundInJD) return parsedTitle;
+    if (inferredTitle) return inferredTitle;
+    return parsedTitle;
+  };
+
   const formatKeywordList = (keywords = []) => {
     const cleaned = keywords.map((item) => item?.trim()).filter(Boolean);
     if (!cleaned.length) return "";
@@ -1139,54 +1209,209 @@ function JDAnalyzerModal({ onClose, data, setData, jdState, setJdState, jdScore,
   };
 
   const appendKeywordsToBullet = (bullet = "", keywords = []) => {
-    const additions = keywords.filter((keyword) => !containsKeyword(bullet, keyword));
+    const additions = keywords.filter((keyword) => !containsKeyword(bullet, keyword)).slice(0, 1);
     if (!additions.length) return bullet;
     const base = bullet.trim().replace(/[.!?\s]+$/, "");
-    return `${base} using ${formatKeywordList(additions)}.`;
+    if (/\b(using|with|including)\b/i.test(base)) {
+      return `${base}, including ${formatKeywordList(additions)}.`;
+    }
+    return `${base} with ${formatKeywordList(additions)}.`;
   };
 
   const enrichSummaryWithKeywords = (summary = "", keywords = [], jobTitle = "") => {
-    const additions = keywords.filter((keyword) => !containsKeyword(summary, keyword)).slice(0, 4);
-    if (!additions.length) return summary;
+    const additions = keywords.filter((keyword) => !containsKeyword(summary, keyword)).slice(0, 2);
+    if (!additions.length) return stripCandidateNameFromSummary(summary);
 
-    const normalizedSummary = summary.trim();
+    const normalizedSummary = stripCandidateNameFromSummary(summary)
+      .replace(/\s+with strengths in [^.]+\.?$/i, "")
+      .trim();
     const prefix = normalizedSummary
       ? normalizedSummary.replace(/[.!?\s]+$/, "")
       : `${jobTitle || "Professional"} with hands-on experience`;
 
-    return `${prefix} with strengths in ${formatKeywordList(additions)}.`;
+    return stripCandidateNameFromSummary(`${prefix}. Experienced with ${formatKeywordList(additions)}.`);
   };
 
-  const injectKeywordsIntoEntries = (entries = [], keywords = [], getKey) => {
-    const queue = [...keywords];
-    const changedKeys = [];
-    let changed = false;
+  const alignSummaryToJobTitle = (summary = "", jobTitle = "") => {
+    const cleanedSummary = stripCandidateNameFromSummary(summary);
+    if (!cleanedSummary || !jobTitle) return cleanedSummary;
+    if (containsKeyword(cleanedSummary, jobTitle)) return cleanedSummary;
 
-    const nextEntries = entries.map((entry) => {
-      const nextEntry = { ...entry, bullets: [...(entry.bullets || [])] };
-      let entryChanged = false;
+    const nextSummary = cleanedSummary.replace(
+      /^[A-Za-z/&,+\-\s]{3,50}\s+(with|specializing|experienced|focused|skilled|bringing)\b/i,
+      `${jobTitle} $1`
+    );
 
-      for (let i = 0; i < nextEntry.bullets.length && queue.length; i += 1) {
-        const bullet = nextEntry.bullets[i];
-        const chunk = queue.filter((keyword) => !containsKeyword(bullet, keyword)).slice(0, 2);
-        if (!chunk.length) continue;
-        nextEntry.bullets[i] = appendKeywordsToBullet(bullet, chunk);
-        chunk.forEach((keyword) => {
-          const index = queue.indexOf(keyword);
-          if (index !== -1) queue.splice(index, 1);
-        });
-        entryChanged = true;
-        changed = true;
+    if (nextSummary !== cleanedSummary) {
+      return nextSummary;
+    }
+
+    return `${jobTitle} with ${cleanedSummary.charAt(0).toLowerCase()}${cleanedSummary.slice(1)}`;
+  };
+
+  const isEffectivelySameBullet = (currentBullet = "", suggestedBullet = "") => {
+    const current = normalizeSuggestionText(currentBullet);
+    const suggested = normalizeSuggestionText(suggestedBullet);
+    if (!current || !suggested) return false;
+    return current === suggested || current.includes(suggested) || suggested.includes(current);
+  };
+
+  const startsWithActionVerb = (value = "") => {
+    const firstWord = normalizeSuggestionText(value).split(" ").find(Boolean) || "";
+    return actionVerbStarters.has(firstWord);
+  };
+
+  const cleanupOptimizationText = (value = "") => (
+    (value || "")
+      .replace(/\s+using [^.]*? to support [^.]*?requirements\.?/gi, "")
+      .replace(/\s+to better support [^.]*?requirements\.?/gi, "")
+      .replace(/\s+with strengths in [^.]+\.?/gi, "")
+      .replace(/,\s*including\s+([^.,]+)\s+including\s+/gi, ", including ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\s+([.,])/g, "$1")
+  );
+
+  const strengthenBulletForJD = (bullet = "", keywords = []) => {
+    let cleanBullet = cleanupOptimizationText(bullet).replace(/[.!?\s]+$/, "");
+    if (!cleanBullet) return bullet;
+
+    if (keywords.length) {
+      cleanBullet = appendKeywordsToBullet(cleanBullet, keywords);
+      cleanBullet = cleanBullet.replace(/[.!?\s]+$/, "");
+    }
+
+    if (!startsWithActionVerb(cleanBullet)) {
+      cleanBullet = `Delivered ${cleanBullet.charAt(0).toLowerCase()}${cleanBullet.slice(1)}`;
+    }
+
+    return `${cleanBullet}.`;
+  };
+
+  const findExperienceIndex = (entries = [], company = "", role = "") => {
+    const targetKey = createNormalizedKey(company, role);
+    return entries.findIndex((item) => createNormalizedKey(item.company, item.role) === targetKey);
+  };
+
+  const findProjectIndex = (entries = [], name = "") => {
+    const targetKey = createNormalizedKey(name);
+    return entries.findIndex((item) => createNormalizedKey(item.name) === targetKey);
+  };
+
+  const matchesSuggestedBullets = (currentBullets = [], suggestedBullets = []) => {
+    const current = limitBullets(currentBullets).map(normalizeSuggestionText).filter(Boolean);
+    const suggested = limitBullets(suggestedBullets).map(normalizeSuggestionText).filter(Boolean);
+    if (!suggested.length) return false;
+    return current.length === suggested.length && suggested.every((bullet, index) => current[index] === bullet);
+  };
+
+  const areBulletListsEquivalent = (left = [], right = []) => {
+    const a = limitBullets(left).map(normalizeSuggestionText);
+    const b = limitBullets(right).map(normalizeSuggestionText);
+    return a.length === b.length && a.every((bullet, index) => bullet === b[index]);
+  };
+
+  const optimizeDisplayedBullets = (currentBullets = [], suggestedBullets = [], keywordPool = [], fallbackTag = "") => {
+    const current = limitBullets(currentBullets);
+    let remainingKeywords = [...keywordPool];
+    let nextBullets = limitBullets(suggestedBullets).map((bullet, index) => {
+      let nextBullet = cleanupOptimizationText(bullet);
+      const currentBullet = current[index] || "";
+      const isSameAsCurrent = isEffectivelySameBullet(currentBullet, nextBullet);
+
+      if (isSameAsCurrent) {
+        const availableKeywords = remainingKeywords.filter((keyword) => !containsKeyword(`${currentBullet} ${nextBullet} ${fallbackTag}`, keyword));
+        if (availableKeywords.length && nextBullet) {
+          const chunk = availableKeywords.slice(0, 1);
+          nextBullet = appendKeywordsToBullet(nextBullet, chunk);
+          remainingKeywords = remainingKeywords.filter((keyword) => !chunk.includes(keyword));
+        }
       }
 
-      if (entryChanged) {
-        changedKeys.push(getKey(nextEntry));
+      if (isEffectivelySameBullet(currentBullet, nextBullet) && nextBullet) {
+        nextBullet = strengthenBulletForJD(nextBullet, remainingKeywords.slice(0, 1));
+        remainingKeywords = remainingKeywords.filter((keyword) => !containsKeyword(nextBullet, keyword)).slice(0, 2);
+      } else if (nextBullet && !startsWithActionVerb(nextBullet)) {
+        nextBullet = strengthenBulletForJD(nextBullet);
       }
 
-      return nextEntry;
+      return nextBullet;
     });
 
-    return { entries: nextEntries, remaining: queue, changedKeys, changed };
+    if (areBulletListsEquivalent(current, nextBullets) && nextBullets.length) {
+      nextBullets = [
+        strengthenBulletForJD(nextBullets[0], remainingKeywords.slice(0, 1)),
+        ...nextBullets.slice(1),
+      ];
+    }
+
+    return limitBullets(nextBullets);
+  };
+
+  const buildFinalOptimizedArtifacts = (sourceAnalysis = analysis, sourceData = data, scoreSnapshot = jdScore) => {
+    const resolvedJobTitle = resolveAnalysisJobTitle(sourceAnalysis?.jobTitle || "", jdText);
+    const rawSummary = alignSummaryToJobTitle(stripCandidateNameFromSummary(sourceAnalysis?.optimizedSummary || ""), resolvedJobTitle);
+    const missingKeywords = (scoreSnapshot?.missing || [])
+      .filter((item) => item.importance === "must" || item.importance === "preferred")
+      .map((item) => item.keyword)
+      .filter(Boolean);
+    const relatedKeywords = (scoreSnapshot?.related || [])
+      .map((item) => item.keyword)
+      .filter(Boolean);
+    const keywordPool = [...new Set([...missingKeywords, ...relatedKeywords])];
+    const finalSummary = rawSummary
+      ? enrichSummaryWithKeywords(rawSummary, missingKeywords.slice(0, 4), resolvedJobTitle)
+      : "";
+
+    const baseExperience = (sourceAnalysis?.optimizedExperience || []).map((item) => {
+      const currentEntry = (sourceData.experience || []).find((entry) => entry.company === item.company && entry.role === item.role);
+      return {
+        ...item,
+        bullets: optimizeDisplayedBullets(
+          currentEntry?.bullets || [],
+          item.optimizedBullets || [],
+          keywordPool,
+          `${item.role} ${item.company}`
+        ),
+      };
+    });
+
+    const baseProjects = (sourceAnalysis?.optimizedProjects || []).map((item) => {
+      const currentProject = (sourceData.projects || []).find((project) => project.name === item.name);
+      return {
+        ...item,
+        bullets: optimizeDisplayedBullets(
+          currentProject?.bullets || [],
+          item.optimizedBullets || [],
+          keywordPool,
+          item.name
+        ),
+      };
+    });
+
+    return {
+      summary: cleanupOptimizationText(finalSummary),
+      experience: baseExperience.map((item) => ({ ...item, optimizedBullets: limitBullets((item.bullets || []).map((bullet) => cleanupOptimizationText(bullet))) })),
+      projects: baseProjects.map((item) => ({ ...item, optimizedBullets: limitBullets((item.bullets || []).map((bullet) => cleanupOptimizationText(bullet))) })),
+    };
+  };
+
+  const finalOptimizedArtifacts = analysis?.preparedOptimizations || buildFinalOptimizedArtifacts();
+
+  const summarySuggestionText = finalOptimizedArtifacts.summary;
+  const isSummarySuggestionApplied = !!summarySuggestionText &&
+    normalizeSuggestionText(stripCandidateNameFromSummary(data.summary || "")) === normalizeSuggestionText(summarySuggestionText);
+
+  const isExperienceSuggestionApplied = (optExp) => {
+    const target = (data.experience || []).find((item) => createNormalizedKey(item.company, item.role) === createNormalizedKey(optExp.company, optExp.role));
+    if (!target) return false;
+    return matchesSuggestedBullets(target.bullets || [], optExp.optimizedBullets || []);
+  };
+
+  const isProjectSuggestionApplied = (optProj) => {
+    const target = (data.projects || []).find((item) => createNormalizedKey(item.name) === createNormalizedKey(optProj.name));
+    if (!target) return false;
+    return matchesSuggestedBullets(target.bullets || [], optProj.optimizedBullets || []);
   };
 
   const buildResumeText = () => {
@@ -1204,6 +1429,7 @@ function JDAnalyzerModal({ onClose, data, setData, jdState, setJdState, jdScore,
     setAppliedProj({});
     setAppliedSummary(false);
     setRecommendationsApplied(false);
+    setShowScoreExplainer(false);
     applyAllLockedRef.current = false;
     try {
       const resumeText = buildResumeText();
@@ -1236,8 +1462,8 @@ ${resumeText}
 
 Return ONLY valid JSON using this exact shape:
 {
-  "jobTitle": "Data Analyst",
-  "seniority": "mid",
+  "jobTitle": "Exact job title from the JD",
+  "seniority": "Exact seniority from the JD if stated, otherwise best estimate",
   "requirements": [
     {
       "keyword": "Python",
@@ -1262,6 +1488,8 @@ Return ONLY valid JSON using this exact shape:
 }
 
 Rules:
+- jobTitle must come from the JD itself and should stay close to the posted role name
+- never default jobTitle to Data Analyst unless the JD really says Data Analyst
 - importance must be one of: must, preferred, nice
 - category must be one of: Technical Skills, Tools / Software, Frameworks, AI/ML, Cloud Platforms, Databases, Analytics, Domain Skills, Certifications, Other
 - aliases should include acronyms, full forms, and common written variants only when they are safe and unambiguous
@@ -1269,6 +1497,7 @@ Rules:
 - do not use partial-word aliases or broad synonyms that could create false exact matches
 - exactRequired should be true for requirements that must not be loosely substituted
 - critical should be true for clear must-have blockers
+- optimizedSummary should not include the candidate's name
 - optimizedSummary must be 55 to 70 words
 - optimized bullets must improve existing content only
 - each optimized experience or project bullet must be around 12 to 25 words
@@ -1293,16 +1522,23 @@ Rules:
       const json = await resp.json();
       const rawText = json.choices?.[0]?.message?.content || "{}";
       const parsed = JSON.parse(rawText);
+      const normalizedAnalysis = {
+        ...parsed,
+        jobTitle: resolveAnalysisJobTitle(parsed.jobTitle || "", jdText),
+        requirements: Array.isArray(parsed.requirements) ? parsed.requirements : [],
+        softSkills: Array.isArray(parsed.softSkills) ? parsed.softSkills : [],
+        optimizedExperience: Array.isArray(parsed.optimizedExperience) ? parsed.optimizedExperience : [],
+        optimizedProjects: Array.isArray(parsed.optimizedProjects) ? parsed.optimizedProjects : [],
+      };
+      const initialJDScore = calculateJDScore(data, normalizedAnalysis);
+      const preparedOptimizations = buildFinalOptimizedArtifacts(normalizedAnalysis, data, initialJDScore);
       setJdState(prev => ({
         ...prev,
         status: "done",
         error: "",
         analysis: {
-          ...parsed,
-          requirements: Array.isArray(parsed.requirements) ? parsed.requirements : [],
-          softSkills: Array.isArray(parsed.softSkills) ? parsed.softSkills : [],
-          optimizedExperience: Array.isArray(parsed.optimizedExperience) ? parsed.optimizedExperience : [],
-          optimizedProjects: Array.isArray(parsed.optimizedProjects) ? parsed.optimizedProjects : [],
+          ...normalizedAnalysis,
+          preparedOptimizations,
         }
       }));
     } catch (err) {
@@ -1354,25 +1590,25 @@ Rules:
   const applyExperienceOptimization = (optExp) => {
     setData(prev => {
       const e = [...prev.experience];
-      const idx = e.findIndex(x => x.company === optExp.company && x.role === optExp.role);
+      const idx = findExperienceIndex(e, optExp.company, optExp.role);
       if (idx !== -1) {
-        e[idx] = { ...e[idx], bullets: optExp.optimizedBullets };
+        e[idx] = { ...e[idx], bullets: limitBullets(optExp.optimizedBullets) };
       }
       return { ...prev, experience: e };
     });
-    setAppliedExp(prev => ({ ...prev, [`${optExp.company}_${optExp.role}`]: true }));
+    setAppliedExp(prev => ({ ...prev, [createNormalizedKey(optExp.company, optExp.role)]: true }));
   };
 
   const applyProjectOptimization = (optProj) => {
     setData(prev => {
       const p = [...prev.projects];
-      const idx = p.findIndex(x => x.name === optProj.name);
+      const idx = findProjectIndex(p, optProj.name);
       if (idx !== -1) {
-        p[idx] = { ...p[idx], bullets: optProj.optimizedBullets };
+        p[idx] = { ...p[idx], bullets: limitBullets(optProj.optimizedBullets) };
       }
       return { ...prev, projects: p };
     });
-    setAppliedProj(prev => ({ ...prev, [optProj.name]: true }));
+    setAppliedProj(prev => ({ ...prev, [createNormalizedKey(optProj.name)]: true }));
   };
 
   const applySummaryOptimization = (optSummary) => {
@@ -1410,59 +1646,27 @@ Rules:
         });
       }
 
-      if (analysis.optimizedSummary && !appliedSummary) {
-        next.summary = analysis.optimizedSummary;
+      if (finalOptimizedArtifacts.summary && !isSummarySuggestionApplied) {
+        next.summary = finalOptimizedArtifacts.summary;
         summaryChanged = true;
       }
 
-      if (analysis.optimizedExperience?.length) {
+      if (finalOptimizedArtifacts.experience?.length) {
         next.experience = next.experience.map((item) => {
-          const optimized = analysis.optimizedExperience.find((optExp) => optExp.company === item.company && optExp.role === item.role);
-          if (!optimized || appliedExp[`${optimized.company}_${optimized.role}`]) return item;
-          changedExpKeys.push(`${optimized.company}_${optimized.role}`);
-          return { ...item, bullets: optimized.optimizedBullets };
+          const optimized = finalOptimizedArtifacts.experience.find((optExp) => createNormalizedKey(optExp.company, optExp.role) === createNormalizedKey(item.company, item.role));
+          if (!optimized || appliedExp[createNormalizedKey(optimized.company, optimized.role)]) return item;
+          changedExpKeys.push(createNormalizedKey(optimized.company, optimized.role));
+          return { ...item, bullets: limitBullets(optimized.optimizedBullets) };
         });
       }
 
-      if (analysis.optimizedProjects?.length) {
+      if (finalOptimizedArtifacts.projects?.length) {
         next.projects = next.projects.map((item) => {
-          const optimized = analysis.optimizedProjects.find((optProj) => optProj.name === item.name);
-          if (!optimized || appliedProj[optimized.name]) return item;
-          changedProjKeys.push(optimized.name);
-          return { ...item, bullets: optimized.optimizedBullets };
+          const optimized = finalOptimizedArtifacts.projects.find((optProj) => createNormalizedKey(optProj.name) === createNormalizedKey(item.name));
+          if (!optimized || appliedProj[createNormalizedKey(optimized.name)]) return item;
+          changedProjKeys.push(createNormalizedKey(optimized.name));
+          return { ...item, bullets: limitBullets(optimized.optimizedBullets) };
         });
-      }
-
-      const priorityKeywords = (jdScore?.missing || [])
-        .filter((item) => item.importance === "must" || item.importance === "preferred")
-        .map((item) => item.keyword)
-        .filter(Boolean);
-
-      if (priorityKeywords.length) {
-        const summaryKeywords = priorityKeywords.slice(0, 4);
-        const enrichedSummary = enrichSummaryWithKeywords(next.summary || "", summaryKeywords, analysis.jobTitle);
-        if (enrichedSummary !== (next.summary || "")) {
-          next.summary = enrichedSummary;
-          summaryChanged = true;
-        }
-
-        const afterSummarySnapshot = buildResumeSnapshot(next);
-        const remainingAfterSummary = priorityKeywords.filter((keyword) => {
-          const summaryHit = containsKeyword(afterSummarySnapshot.summary, keyword);
-          const titleHit = containsKeyword(afterSummarySnapshot.title, keyword);
-          const bulletHit = afterSummarySnapshot.allBullets.some((bullet) => containsKeyword(bullet, keyword));
-          return !summaryHit && !titleHit && !bulletHit;
-        });
-
-        if (remainingAfterSummary.length) {
-          const expResult = injectKeywordsIntoEntries(next.experience, remainingAfterSummary, (item) => `${item.company}_${item.role}`);
-          next.experience = expResult.entries;
-          changedExpKeys = [...changedExpKeys, ...expResult.changedKeys];
-
-          const projResult = injectKeywordsIntoEntries(next.projects, expResult.remaining, (item) => item.name);
-          next.projects = projResult.entries;
-          changedProjKeys = [...changedProjKeys, ...projResult.changedKeys];
-        }
       }
 
       return next;
@@ -1471,14 +1675,16 @@ Rules:
     if (Object.keys(addedKeywords).length) {
       setAdded((prev) => ({ ...prev, ...addedKeywords }));
     }
-    if (summaryChanged) {
+    if (finalOptimizedArtifacts.summary || summaryChanged) {
       setAppliedSummary(true);
     }
-    if (changedExpKeys.length) {
-      setAppliedExp((prev) => ({ ...prev, ...Object.fromEntries([...new Set(changedExpKeys)].map((key) => [key, true])) }));
+    if (finalOptimizedArtifacts.experience?.length) {
+      const expKeys = finalOptimizedArtifacts.experience.map((opt) => createNormalizedKey(opt.company, opt.role));
+      setAppliedExp((prev) => ({ ...prev, ...Object.fromEntries([...new Set([...changedExpKeys, ...expKeys])].map((key) => [key, true])) }));
     }
-    if (changedProjKeys.length) {
-      setAppliedProj((prev) => ({ ...prev, ...Object.fromEntries([...new Set(changedProjKeys)].map((key) => [key, true])) }));
+    if (finalOptimizedArtifacts.projects?.length) {
+      const projectKeys = finalOptimizedArtifacts.projects.map((opt) => createNormalizedKey(opt.name));
+      setAppliedProj((prev) => ({ ...prev, ...Object.fromEntries([...new Set([...changedProjKeys, ...projectKeys])].map((key) => [key, true])) }));
     }
   };
 
@@ -1486,9 +1692,9 @@ Rules:
   const guidedMissing = jdScore?.missing?.filter((item) => !canAddDirectly(item)) || [];
   const allAdded = skillReadyMissing.length > 0 && skillReadyMissing.every(m => added[m.keyword]);
   const allOptimizationsApplied = !!analysis && (
-    (!analysis.optimizedSummary || appliedSummary) &&
-    (analysis.optimizedExperience?.every(opt => appliedExp[`${opt.company}_${opt.role}`]) ?? true) &&
-    (analysis.optimizedProjects?.every(opt => appliedProj[opt.name]) ?? true)
+    (!finalOptimizedArtifacts.summary || appliedSummary || isSummarySuggestionApplied) &&
+    (finalOptimizedArtifacts.experience?.every(opt => appliedExp[createNormalizedKey(opt.company, opt.role)] || isExperienceSuggestionApplied(opt)) ?? true) &&
+    (finalOptimizedArtifacts.projects?.every(opt => appliedProj[createNormalizedKey(opt.name)] || isProjectSuggestionApplied(opt)) ?? true)
   );
   const everythingApplied = recommendationsApplied || (!!analysis && (allAdded || !skillReadyMissing.length) && allOptimizationsApplied);
   const wordCount = jdText.trim().split(/\s+/).filter(Boolean).length;
@@ -1658,6 +1864,53 @@ Rules:
                 {guideContent}
               </div>
             )}
+            {showScoreExplainer && (
+              <div style={{ position: "absolute", inset: 12, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 18, overflowY: "auto", zIndex: 6, boxShadow: "0 14px 34px rgba(15,23,42,0.16)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>How Scoring Works</div>
+                    <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>These are the exact factors and weights used for the JD match score.</div>
+                  </div>
+                  <button onClick={() => setShowScoreExplainer(false)} style={{ width: 30, height: 30, border: "none", background: "#f3f4f6", borderRadius: 8, cursor: "pointer", fontSize: 14, color: "#94a3b8" }}>×</button>
+                </div>
+
+                <div style={{ display: "grid", gap: 18 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>JD Score Weights</div>
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+                      {jdScoreWeights.map(([label, internal, weight], index) => (
+                        <div key={label} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 80px", gap: 10, padding: "10px 12px", background: index % 2 ? "#fff" : "#f8fafc", borderTop: index ? "1px solid #e5e7eb" : "none", fontSize: 11.5, color: "#334155" }}>
+                          <strong style={{ color: "#0f172a" }}>{label}</strong>
+                          <span>{internal}</span>
+                          <span style={{ fontWeight: 800, color: "#1d4ed8" }}>{weight}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>JD Requirement Weight</div>
+                      <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+                        {jdImportanceWeights.map(([label, weight], index) => (
+                          <div key={label} style={{ display: "grid", gridTemplateColumns: "1fr 70px", gap: 10, padding: "10px 12px", background: index % 2 ? "#fff" : "#f8fafc", borderTop: index ? "1px solid #e5e7eb" : "none", fontSize: 11.5 }}>
+                            <strong style={{ color: "#0f172a" }}>{label}</strong>
+                            <span style={{ fontWeight: 800, color: "#1d4ed8" }}>{weight}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#f8fafc" }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>Production Model</div>
+                      <div style={{ fontSize: 11.5, color: "#475569", lineHeight: 1.6 }}>
+                        The public JD score now shows 4 clearer factors focused on keyword match, title alignment, related terminology, and critical requirement coverage.
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
             {status === "idle" && (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 10, textAlign: "center", color: "#94a3b8" }}>
                 <div style={{ width: 70, height: 70, borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1678,7 +1931,6 @@ Rules:
             )}
 
             {status === "done" && analysis && jdScore && (() => {
-              const sc = scoreColor(jdScore.overall);
               const resumePalette = ringColors(resumeScore?.overall ?? 0, "orange");
               const jdPalette = ringColors(jdScore.overall, "blue");
               return (
@@ -1707,31 +1959,21 @@ Rules:
                     </div>
                   </div>
 
-                  {/* Score Card */}
-                  <div style={{ background: sc.bg, border: `1.5px solid ${sc.bar}33`, borderRadius: 16, padding: 18, display: "flex", alignItems: "flex-start", gap: 18 }}>
-                    <RingScore score={jdScore.overall} tone="blue" label="JMS" />
-                    <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: sc.c }}>{jdScore.label}</div>
-                      {analysis.jobTitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>JD: {analysis.jobTitle}</div>}
-                      <div style={{ fontSize: 12, color: "#334155", marginTop: 8, lineHeight: 1.55 }}>{analysis.topTip || jdScore.recommendations?.[0] || "Add the missing keywords and stronger bullet proof to improve the match."}</div>
-                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{jdScore.totals?.matched || 0} exact · {jdScore.totals?.related || 0} related · {jdScore.totals?.missing || 0} missing · {jdScore.totals?.total || 0} total</div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
                     {[
                       ["JD Keywords Found", jdScore.factors.weightedKeywordCoverage],
-                      ["Proof in Resume", jdScore.factors.evidenceAlignment],
-                      ["Keyword Placement", jdScore.factors.keywordPlacement],
                       ["Related Skill Match", jdScore.factors.semanticEquivalence],
                       ["Job Title Match", jdScore.factors.titleAlignment],
-                      ["Critical Requirements Covered", jdScore.factors.criticalRequirementRisk],
                     ].map(([label, value]) => {
                       const isOpen = openMetric === label;
                       const help = factorDescriptions[label];
                       const palette = scoreColor(Number(value));
                       return (
-                        <button key={label} onClick={() => setOpenMetric(isOpen ? "" : label)} style={{ textAlign: "left", border: `1px solid ${isOpen ? palette.bar : "#e5e7eb"}`, borderRadius: 12, padding: "12px 14px", background: isOpen ? palette.bg : "#fff", cursor: "pointer" }}>
+                        <button
+                          key={label}
+                          onClick={() => setOpenMetric(isOpen ? "" : label)}
+                          style={{ textAlign: "left", border: `1px solid ${isOpen ? palette.bar : "#e5e7eb"}`, borderRadius: 12, padding: "12px 14px", background: isOpen ? palette.bg : "#fff", cursor: "pointer" }}
+                        >
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                             <div style={{ fontSize: 11, color: "#475569", fontWeight: 800 }}>{label}</div>
                             <div style={{ fontSize: 18, fontWeight: 900, color: palette.c }}>{value}</div>
@@ -1741,6 +1983,52 @@ Rules:
                         </button>
                       );
                     })}
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1fr) minmax(260px, 2fr)", gap: 10, alignItems: "stretch" }}>
+                    {(() => {
+                      const label = "Critical Requirements Covered";
+                      const value = jdScore.factors.criticalRequirementRisk;
+                      const isOpen = openMetric === label;
+                      const help = factorDescriptions[label];
+                      const palette = scoreColor(Number(value));
+                      return (
+                        <button
+                          key={label}
+                          onClick={() => setOpenMetric(isOpen ? "" : label)}
+                          style={{ textAlign: "left", border: `1px solid ${isOpen ? palette.bar : "#e5e7eb"}`, borderRadius: 12, padding: "12px 14px", background: isOpen ? palette.bg : "#fff", cursor: "pointer" }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                            <div style={{ fontSize: 11, color: "#475569", fontWeight: 800 }}>{label}</div>
+                            <div style={{ fontSize: 18, fontWeight: 900, color: palette.c }}>{value}</div>
+                          </div>
+                          <div style={{ fontSize: 11, color: "#64748b", marginTop: 6, lineHeight: 1.45 }}>{help.summary}</div>
+                          {isOpen && <div style={{ fontSize: 11, color: "#334155", marginTop: 8, lineHeight: 1.55 }}><strong>How to improve:</strong> {help.improve}</div>}
+                        </button>
+                      );
+                    })()}
+                    <div style={{ background: "#f8fafc", border: "1px solid #dbe5f1", borderRadius: 14, padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 10 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d", background: "#f0fdf4", border: "1px solid #86efac", padding: "5px 10px", borderRadius: 999 }}>
+                          {jdScore.totals?.matched || 0} Exact Match
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#1d4ed8", background: "#eff6ff", border: "1px solid #93c5fd", padding: "5px 10px", borderRadius: 999 }}>
+                          {jdScore.totals?.related || 0} Related
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#b45309", background: "#fffbeb", border: "1px solid #fcd34d", padding: "5px 10px", borderRadius: 999 }}>
+                          {jdScore.totals?.missing || 0} Missing
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.65 }}>
+                        {analysis.topTip || jdScore.recommendations?.[0] || "Add the missing keywords naturally to improve the job match score."}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button onClick={() => setShowScoreExplainer(true)} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #dbeafe", background: "#eff6ff", color: "#1d4ed8", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>
+                      How scoring works
+                    </button>
                   </div>
 
                   {/* Tip Banner */}
@@ -1855,28 +2143,28 @@ Rules:
                   )}
 
                   {/* Optimized Summary */}
-                  {analysis.optimizedSummary && (
+                  {finalOptimizedArtifacts.summary && (
                     <div style={{ marginTop: 6 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>✍️ Optimized Summary <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#7c3aed", padding: "2px 6px", borderRadius: 12 }}>AI Suggestion</span></div>
-                      <div style={{ padding: "16px", background: appliedSummary ? "#f0fdf4" : "#f8fafc", border: `1px solid ${appliedSummary ? "#86efac" : "#cbd5e1"}`, borderRadius: 14 }}>
+                      <div style={{ padding: "16px", background: (appliedSummary || isSummarySuggestionApplied) ? "#f0fdf4" : "#f8fafc", border: `1px solid ${(appliedSummary || isSummarySuggestionApplied) ? "#86efac" : "#cbd5e1"}`, borderRadius: 14 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                          <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.8, flex: 1, paddingRight: 12 }}>{analysis.optimizedSummary}</div>
-                          <button onClick={() => applySummaryOptimization(analysis.optimizedSummary)} disabled={appliedSummary} style={{ padding: "6px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 8, cursor: appliedSummary ? "default" : "pointer", background: appliedSummary ? "#dcfce7" : "#3b82f6", color: appliedSummary ? "#15803d" : "#fff", transition: "all 0.2s", whiteSpace: "nowrap" }}>
-                            {appliedSummary ? "Applied" : "Apply Update"}
+                          <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.8, flex: 1, paddingRight: 12 }}>{summarySuggestionText}</div>
+                          <button onClick={() => applySummaryOptimization(summarySuggestionText)} disabled={appliedSummary || isSummarySuggestionApplied} style={{ padding: "6px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 8, cursor: (appliedSummary || isSummarySuggestionApplied) ? "default" : "pointer", background: (appliedSummary || isSummarySuggestionApplied) ? "#dcfce7" : "#3b82f6", color: (appliedSummary || isSummarySuggestionApplied) ? "#15803d" : "#fff", transition: "all 0.2s", whiteSpace: "nowrap" }}>
+                            {(appliedSummary || isSummarySuggestionApplied) ? "Applied" : "Apply Update"}
                           </button>
                         </div>
-                        <div style={{ fontSize: 10, color: "#64748b" }}>Summary length: {countWords(analysis.optimizedSummary)} words</div>
+                        <div style={{ fontSize: 10, color: "#64748b" }}>Summary length: {countWords(summarySuggestionText)} words</div>
                       </div>
                     </div>
                   )}
 
                   {/* Optimized Experience */}
-                  {analysis.optimizedExperience?.length > 0 && (
+                  {finalOptimizedArtifacts.experience?.length > 0 && (
                     <div style={{ marginTop: 6 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>✨ Optimized Experience Bullets <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#7c3aed", padding: "2px 6px", borderRadius: 12 }}>AI Suggestion</span></div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                        {analysis.optimizedExperience.map((opt, i) => {
-                          const isApplied = appliedExp[`${opt.company}_${opt.role}`];
+                        {finalOptimizedArtifacts.experience.map((opt, i) => {
+                          const isApplied = appliedExp[createNormalizedKey(opt.company, opt.role)] || isExperienceSuggestionApplied(opt);
                           return (
                             <div key={i} style={{ padding: "16px", background: isApplied ? "#f0fdf4" : "#f8fafc", border: `1px solid ${isApplied ? "#86efac" : "#cbd5e1"}`, borderRadius: 14 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
@@ -1899,12 +2187,12 @@ Rules:
                   )}
 
                   {/* Optimized Projects */}
-                  {analysis.optimizedProjects?.length > 0 && (
+                  {finalOptimizedArtifacts.projects?.length > 0 && (
                     <div style={{ marginTop: 6 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>🚀 Optimized Project Bullets <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#7c3aed", padding: "2px 6px", borderRadius: 12 }}>AI Suggestion</span></div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                        {analysis.optimizedProjects.map((opt, i) => {
-                          const isApplied = appliedProj[opt.name];
+                        {finalOptimizedArtifacts.projects.map((opt, i) => {
+                          const isApplied = appliedProj[createNormalizedKey(opt.name)] || isProjectSuggestionApplied(opt);
                           return (
                             <div key={i} style={{ padding: "16px", background: isApplied ? "#f0fdf4" : "#f8fafc", border: `1px solid ${isApplied ? "#86efac" : "#cbd5e1"}`, borderRadius: 14 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
