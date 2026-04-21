@@ -794,7 +794,7 @@ RESUME TEXT:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "llama-3.1-8b-instant",
           temperature: 0.1,
           max_tokens: 4000,
           response_format: { type: "json_object" },
@@ -963,26 +963,65 @@ function JDAnalyzerModal({ onClose, data, setData, jdState, setJdState, jdScore,
   const [appliedExp, setAppliedExp] = useState({});
   const [appliedProj, setAppliedProj] = useState({});
   const [appliedSummary, setAppliedSummary] = useState(false);
+  const [recommendationsApplied, setRecommendationsApplied] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [guideRead, setGuideRead] = useState(false);
+  const [openMetric, setOpenMetric] = useState("");
+  const shouldShowSoftSkills = false;
+  const applyAllLockedRef = useRef(false);
   const normalizeSkillText = (value = "") => value.toLowerCase().replace(/[^a-z0-9+#/\s]/g, " ").replace(/\s+/g, " ").trim();
   const tokenizeSkillText = (value = "") => normalizeSkillText(value).split(" ").filter(Boolean);
   const factorDescriptions = {
-    "Weighted Coverage": "How much of the job description your resume already covers.",
-    "Keyword Placement": "Whether important terms appear in the title, summary, skills, and recent experience.",
-    "Evidence Strength": "Whether matched skills are supported with real, outcome-based resume evidence.",
-    "Title Match": "How closely your resume title aligns with the target role.",
-    "Semantic Match": "How many requirements are closely related, even when wording differs.",
-    "Critical Gaps": "How many must-have requirements are still missing."
+    "JD Keywords Found": {
+      summary: "How many important JD keywords already appear clearly in your resume.",
+      improve: "Add the most important missing JD words into your skills and recent work bullets."
+    },
+    "Proof in Resume": {
+      summary: "Shows whether your resume proves the skills with work, projects, or results.",
+      improve: "Add action verbs, tools used, and measurable outcomes in bullets."
+    },
+    "Keyword Placement": {
+      summary: "Checks if important words appear in the right places like title, summary, and recent experience.",
+      improve: "Place the top JD keywords in your title, summary, and latest experience."
+    },
+    "Related Skill Match": {
+      summary: "Shows how well your resume uses exact or close JD terminology across sections.",
+      improve: "Use the same role language, tools, and phrases from the JD in your real resume content."
+    },
+    "Job Title Match": {
+      summary: "Shows how close your resume title is to the target role.",
+      improve: "Update your title and summary so they match the role name and level in the JD."
+    },
+    "Critical Requirements Covered": {
+      summary: "Shows how many critical must-have JD requirements are already covered.",
+      improve: "Fix the must-have missing keywords first before improving the nice-to-have ones."
+    }
   };
-  const getSectionLabel = (section = "skills") => ({
-    skills: "Skills",
-    summary: "Summary",
-    experience: "Experience",
-    projects: "Projects",
-    certifications: "Certifications"
-  }[section] || "Skills");
-  const canAddDirectly = (item) => item?.recommendedSection === "skills";
+  const canAddDirectly = () => true;
+  const countWords = (value = "") => value.trim().split(/\s+/).filter(Boolean).length;
+  const ringColors = (score) => {
+    if (score >= 80) return { fg: "#16a34a", bg: "#bbf7d0", text: "#166534" };
+    if (score >= 60) return { fg: "#f59e0b", bg: "#fde68a", text: "#92400e" };
+    return { fg: "#ef4444", bg: "#fecaca", text: "#991b1b" };
+  };
+  const RingScore = ({ score = 0, tone = "blue", label = "SCORE" }) => {
+    const radius = 34;
+    const circumference = 2 * Math.PI * radius;
+    const dash = (Math.max(0, Math.min(score, 100)) / 100) * circumference;
+    const palette = ringColors(score, tone);
+    return (
+      <div style={{ position: "relative", width: 92, height: 92, flexShrink: 0 }}>
+        <svg width="92" height="92" viewBox="0 0 92 92">
+          <circle cx="46" cy="46" r={radius} fill="none" stroke={palette.bg} strokeWidth="8" />
+          <circle cx="46" cy="46" r={radius} fill="none" stroke={palette.fg} strokeWidth="8" strokeLinecap="round" strokeDasharray={`${dash} ${circumference - dash}`} transform="rotate(-90 46 46)" />
+        </svg>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontSize: 24, fontWeight: 900, color: palette.text, lineHeight: 1 }}>{score}</span>
+          <span style={{ fontSize: 8, fontWeight: 800, color: palette.text, letterSpacing: 0.6 }}>{label}</span>
+        </div>
+      </div>
+    );
+  };
   const inferSkillGroup = (value = "") => {
     const text = normalizeSkillText(value);
     if (!text) return "general";
@@ -1052,9 +1091,9 @@ function JDAnalyzerModal({ onClose, data, setData, jdState, setJdState, jdScore,
 
     if (targetIndex === -1) {
       return {
-        changed: true,
-        assignedCategory: category || "Skills",
-        skills: [{ category: category || "Skills", items: keyword }]
+        changed: false,
+        assignedCategory: "",
+        skills
       };
     }
 
@@ -1084,6 +1123,72 @@ function JDAnalyzerModal({ onClose, data, setData, jdState, setJdState, jdScore,
     };
   };
 
+  const containsKeyword = (value = "", keyword = "") => {
+    const normalizedValue = normalizeSkillText(value);
+    const normalizedKeyword = normalizeSkillText(keyword);
+    if (!normalizedValue || !normalizedKeyword) return false;
+    return normalizedValue.includes(normalizedKeyword);
+  };
+
+  const formatKeywordList = (keywords = []) => {
+    const cleaned = keywords.map((item) => item?.trim()).filter(Boolean);
+    if (!cleaned.length) return "";
+    if (cleaned.length === 1) return cleaned[0];
+    if (cleaned.length === 2) return `${cleaned[0]} and ${cleaned[1]}`;
+    return `${cleaned.slice(0, -1).join(", ")}, and ${cleaned[cleaned.length - 1]}`;
+  };
+
+  const appendKeywordsToBullet = (bullet = "", keywords = []) => {
+    const additions = keywords.filter((keyword) => !containsKeyword(bullet, keyword));
+    if (!additions.length) return bullet;
+    const base = bullet.trim().replace(/[.!?\s]+$/, "");
+    return `${base} using ${formatKeywordList(additions)}.`;
+  };
+
+  const enrichSummaryWithKeywords = (summary = "", keywords = [], jobTitle = "") => {
+    const additions = keywords.filter((keyword) => !containsKeyword(summary, keyword)).slice(0, 4);
+    if (!additions.length) return summary;
+
+    const normalizedSummary = summary.trim();
+    const prefix = normalizedSummary
+      ? normalizedSummary.replace(/[.!?\s]+$/, "")
+      : `${jobTitle || "Professional"} with hands-on experience`;
+
+    return `${prefix} with strengths in ${formatKeywordList(additions)}.`;
+  };
+
+  const injectKeywordsIntoEntries = (entries = [], keywords = [], getKey) => {
+    const queue = [...keywords];
+    const changedKeys = [];
+    let changed = false;
+
+    const nextEntries = entries.map((entry) => {
+      const nextEntry = { ...entry, bullets: [...(entry.bullets || [])] };
+      let entryChanged = false;
+
+      for (let i = 0; i < nextEntry.bullets.length && queue.length; i += 1) {
+        const bullet = nextEntry.bullets[i];
+        const chunk = queue.filter((keyword) => !containsKeyword(bullet, keyword)).slice(0, 2);
+        if (!chunk.length) continue;
+        nextEntry.bullets[i] = appendKeywordsToBullet(bullet, chunk);
+        chunk.forEach((keyword) => {
+          const index = queue.indexOf(keyword);
+          if (index !== -1) queue.splice(index, 1);
+        });
+        entryChanged = true;
+        changed = true;
+      }
+
+      if (entryChanged) {
+        changedKeys.push(getKey(nextEntry));
+      }
+
+      return nextEntry;
+    });
+
+    return { entries: nextEntries, remaining: queue, changedKeys, changed };
+  };
+
   const buildResumeText = () => {
     return buildResumeSnapshot(data).fullText;
   };
@@ -1095,13 +1200,18 @@ function JDAnalyzerModal({ onClose, data, setData, jdState, setJdState, jdScore,
     }
     setJdState(prev => ({ ...prev, status: "analyzing", error: "", analysis: null }));
     setAdded({});
+    setAppliedExp({});
+    setAppliedProj({});
+    setAppliedSummary(false);
+    setRecommendationsApplied(false);
+    applyAllLockedRef.current = false;
     try {
       const resumeText = buildResumeText();
       const resp = await fetch("/api/groq", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile", temperature: 0.1, max_tokens: 4000,
+          model: "llama-3.1-8b-instant", temperature: 0.1, max_tokens: 4000,
           response_format: { type: "json_object" },
           messages: [
             {
@@ -1142,7 +1252,7 @@ Return ONLY valid JSON using this exact shape:
   ],
   "softSkills": ["communication"],
   "topTip": "One sentence job-specific recommendation",
-  "optimizedSummary": "40 to 55 word optimized summary",
+  "optimizedSummary": "55 to 70 word optimized summary",
   "optimizedExperience": [
     { "company": "Company Name", "role": "Role Name", "optimizedBullets": ["Bullet 1", "Bullet 2"] }
   ],
@@ -1159,8 +1269,9 @@ Rules:
 - do not use partial-word aliases or broad synonyms that could create false exact matches
 - exactRequired should be true for requirements that must not be loosely substituted
 - critical should be true for clear must-have blockers
-- optimizedSummary must be 40 to 55 words
+- optimizedSummary must be 55 to 70 words
 - optimized bullets must improve existing content only
+- each optimized experience or project bullet must be around 12 to 25 words
 - return JSON only`
             }
           ]
@@ -1199,8 +1310,7 @@ Rules:
     }
   };
 
-  const addKeyword = (keyword, category, recommendedSection = "skills") => {
-    if (recommendedSection !== "skills") return;
+  const addKeyword = (keyword, category) => {
     if (added[keyword]) return;
     let assignedCategory = category || "Skills";
     let changed = false;
@@ -1224,7 +1334,7 @@ Rules:
 
       jdScore.missing.forEach((item) => {
         const keyword = item.keyword?.trim();
-        if (!keyword || item.recommendedSection !== "skills") return;
+        if (!keyword) return;
         const merged = mergeKeywordIntoSkills(nextSkills, keyword, item.category);
         nextSkills = merged.skills;
         if (merged.changed) {
@@ -1271,28 +1381,105 @@ Rules:
   };
 
   const applyAllAISuggestions = () => {
-    if (!analysis) return;
+    if (!analysis || recommendationsApplied || applyAllLockedRef.current) return;
+    applyAllLockedRef.current = true;
+    setRecommendationsApplied(true);
 
-    if (jdScore?.missing?.length) {
-      addAll();
-    }
+    let addedKeywords = {};
+    let summaryChanged = false;
+    let changedExpKeys = [];
+    let changedProjKeys = [];
 
-    if (analysis.optimizedSummary && !appliedSummary) {
-      applySummaryOptimization(analysis.optimizedSummary);
-    }
+    setData((prev) => {
+      let next = {
+        ...prev,
+        skills: [...(prev.skills || [])],
+        experience: (prev.experience || []).map((item) => ({ ...item, bullets: [...(item.bullets || [])] })),
+        projects: (prev.projects || []).map((item) => ({ ...item, bullets: [...(item.bullets || [])] })),
+      };
 
-    analysis.optimizedExperience?.forEach((optExp) => {
-      const key = `${optExp.company}_${optExp.role}`;
-      if (!appliedExp[key]) {
-        applyExperienceOptimization(optExp);
+      if (jdScore?.missing?.length) {
+        jdScore.missing.forEach((item) => {
+          const keyword = item.keyword?.trim();
+          if (!keyword) return;
+          const merged = mergeKeywordIntoSkills(next.skills, keyword, item.category);
+          next.skills = merged.skills;
+          if (merged.changed) {
+            addedKeywords[keyword] = merged.assignedCategory;
+          }
+        });
       }
+
+      if (analysis.optimizedSummary && !appliedSummary) {
+        next.summary = analysis.optimizedSummary;
+        summaryChanged = true;
+      }
+
+      if (analysis.optimizedExperience?.length) {
+        next.experience = next.experience.map((item) => {
+          const optimized = analysis.optimizedExperience.find((optExp) => optExp.company === item.company && optExp.role === item.role);
+          if (!optimized || appliedExp[`${optimized.company}_${optimized.role}`]) return item;
+          changedExpKeys.push(`${optimized.company}_${optimized.role}`);
+          return { ...item, bullets: optimized.optimizedBullets };
+        });
+      }
+
+      if (analysis.optimizedProjects?.length) {
+        next.projects = next.projects.map((item) => {
+          const optimized = analysis.optimizedProjects.find((optProj) => optProj.name === item.name);
+          if (!optimized || appliedProj[optimized.name]) return item;
+          changedProjKeys.push(optimized.name);
+          return { ...item, bullets: optimized.optimizedBullets };
+        });
+      }
+
+      const priorityKeywords = (jdScore?.missing || [])
+        .filter((item) => item.importance === "must" || item.importance === "preferred")
+        .map((item) => item.keyword)
+        .filter(Boolean);
+
+      if (priorityKeywords.length) {
+        const summaryKeywords = priorityKeywords.slice(0, 4);
+        const enrichedSummary = enrichSummaryWithKeywords(next.summary || "", summaryKeywords, analysis.jobTitle);
+        if (enrichedSummary !== (next.summary || "")) {
+          next.summary = enrichedSummary;
+          summaryChanged = true;
+        }
+
+        const afterSummarySnapshot = buildResumeSnapshot(next);
+        const remainingAfterSummary = priorityKeywords.filter((keyword) => {
+          const summaryHit = containsKeyword(afterSummarySnapshot.summary, keyword);
+          const titleHit = containsKeyword(afterSummarySnapshot.title, keyword);
+          const bulletHit = afterSummarySnapshot.allBullets.some((bullet) => containsKeyword(bullet, keyword));
+          return !summaryHit && !titleHit && !bulletHit;
+        });
+
+        if (remainingAfterSummary.length) {
+          const expResult = injectKeywordsIntoEntries(next.experience, remainingAfterSummary, (item) => `${item.company}_${item.role}`);
+          next.experience = expResult.entries;
+          changedExpKeys = [...changedExpKeys, ...expResult.changedKeys];
+
+          const projResult = injectKeywordsIntoEntries(next.projects, expResult.remaining, (item) => item.name);
+          next.projects = projResult.entries;
+          changedProjKeys = [...changedProjKeys, ...projResult.changedKeys];
+        }
+      }
+
+      return next;
     });
 
-    analysis.optimizedProjects?.forEach((optProj) => {
-      if (!appliedProj[optProj.name]) {
-        applyProjectOptimization(optProj);
-      }
-    });
+    if (Object.keys(addedKeywords).length) {
+      setAdded((prev) => ({ ...prev, ...addedKeywords }));
+    }
+    if (summaryChanged) {
+      setAppliedSummary(true);
+    }
+    if (changedExpKeys.length) {
+      setAppliedExp((prev) => ({ ...prev, ...Object.fromEntries([...new Set(changedExpKeys)].map((key) => [key, true])) }));
+    }
+    if (changedProjKeys.length) {
+      setAppliedProj((prev) => ({ ...prev, ...Object.fromEntries([...new Set(changedProjKeys)].map((key) => [key, true])) }));
+    }
   };
 
   const skillReadyMissing = jdScore?.missing?.filter(canAddDirectly) || [];
@@ -1303,7 +1490,7 @@ Rules:
     (analysis.optimizedExperience?.every(opt => appliedExp[`${opt.company}_${opt.role}`]) ?? true) &&
     (analysis.optimizedProjects?.every(opt => appliedProj[opt.name]) ?? true)
   );
-  const everythingApplied = !!analysis && (allAdded || !skillReadyMissing.length) && allOptimizationsApplied;
+  const everythingApplied = recommendationsApplied || (!!analysis && (allAdded || !skillReadyMissing.length) && allOptimizationsApplied);
   const wordCount = jdText.trim().split(/\s+/).filter(Boolean).length;
 
   const impColor = (imp) => imp === "high" ? { c: "#dc2626", bg: "#fef2f2" } : imp === "medium" ? { c: "#b45309", bg: "#fffbeb" } : { c: "#6b7688", bg: "#f3f4f6" };
@@ -1314,7 +1501,6 @@ Rules:
       {/* Why Use This Tool? */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 18 }}>🎯</span>
           Why Use This Tool?
         </div>
         <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5, paddingLeft: 26 }}>
@@ -1433,8 +1619,7 @@ Rules:
       <div className={`jd-modal-inner ${pageMode ? "jd-page-analyzer" : ""}`} style={{ width: "100%", height: "100%", background: pageMode ? "transparent" : "#fff", borderRadius: pageMode ? 0 : 16, boxShadow: pageMode ? "none" : "0 8px 24px rgba(15,23,42,0.08)", display: "flex", flexDirection: "column", overflow: pageMode ? "visible" : "hidden", border: "none" }}>
         <div className={`jd-analyzer-topbar ${pageMode ? "jd-analyzer-topbar-page" : ""}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: pageMode ? "0 0 14px" : "16px 20px", borderBottom: pageMode ? "none" : "1px solid #e5e7eb", background: "transparent" }}>
           <div className="jd-analyzer-title" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 22 }}>🎯</span>
-            <div><div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>{pageMode ? "Resume Tailored for the Job Description" : "Job Description Analyzer"}</div><div style={{ fontSize: 11, color: "#94a3b8" }}>{pageMode ? "Review keyword match, soft skills, and ATS-friendly AI tailoring suggestions." : "Paste a JD to find missing keywords and boost your ATS score"}</div></div>
+            {!pageMode && <div><div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>Job Description Analyzer</div><div style={{ fontSize: 11, color: "#94a3b8" }}>Paste a JD to find missing keywords and boost your ATS score</div></div>}
           </div>
           <div className="jd-analyzer-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button className="jd-analyzer-guide-btn" onClick={() => setShowGuide(s => !s)} style={{ display: "none", padding: "6px 12px", border: "1px solid #e5e7eb", background: showGuide ? "#eef2ff" : "#ffffff", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: showGuide ? "#4338ca" : "#475569" }}>
@@ -1458,7 +1643,7 @@ Rules:
           </div>
 
           {/* RIGHT — Results */}
-          <div className={`jd-modal-right ${pageMode ? "jd-page-results" : ""}`} style={{ flex: 1, overflowY: pageMode ? "visible" : "auto", padding: pageMode ? "4px 4px 18px 0" : 20, position: "relative", background: "transparent", minHeight: 0, height: "auto" }}>
+          <div className={`jd-modal-right ${pageMode ? "jd-page-results" : ""}`} style={{ flex: 1, overflowY: pageMode ? "visible" : "auto", padding: pageMode ? "0 4px 18px 0" : 20, position: "relative", background: "transparent", minHeight: 0, height: "auto" }}>
             {showGuide && (
               <div style={{ position: "absolute", inset: 12, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, overflowY: "auto", zIndex: 5, boxShadow: "0 10px 30px rgba(0,0,0,0.12)" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -1494,82 +1679,68 @@ Rules:
 
             {status === "done" && analysis && jdScore && (() => {
               const sc = scoreColor(jdScore.overall);
+              const resumePalette = ringColors(resumeScore?.overall ?? 0, "orange");
+              const jdPalette = ringColors(jdScore.overall, "blue");
               return (
                 <div style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 28 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-                    <div style={{ background: "#fff7ed", border: "1.5px solid rgba(249,115,22,0.22)", borderRadius: 12, padding: 16 }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: "#9a3412", letterSpacing: 0.4 }}>RESUME QUALITY SCORE (RQS)</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 10 }}>
-                        <div style={{ width: 64, height: 64, borderRadius: "50%", border: "4px solid #f97316", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
-                          <span style={{ fontSize: 22, fontWeight: 900, color: "#9a3412" }}>{resumeScore?.overall ?? 0}</span>
-                        </div>
+                    <div style={{ background: `${resumePalette.bg}33`, border: `1.5px solid ${resumePalette.fg}33`, borderRadius: 12, padding: 16 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: resumePalette.text, letterSpacing: 0.4 }}>RESUME QUALITY SCORE</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 10 }}>
+                        <RingScore score={resumeScore?.overall ?? 0} tone="orange" label="RQS" />
                         <div>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: "#9a3412" }}>{resumeScore?.label || "Needs Work"}</div>
-                          <div style={{ fontSize: 11, color: "#7c2d12", marginTop: 4 }}>Your current ATS readiness based on resume structure, clarity, and evidence.</div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: resumePalette.text }}>{resumeScore?.label || "Needs Work"}</div>
+                          <div style={{ fontSize: 11, color: resumePalette.text, marginTop: 4, lineHeight: 1.5 }}>Shows how strong your resume is before matching it with this job.</div>
                         </div>
                       </div>
                     </div>
-                    <div style={{ background: "#eff6ff", border: "1.5px solid rgba(59,130,246,0.22)", borderRadius: 12, padding: 16 }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: "#1d4ed8", letterSpacing: 0.4 }}>JD MATCH SCORE (JMS)</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 10 }}>
-                        <div style={{ width: 64, height: 64, borderRadius: "50%", border: "4px solid #2563eb", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#fff" }}>
-                          <span style={{ fontSize: 22, fontWeight: 900, color: "#1d4ed8" }}>{jdScore.overall}</span>
-                          <span style={{ fontSize: 8, fontWeight: 700, color: "#1d4ed8" }}>MATCH</span>
-                        </div>
+                    <div style={{ background: `${jdPalette.bg}33`, border: `1.5px solid ${jdPalette.fg}33`, borderRadius: 12, padding: 16 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: jdPalette.text, letterSpacing: 0.4 }}>JD MATCH SCORE</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 10 }}>
+                        <RingScore score={jdScore.overall} tone="blue" label="JMS" />
                         <div>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: "#1d4ed8" }}>{jdScore.label}</div>
-                          <div style={{ fontSize: 11, color: "#1e3a8a", marginTop: 4 }}>How well your resume matches this specific job description.</div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: jdPalette.text }}>{jdScore.label}</div>
+                          <div style={{ fontSize: 11, color: jdPalette.text, marginTop: 4, lineHeight: 1.5 }}>Shows how closely your resume matches this specific job description.</div>
                           {analysis.jobTitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>Target role: {analysis.jobTitle}</div>}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b" }}>CURRENT RESUME QUALITY</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", marginTop: 4 }}>{resumeScore?.overall ?? 0}/100</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b" }}>JOB MATCH SCORE</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", marginTop: 4 }}>{jdScore.overall}/100</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b" }}>TOP GAPS AFFECTING THIS JOB</div>
-                      <div style={{ fontSize: 12, color: "#334155", marginTop: 6, lineHeight: 1.5 }}>
-                        {jdScore.criticalGaps?.length ? jdScore.criticalGaps.slice(0, 3).join(", ") : "No critical gaps detected."}
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Score Card */}
-                  <div style={{ background: sc.bg, border: `1.5px solid ${sc.bar}33`, borderRadius: 12, padding: 18, display: "flex", alignItems: "center", gap: 20 }}>
-                    <div style={{ width: 72, height: 72, borderRadius: "50%", border: `4px solid ${sc.bar}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#fff" }}>
-                      <span style={{ fontSize: 24, fontWeight: 900, color: sc.c }}>{jdScore.overall}</span>
-                      <span style={{ fontSize: 8, fontWeight: 700, color: sc.c }}>MATCH</span>
-                    </div>
-                    <div>
+                  <div style={{ background: sc.bg, border: `1.5px solid ${sc.bar}33`, borderRadius: 16, padding: 18, display: "flex", alignItems: "flex-start", gap: 18 }}>
+                    <RingScore score={jdScore.overall} tone="blue" label="JMS" />
+                    <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
                       <div style={{ fontSize: 15, fontWeight: 800, color: sc.c }}>{jdScore.label}</div>
                       {analysis.jobTitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>JD: {analysis.jobTitle}</div>}
+                      <div style={{ fontSize: 12, color: "#334155", marginTop: 8, lineHeight: 1.55 }}>{analysis.topTip || jdScore.recommendations?.[0] || "Add the missing keywords and stronger bullet proof to improve the match."}</div>
                       <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{jdScore.totals?.matched || 0} exact · {jdScore.totals?.related || 0} related · {jdScore.totals?.missing || 0} missing · {jdScore.totals?.total || 0} total</div>
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
                     {[
-                      ["Weighted Coverage", jdScore.factors.weightedKeywordCoverage],
+                      ["JD Keywords Found", jdScore.factors.weightedKeywordCoverage],
+                      ["Proof in Resume", jdScore.factors.evidenceAlignment],
                       ["Keyword Placement", jdScore.factors.keywordPlacement],
-                      ["Evidence Strength", jdScore.factors.evidenceAlignment],
-                      ["Title Match", jdScore.factors.titleAlignment],
-                      ["Semantic Match", jdScore.factors.semanticEquivalence],
-                      ["Critical Gaps", jdScore.factors.criticalRequirementRisk],
-                    ].map(([label, value]) => (
-                      <div key={label} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "10px 12px", background: "#fff" }}>
-                        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>{label}</div>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", marginTop: 4 }}>{value}</div>
-                        <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4, lineHeight: 1.45 }}>{factorDescriptions[label]}</div>
-                      </div>
-                    ))}
+                      ["Related Skill Match", jdScore.factors.semanticEquivalence],
+                      ["Job Title Match", jdScore.factors.titleAlignment],
+                      ["Critical Requirements Covered", jdScore.factors.criticalRequirementRisk],
+                    ].map(([label, value]) => {
+                      const isOpen = openMetric === label;
+                      const help = factorDescriptions[label];
+                      const palette = scoreColor(Number(value));
+                      return (
+                        <button key={label} onClick={() => setOpenMetric(isOpen ? "" : label)} style={{ textAlign: "left", border: `1px solid ${isOpen ? palette.bar : "#e5e7eb"}`, borderRadius: 12, padding: "12px 14px", background: isOpen ? palette.bg : "#fff", cursor: "pointer" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                            <div style={{ fontSize: 11, color: "#475569", fontWeight: 800 }}>{label}</div>
+                            <div style={{ fontSize: 18, fontWeight: 900, color: palette.c }}>{value}</div>
+                          </div>
+                          <div style={{ fontSize: 11, color: "#64748b", marginTop: 6, lineHeight: 1.45 }}>{help.summary}</div>
+                          {isOpen && <div style={{ fontSize: 11, color: "#334155", marginTop: 8, lineHeight: 1.55 }}><strong>How to improve:</strong> {help.improve}</div>}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Tip Banner */}
@@ -1613,7 +1784,7 @@ Rules:
                       </div>
                       {guidedMissing.length > 0 && (
                         <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10, lineHeight: 1.5 }}>
-                          Some missing keywords should be used in your summary, experience, projects, or certifications. They are shown with guided placement instead of being added blindly to the skills section.
+                          Click a missing keyword to add it into the best existing skills category. Apply Recommended Improvements adds all missing keywords the same way.
                         </div>
                       )}
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1631,15 +1802,15 @@ Rules:
                               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                                 {directAdd ? (
                                   <button onClick={() => addKeyword(m.keyword, m.category, m.recommendedSection)} disabled={!!isAdded} style={{ padding: "4px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: isAdded ? "default" : "pointer", background: isAdded ? "#dcfce7" : "#16a34a", color: isAdded ? "#15803d" : "#fff", transition: "all 0.2s" }}>
-                                    {isAdded ? "Added" : "Add to Skills"}
+                                    {isAdded ? "Added" : "Add"}
                                   </button>
                                 ) : (
                                   <div style={{ padding: "4px 12px", fontSize: 10, fontWeight: 700, borderRadius: 6, background: "#eff6ff", color: "#1d4ed8" }}>
-                                    Use in {getSectionLabel(m.recommendedSection)}
+                                    Add
                                   </div>
                                 )}
                                 {isAdded && <span style={{ fontSize: 9, color: "#15803d" }}>Added to Skills → {isAdded}</span>}
-                                {!isAdded && <span style={{ fontSize: 9, color: "#64748b", fontStyle: "italic", marginTop: 2 }}>Best placed in {getSectionLabel(m.recommendedSection)}</span>}
+                                {!isAdded && <span style={{ fontSize: 9, color: "#64748b", fontStyle: "italic", marginTop: 2 }}>Will be added into your existing skills groups</span>}
                               </div>
                             </div>
                           );
@@ -1662,7 +1833,7 @@ Rules:
 
                   {jdScore.related?.length > 0 && (
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Related Match ({jdScore.related.length})</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Partial Match ({jdScore.related.length})</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {jdScore.related.map((m, i) => (
                           <span key={i} style={{ fontSize: 11, fontWeight: 600, color: "#1d4ed8", background: "#eff6ff", border: "1px solid #93c5fd", padding: "4px 12px", borderRadius: 20 }}>{m.keyword}</span>
@@ -1672,7 +1843,7 @@ Rules:
                   )}
 
                   {/* Soft Skills */}
-                  {analysis.softSkills?.length > 0 && (
+                  {shouldShowSoftSkills && analysis.softSkills?.length > 0 && (
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>💬 Soft Skills Found</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -1687,13 +1858,14 @@ Rules:
                   {analysis.optimizedSummary && (
                     <div style={{ marginTop: 6 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>✍️ Optimized Summary <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#7c3aed", padding: "2px 6px", borderRadius: 12 }}>AI Suggestion</span></div>
-                      <div style={{ padding: "12px", background: appliedSummary ? "#f0fdf4" : "#f8fafc", border: `1px solid ${appliedSummary ? "#86efac" : "#cbd5e1"}`, borderRadius: 10 }}>
+                      <div style={{ padding: "16px", background: appliedSummary ? "#f0fdf4" : "#f8fafc", border: `1px solid ${appliedSummary ? "#86efac" : "#cbd5e1"}`, borderRadius: 14 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                          <div style={{ fontSize: 11, color: "#334155", lineHeight: 1.5, flex: 1, paddingRight: 10 }}>{analysis.optimizedSummary}</div>
-                          <button onClick={() => applySummaryOptimization(analysis.optimizedSummary)} disabled={appliedSummary} style={{ padding: "5px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: appliedSummary ? "default" : "pointer", background: appliedSummary ? "#dcfce7" : "#3b82f6", color: appliedSummary ? "#15803d" : "#fff", transition: "all 0.2s", whiteSpace: "nowrap" }}>
+                          <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.8, flex: 1, paddingRight: 12 }}>{analysis.optimizedSummary}</div>
+                          <button onClick={() => applySummaryOptimization(analysis.optimizedSummary)} disabled={appliedSummary} style={{ padding: "6px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 8, cursor: appliedSummary ? "default" : "pointer", background: appliedSummary ? "#dcfce7" : "#3b82f6", color: appliedSummary ? "#15803d" : "#fff", transition: "all 0.2s", whiteSpace: "nowrap" }}>
                             {appliedSummary ? "Applied" : "Apply Update"}
                           </button>
                         </div>
+                        <div style={{ fontSize: 10, color: "#64748b" }}>Summary length: {countWords(analysis.optimizedSummary)} words</div>
                       </div>
                     </div>
                   )}
@@ -1702,21 +1874,21 @@ Rules:
                   {analysis.optimizedExperience?.length > 0 && (
                     <div style={{ marginTop: 6 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>✨ Optimized Experience Bullets <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#7c3aed", padding: "2px 6px", borderRadius: 12 }}>AI Suggestion</span></div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                         {analysis.optimizedExperience.map((opt, i) => {
                           const isApplied = appliedExp[`${opt.company}_${opt.role}`];
                           return (
-                            <div key={i} style={{ padding: "12px", background: isApplied ? "#f0fdf4" : "#f8fafc", border: `1px solid ${isApplied ? "#86efac" : "#cbd5e1"}`, borderRadius: 10 }}>
+                            <div key={i} style={{ padding: "16px", background: isApplied ? "#f0fdf4" : "#f8fafc", border: `1px solid ${isApplied ? "#86efac" : "#cbd5e1"}`, borderRadius: 14 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                                 <div>
                                   <div style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>{opt.role}</div>
                                   <div style={{ fontSize: 10, color: "#64748b", fontStyle: "italic" }}>@ {opt.company}</div>
                                 </div>
-                                <button onClick={() => applyExperienceOptimization(opt)} disabled={isApplied} style={{ padding: "5px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: isApplied ? "default" : "pointer", background: isApplied ? "#dcfce7" : "#3b82f6", color: isApplied ? "#15803d" : "#fff", transition: "all 0.2s" }}>
+                                <button onClick={() => applyExperienceOptimization(opt)} disabled={isApplied} style={{ padding: "6px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 8, cursor: isApplied ? "default" : "pointer", background: isApplied ? "#dcfce7" : "#3b82f6", color: isApplied ? "#15803d" : "#fff", transition: "all 0.2s" }}>
                                   {isApplied ? "Applied" : "Apply Update"}
                                 </button>
                               </div>
-                              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: "#334155", lineHeight: 1.5 }}>
+                              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "#334155", lineHeight: 1.9 }}>
                                 {opt.optimizedBullets?.map((b, j) => <li key={j} style={{ marginBottom: 4 }}>{b}</li>)}
                               </ul>
                             </div>
@@ -1730,18 +1902,18 @@ Rules:
                   {analysis.optimizedProjects?.length > 0 && (
                     <div style={{ marginTop: 6 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>🚀 Optimized Project Bullets <span style={{ fontSize: 10, fontWeight: 600, color: "#fff", background: "#7c3aed", padding: "2px 6px", borderRadius: 12 }}>AI Suggestion</span></div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                         {analysis.optimizedProjects.map((opt, i) => {
                           const isApplied = appliedProj[opt.name];
                           return (
-                            <div key={i} style={{ padding: "12px", background: isApplied ? "#f0fdf4" : "#f8fafc", border: `1px solid ${isApplied ? "#86efac" : "#cbd5e1"}`, borderRadius: 10 }}>
+                            <div key={i} style={{ padding: "16px", background: isApplied ? "#f0fdf4" : "#f8fafc", border: `1px solid ${isApplied ? "#86efac" : "#cbd5e1"}`, borderRadius: 14 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                                 <div style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>{opt.name}</div>
-                                <button onClick={() => applyProjectOptimization(opt)} disabled={isApplied} style={{ padding: "5px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: isApplied ? "default" : "pointer", background: isApplied ? "#dcfce7" : "#3b82f6", color: isApplied ? "#15803d" : "#fff", transition: "all 0.2s" }}>
+                                <button onClick={() => applyProjectOptimization(opt)} disabled={isApplied} style={{ padding: "6px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 8, cursor: isApplied ? "default" : "pointer", background: isApplied ? "#dcfce7" : "#3b82f6", color: isApplied ? "#15803d" : "#fff", transition: "all 0.2s" }}>
                                   {isApplied ? "Applied" : "Apply Update"}
                                 </button>
                               </div>
-                              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: "#334155", lineHeight: 1.5 }}>
+                              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "#334155", lineHeight: 1.9 }}>
                                 {opt.optimizedBullets?.map((b, j) => <li key={j} style={{ marginBottom: 4 }}>{b}</li>)}
                               </ul>
                             </div>
@@ -1848,17 +2020,31 @@ function ResumePreviewPane({
 function JDMatchPage() {
   const navigate = useNavigate();
   const {
-    data, setData, showUpload, setShowUpload, showTemplateModal, setShowTemplateModal, showFontPanel, setShowFontPanel,
+    data, setData, update, showUpload, setShowUpload, showTemplateModal, setShowTemplateModal, showFontPanel, setShowFontPanel,
     activeTemplate, setActiveTemplate, headingFont, setHeadingFont, bodyFont, setBodyFont, isFetching,
     handleParsed, handleResumeDownload, zoom, setZoom, resumeFontSize, setResumeFontSize,
     resumeLineHeight, setResumeLineHeight, template5Preview, setTemplate5Preview, previewRef, windowWidth, resumeScore
   } = useResumeWorkspace();
   const [jdState, setJdState] = useState({ text: "", status: "idle", error: "", analysis: null });
+  const [showInlineEditor, setShowInlineEditor] = useState(false);
+  const [editorSection, setEditorSection] = useState("personal");
   const snapshot = buildResumeSnapshot(data);
   const hasResumeContent = snapshot.wordCount >= 20 || snapshot.expEntries.some(e => e.role) || snapshot.projectEntries.some(p => p.name);
   const jdScore = jdState.analysis ? calculateJDScore(data, jdState.analysis) : null;
   const activeTemplateLabel = activeTemplate === "A" ? "Classic" : activeTemplate === "B" ? "Modern" : activeTemplate === "C" ? "Minimal" : activeTemplate === "4" ? "Template 4" : "Template 5";
   const showJDSetup = jdState.status === "idle" && !jdState.analysis;
+  const editorNav = [
+    { id: "personal", label: "Personal", icon: icons.user },
+    { id: "summary", label: "Summary", icon: icons.layers },
+    { id: "skills", label: "Skills", icon: icons.code },
+    { id: "education", label: "Education", icon: icons.book },
+    { id: "experience", label: "Experience", icon: icons.briefcase },
+    { id: "projects", label: "Projects", icon: icons.globe },
+    { id: "certifications", label: "Certs", icon: icons.award },
+    { id: "achievements", label: "Awards", icon: icons.award },
+  ];
+  const IS = { width: "100%", padding: "11px 14px", background: "#f8fafc", border: `1px solid #cbd5e1`, borderRadius: 10, color: C.text, fontSize: 13, outline: "none", boxSizing: "border-box", transition: "all 0.2s ease", boxShadow: "inset 0 3px 6px rgba(0,0,0,0.06), inset 0 0 4px rgba(0,0,0,0.02), 0 1px 0 rgba(255,255,255,0.8)" };
+  const CS = { background: "#ffffff", border: `1px solid #e2e8f0`, borderRadius: 14, padding: 18, marginBottom: 16, boxShadow: "0 4px 10px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.03), inset 0 2px 0 rgba(255,255,255,1), inset 0 -2px 0 rgba(0,0,0,0.02)" };
 
   return (
     <div className="jd-page-shell" style={{ display: "flex", height: "calc(100dvh - 66px)", minHeight: 0, background: C.appBg, overflow: "hidden", position: "relative", fontFamily: "'Sora', sans-serif" }}>
@@ -1874,14 +2060,16 @@ function JDMatchPage() {
       {showTemplateModal && <TemplateModal onClose={() => setShowTemplateModal(false)} activeTemplate={activeTemplate} onSelect={setActiveTemplate} />}
 
       <div className="jd-page-sidebar" style={{ width: 700, maxWidth: "100%", background: "#fff", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", minHeight: 0, flexShrink: 0 }}>
-        <div className="jd-page-header" style={{ padding: "22px 24px 18px", borderBottom: `1px solid ${C.border}`, background: "linear-gradient(180deg, #ffffff 0%, #faf8ff 100%)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+        <div className="jd-page-header" style={{ padding: "14px 24px 12px", borderBottom: `1px solid ${C.border}`, background: "linear-gradient(180deg, #ffffff 0%, #fcfbff 100%)", boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.9), 0 10px 24px rgba(15,23,42,0.03)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: showJDSetup ? 10 : 0 }}>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>Optimize Resume for This Job</div>
-              <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>Compare your resume with the job description and improve it with clear, ATS-friendly suggestions.</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: C.text, lineHeight: 1.2 }}>{showInlineEditor ? "Edit Resume Details" : "Optimize Resume for This Job"}</div>
             </div>
-            <button onClick={() => navigate("/ats-resume-builder")} style={{ padding: "7px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: "#fff", color: C.textMuted, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-              Back
+            <button
+              onClick={() => setShowInlineEditor((prev) => !prev)}
+              style={{ padding: "8px 14px", minWidth: 132, borderRadius: 999, border: `1px solid ${showInlineEditor ? "#bfdbfe" : "#d9e0ea"}`, background: showInlineEditor ? "linear-gradient(135deg, #eff6ff, #ffffff)" : "linear-gradient(135deg, #ffffff, #f8fafc)", color: showInlineEditor ? "#1d4ed8" : "#475569", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", boxShadow: showInlineEditor ? "0 8px 18px rgba(37,99,235,0.12)" : "0 6px 14px rgba(15,23,42,0.05)" }}
+            >
+              {showInlineEditor ? "Previous Score" : "Edit Resume"}
             </button>
           </div>
           {showJDSetup && <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginTop: 16 }} className="jd-top-cards">
@@ -1910,7 +2098,7 @@ function JDMatchPage() {
           </div>}
         </div>
 
-        <div className="jd-page-sidebar-body" style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: 24, display: "flex", flexDirection: "column" }}>
+        <div className="jd-page-sidebar-body" style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: showInlineEditor ? "16px 18px 20px" : "8px 24px 24px", display: "flex", flexDirection: "column", position: "relative" }}>
           {!hasResumeContent ? (
             <div style={{ border: `1px solid ${C.border}`, borderRadius: 18, padding: 24, background: "#fff", boxShadow: "0 8px 24px rgba(15,23,42,0.05)" }}>
               <div style={{ fontSize: 22, marginBottom: 10 }}>📄</div>
@@ -1927,6 +2115,17 @@ function JDMatchPage() {
                 </button>
               </div>
             </div>
+          ) : showInlineEditor ? (
+            <JDInlineEditor
+              data={data}
+              setData={setData}
+              update={update}
+              activeSection={editorSection}
+              setActiveSection={setEditorSection}
+              sideNav={editorNav}
+              IS={IS}
+              CS={CS}
+            />
           ) : (
             <JDAnalyzerModal onClose={() => navigate("/ats-resume-builder")} data={data} setData={setData} jdState={jdState} setJdState={setJdState} jdScore={jdScore} resumeScore={resumeScore} pageMode />
           )}
@@ -1957,6 +2156,57 @@ function JDMatchPage() {
           previewRef={previewRef}
           windowWidth={windowWidth}
         />
+      </div>
+    </div>
+  );
+}
+
+function JDInlineEditor({ data, setData, update, activeSection, setActiveSection, sideNav, IS, CS }) {
+  return (
+    <div className="jd-inline-editor">
+      <div className="jd-inline-editor-nav">
+        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1, color: "#64748b", marginBottom: 10 }}>RESUME SECTIONS</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {sideNav.map((section) => {
+            const isActive = activeSection === section.id;
+            return (
+              <button
+                key={section.id}
+                onClick={() => setActiveSection(section.id)}
+                style={{
+                  width: "100%",
+                  border: isActive ? "1.5px solid #60a5fa" : "1px solid #dbe3ee",
+                  borderRadius: 12,
+                  background: isActive ? "linear-gradient(135deg, #eff6ff, #ffffff)" : "#ffffff",
+                  color: isActive ? "#1d4ed8" : "#475569",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "10px 12px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  textAlign: "left",
+                  boxShadow: isActive ? "0 8px 18px rgba(37, 99, 235, 0.12)" : "0 4px 10px rgba(15,23,42,0.04)",
+                }}
+              >
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d={section.icon} /></svg>
+                {section.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="jd-inline-editor-form" style={{ minWidth: 0, border: "1px solid rgba(226,232,240,0.95)", borderRadius: 20, background: "rgba(255,255,255,0.92)", boxShadow: "0 18px 40px rgba(15,23,42,0.06)", padding: 18 }}>
+        {activeSection === "personal" && <PersonalForm data={data.personal} update={update} IS={IS} />}
+        {activeSection === "summary" && <SummaryForm summary={data.summary} update={update} IS={IS} onGenerate={() => {}} loading={false} error="" />}
+        {activeSection === "skills" && <SkillsForm skills={data.skills} setData={setData} IS={IS} CS={CS} />}
+        {activeSection === "education" && <EducationForm education={data.education} setData={setData} IS={IS} CS={CS} />}
+        {activeSection === "experience" && <ExperienceForm experience={data.experience} setData={setData} IS={IS} CS={CS} />}
+        {activeSection === "projects" && <ProjectsForm projects={data.projects} setData={setData} IS={IS} CS={CS} />}
+        {activeSection === "certifications" && <CertsForm certifications={data.certifications} setData={setData} IS={IS} CS={CS} />}
+        {activeSection === "achievements" && <AchievementsForm achievements={data.achievements} setData={setData} IS={IS} CS={CS} />}
       </div>
     </div>
   );
@@ -2209,7 +2459,7 @@ function useResumeWorkspace() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
+            model: "llama-3.1-8b-instant",
             temperature: 0.1,
             max_tokens: 500,
             response_format: { type: "json_object" },
@@ -2624,7 +2874,7 @@ function ResumeBuilder() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
+            model: "llama-3.1-8b-instant",
             temperature: 0.1,
             max_tokens: 500,
             response_format: { type: "json_object" },
@@ -2686,7 +2936,7 @@ ${snapshot.fullText}`
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile", max_tokens: 1000,
+          model: "llama-3.1-8b-instant", max_tokens: 1000,
           messages: [{ role: "system", content: "You are a professional resume writer. Write concise, ATS-friendly summaries." }, { role: "user", content: `Write a professional resume summary (2-3 sentences, ATS-friendly) for:\nName: ${data.personal.name || "Professional"}\nTitle: ${data.personal.title || ""}\nExperience: ${expText || "fresher"}\nSkills: ${skillText}\nKeep it concise, impactful, avoid first-person. Output only the summary text.` }]
         })
       });
@@ -2710,7 +2960,7 @@ ${snapshot.fullText}`
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "llama-3.1-8b-instant",
           max_tokens: 1400,
           messages: [
             {

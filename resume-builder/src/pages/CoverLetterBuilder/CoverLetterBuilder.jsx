@@ -221,7 +221,7 @@ RESUME TEXT:
             const parseResp = await fetch("/api/groq", {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    model: "llama-3.3-70b-versatile",
+                    model: "llama-3.1-8b-instant",
                     temperature: 0.1,
                     max_tokens: 4000,
                     response_format: { type: "json_object" },
@@ -348,7 +348,7 @@ STRICT RULES:
             const resp = await fetch("/api/groq", {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    model: "llama-3.3-70b-versatile", temperature: 0.72, max_tokens: 1500,
+                    model: "llama-3.1-8b-instant", temperature: 0.72, max_tokens: 1500,
                     messages: [
                         { role: "system", content: "You are a world-class career coach and cover letter writer. You write specific, ATS-optimized cover letters using only the candidate's real experience. Every sentence must add value. Never use cliche phrases." },
                         { role: "user", content: prompt }

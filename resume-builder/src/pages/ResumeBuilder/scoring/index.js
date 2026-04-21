@@ -386,6 +386,7 @@ function keywordEvidence(snapshot, requirement) {
   const phrase = sentenceLike(requirement.keyword);
   const strictAliases = unique([phrase, ...(requirement.aliases || []).filter((alias) => isSafeEquivalentAlias(phrase, alias))]).filter(Boolean);
   const relaxedAliases = unique([phrase, ...(requirement.aliases || [])]).filter(Boolean);
+  const isMultiWord = phrase.split(" ").filter(Boolean).length > 1;
   const textBlocks = {
     title: sentenceLike(snapshot.title),
     summary: sentenceLike(snapshot.summary),
@@ -402,7 +403,18 @@ function keywordEvidence(snapshot, requirement) {
   const exactAliasHit = !requirement.exactRequired && strictAliases.some((alias) => alias !== phrase && Object.values(textBlocks).some((block) => hasWholeTerm(block, alias)));
   const relatedAliasHit = relaxedAliases.some((alias) => Object.values(textBlocks).some((block) => hasWholeTerm(block, alias)));
   const tokenCoverage = Math.max(...Object.values(textBlocks).map((block) => relatedTokenCoverage(block, phrase)), 0);
-  const matchQuality = exactPhraseHit ? 1 : exactAliasHit ? 0.92 : relatedAliasHit ? 0.72 : tokenCoverage >= 0.75 ? 0.68 : tokenCoverage >= 0.5 ? 0.45 : 0;
+  const skillsOnlyHit = strictAliases.some((alias) => hasWholeTerm(textBlocks.skills, alias)) && !strictAliases.some((alias) => hasWholeTerm(textBlocks.experience, alias) || hasWholeTerm(textBlocks.misc, alias) || hasWholeTerm(textBlocks.summary, alias) || hasWholeTerm(textBlocks.title, alias));
+  const matchQuality = exactPhraseHit
+    ? (skillsOnlyHit ? 0.62 : 1)
+    : exactAliasHit
+      ? (skillsOnlyHit ? 0.6 : 0.9)
+      : relatedAliasHit
+        ? (isMultiWord ? 0.58 : 0.62)
+        : tokenCoverage >= 0.9
+          ? 0.62
+          : tokenCoverage >= (isMultiWord ? 0.8 : 0.7)
+            ? 0.52
+            : 0;
   const matchedAlias = exactPhraseHit
     ? phrase
     : exactAliasHit
@@ -418,7 +430,7 @@ function keywordEvidence(snapshot, requirement) {
     strictAliases.some((alias) => hasWholeTerm(textBlocks.misc, alias)) || hasWholeTerm(textBlocks.misc, phrase) ? 10 : 0,
   ].reduce((sum, value) => sum + value, 0);
 
-  const supportingBullet = snapshot.allBullets.find((bullet) => relaxedAliases.some((alias) => hasWholeTerm(sentenceLike(bullet), alias)) || relatedTokenCoverage(sentenceLike(bullet), phrase) >= 0.75);
+  const supportingBullet = snapshot.allBullets.find((bullet) => relaxedAliases.some((alias) => hasWholeTerm(sentenceLike(bullet), alias)) || relatedTokenCoverage(sentenceLike(bullet), phrase) >= (isMultiWord ? 0.85 : 0.75));
   const evidenceStrength = supportingBullet
     ? clamp(
       (ACTION_VERBS.some((verb) => new RegExp(`^${verb}\\b`, "i").test(supportingBullet)) ? 40 : 10) +
