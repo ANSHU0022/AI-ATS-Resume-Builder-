@@ -9,7 +9,7 @@ const columns = [
             { label: 'LaTeX Editor', path: '/latex-editor' },
             { label: 'CV Upload & Auto-fill', path: '/ats-resume-builder', state: { openUpload: true } },
             { label: 'Cover Letter Generator', path: '/cover-letter' },
-            { label: 'Job Description Keyword Match', path: '/ats-resume-builder', state: { openJDPanel: true } },
+            { label: 'Job Description Keyword Match', path: '/jd-match' },
             { label: 'Networking', path: '/network-outreach' },
         ],
     },
@@ -18,7 +18,7 @@ const columns = [
         links: [
             { label: 'ATS Score Checker', path: '/ats-resume-builder' },
             { label: 'AI Summary Generator', path: '/ats-resume-builder' },
-            { label: 'JD Keyword Match', path: '/ats-resume-builder', state: { openJDPanel: true } },
+            { label: 'JD Keyword Match', path: '/jd-match' },
             { label: 'PDF Export', path: '/ats-resume-builder' },
             { label: 'Cold Email', path: '/network-outreach' },
             { label: 'Cold DM', path: '/network-outreach' },

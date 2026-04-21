@@ -139,6 +139,29 @@
   box-shadow: 0 10px 22px rgba(124, 92, 191, 0.2);
 }
 
+.btn-feedback-icon {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(124, 92, 191, 0.2);
+  border-radius: 12px;
+  background: rgba(124, 92, 191, 0.08);
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 6px 18px rgba(124, 92, 191, 0.08);
+}
+
+.btn-feedback-icon:hover {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(124, 92, 191, 0.2);
+}
+
 .btn-start {
   font-size: 13.5px;
   font-weight: 700;

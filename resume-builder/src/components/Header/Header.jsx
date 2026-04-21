@@ -9,6 +9,7 @@ export default function Header() {
     const navigate = useNavigate();
     const [user, setUser] = useState(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const MotionDiv = motion.div;
 
     const goToFeedback = () => {
         if (window.location.pathname !== '/') {
@@ -62,6 +63,14 @@ export default function Header() {
                 <polyline points="10 9 9 9 8 9"/>
             </svg>
         ),
+        'JD Match': (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 5a2 2 0 0 1 2-2h8l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z"/>
+                <polyline points="13 3 13 8 18 8"/>
+                <circle cx="17.5" cy="17.5" r="3.5"/>
+                <line x1="20" y1="20" x2="22" y2="22"/>
+            </svg>
+        ),
         'Cover Letter': (
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
@@ -95,6 +104,7 @@ export default function Header() {
 
     const navItems = [
         { label: 'Resume', path: '/ats-resume-builder' },
+        { label: 'JD Match', path: '/jd-match' },
         { label: 'Cover Letter', path: '/cover-letter' },
         { label: 'LaTeX Editor', path: '/latex-editor' },
         { label: 'Networking', path: '/network-outreach' },
@@ -123,10 +133,6 @@ export default function Header() {
                 </ul>
 
                 <div className="rf-nav-actions">
-                    <button className="btn-feedback desktop-only" type="button" onClick={goToFeedback}>
-                        Feedback
-                    </button>
-
                     {user ? (
                         <div className="desktop-user-actions" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                             <div className="rf-user-greeting">
@@ -134,11 +140,21 @@ export default function Header() {
                                 <span style={{ fontWeight: 600 }}>Hi, {getFirstName()}</span>
                             </div>
                             <button className="btn-signin" type="button" onClick={handleLogout}>Log out</button>
+                            <button className="btn-feedback-icon desktop-only" type="button" onClick={goToFeedback} aria-label="Open feedback">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                </svg>
+                            </button>
                         </div>
                     ) : (
                         <div className="desktop-auth-actions">
                             <button className="btn-signin" type="button" onClick={() => navigate('/auth')}>Sign in</button>
                             <button className="btn-start desktop-only" type="button" onClick={() => navigate('/ats-resume-builder')}>Get Started</button>
+                            <button className="btn-feedback-icon desktop-only" type="button" onClick={goToFeedback} aria-label="Open feedback">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                </svg>
+                            </button>
                         </div>
                     )}
 
@@ -162,14 +178,14 @@ export default function Header() {
                 <AnimatePresence>
                     {isMenuOpen && (
                         <>
-                            <motion.div
+                            <MotionDiv
                                 className="rf-sidebar-overlay"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 onClick={closeMenu}
                             />
-                            <motion.div
+                            <MotionDiv
                                 className="rf-sidebar"
                                 initial={{ opacity: 0, x: 24, scale: 0.98 }}
                                 animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -264,7 +280,7 @@ export default function Header() {
                                         </button>
                                     )}
                                 </div>
-                            </motion.div>
+                            </MotionDiv>
                         </>
                     )}
                 </AnimatePresence>,

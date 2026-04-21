@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import html2pdf from "html2pdf.js";
 import * as pdfjsLib from "pdfjs-dist";
 // Use Vite's ?url syntax to get the worker path statically
@@ -9,6 +9,7 @@ import FontPickerPanel from "../../components/FontPickerPanel/FontPickerPanel";
 import { supabase } from "../../lib/supabase";
 import Template4 from "./templates/Template4";
 import Template5Preview from "./components/Template5Preview";
+import { buildResumeSnapshot, calculateJDScore, calculateResumeScore, formatResumeReviewPayload } from "./scoring";
 import "./ResumeBuilder.css";
 // Set the workerSrc for PDF.js globally
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
@@ -58,25 +59,6 @@ const initialData = {
 };
 
 // ── ATS Scoring ───────────────────────────────────────────────────────────────
-function calcATS(data) {
-  let score = 0; const tips = [];
-  const pF = ["name", "email", "phone", "location", "linkedin"];
-  const pFilled = pF.filter(f => data.personal[f]?.trim()).length;
-  score += (pFilled / pF.length) * 20;
-  if (pFilled < pF.length) tips.push("Complete all personal details");
-  if (data.summary?.trim().length > 50) score += 15; else tips.push("Add a professional summary (50+ characters)");
-  if (data.skills.map(s => s.items).join("").trim().length > 20) score += 15; else tips.push("Add more skills in each category");
-  const expFilled = data.experience.filter(e => e.role && e.company).length;
-  if (expFilled > 0) score += 20; else tips.push("Add at least one work experience");
-  if (data.education.some(e => e.degree && e.institution)) score += 10; else tips.push("Add your education details");
-  if (data.projects.some(p => p.name)) score += 10; else tips.push("Add projects to stand out");
-  if (data.certifications.some(c => c.name)) score += 5;
-  const expText = data.experience.map(e => e.bullets?.join(" ")).join(" ");
-  if (/\d+%|\d+\+|improved|built|led|designed/.test(expText.toLowerCase())) score += 5;
-  else tips.push("Add numbers & achievements in bullets");
-  return { score: Math.min(100, Math.round(score)), tips };
-}
-
 // ── Resume sub-components ─────────────────────────────────────────────────────
 function BIcon({ path, size = 9 }) {
   return (
@@ -178,6 +160,15 @@ const FONT_PAIRS = [
   { label: "Executive", headId: "playfair", bodyId: "lato" },
   { label: "Classic ATS", headId: "georgia", bodyId: "arial" },
 ];
+
+const CL_FONTS = ATS_FONTS;
+const loadCLFont = loadFont;
+
+function cleanCoverLetter(letter, name = "") {
+  return (letter || "")
+    .replace(new RegExp(`^${(name || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"), "")
+    .trim();
+}
 
 
 
@@ -836,8 +827,8 @@ RESUME TEXT:
       try { parsed = JSON.parse(raw); }
       catch { const m = raw.match(/\{[\s\S]*\}/); if (!m) throw new Error("Invalid JSON from Groq."); parsed = JSON.parse(m[0]); }
 
-      const cleanBullets = (arr) => Array.isArray(arr) ? arr.map(b => typeof b === 'string' ? b.replace(/^[\s\u2022\-\*\.]+/g, '').trim() : b) : [];
-      const cleanString = (str) => typeof str === 'string' ? str.replace(/^[\s\u2022\-\*\.]+/g, '').trim() : str;
+      const cleanBullets = (arr) => Array.isArray(arr) ? arr.map(b => typeof b === 'string' ? b.replace(/^[\s\u2022\-*.]+/g, '').trim() : b) : [];
+      const cleanString = (str) => typeof str === 'string' ? str.replace(/^[\s\u2022\-*.]+/g, '').trim() : str;
 
       if (parsed.experience) {
         parsed.experience = parsed.experience.map(exp => ({ ...exp, bullets: cleanBullets(exp.bullets) }));
@@ -850,7 +841,8 @@ RESUME TEXT:
       }
 
       setStatus("done"); setStep("All fields filled successfully!");
-      setTimeout(() => { onParsed(parsed); onClose(); }, 900);
+      const parseMeta = { source: "upload", extractedTextLength: resumeText.length, fileName: file.name, fileType: file.type || "" };
+      setTimeout(() => { onParsed(parsed, parseMeta); onClose(); }, 900);
     } catch (e) {
       setStatus("error");
       setErrorMsg(e.message || "Failed to parse resume. Please try again or fill manually.");
@@ -965,34 +957,144 @@ RESUME TEXT:
 // (Old inline FontPickerPanel removed, using imported FontPickerPanel)
 
 // ── JD KEYWORD ANALYZER MODAL ─────────────────────────────────────────────────
-function JDAnalyzerModal({ onClose, data, setData }) {
-  const [jdText, setJdText] = useState("");
-  const [status, setStatus] = useState("idle"); // idle | analyzing | done | error
-  const [analysis, setAnalysis] = useState(null);
-  const [errorMsg, setErrorMsg] = useState("");
+function JDAnalyzerModal({ onClose, data, setData, jdState, setJdState, jdScore, resumeScore, pageMode = false }) {
+  const { text: jdText, status, analysis, error: errorMsg } = jdState;
   const [added, setAdded] = useState({});
   const [appliedExp, setAppliedExp] = useState({});
   const [appliedProj, setAppliedProj] = useState({});
   const [appliedSummary, setAppliedSummary] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [guideRead, setGuideRead] = useState(false);
+  const normalizeSkillText = (value = "") => value.toLowerCase().replace(/[^a-z0-9+#/\s]/g, " ").replace(/\s+/g, " ").trim();
+  const tokenizeSkillText = (value = "") => normalizeSkillText(value).split(" ").filter(Boolean);
+  const factorDescriptions = {
+    "Weighted Coverage": "How much of the job description your resume already covers.",
+    "Keyword Placement": "Whether important terms appear in the title, summary, skills, and recent experience.",
+    "Evidence Strength": "Whether matched skills are supported with real, outcome-based resume evidence.",
+    "Title Match": "How closely your resume title aligns with the target role.",
+    "Semantic Match": "How many requirements are closely related, even when wording differs.",
+    "Critical Gaps": "How many must-have requirements are still missing."
+  };
+  const getSectionLabel = (section = "skills") => ({
+    skills: "Skills",
+    summary: "Summary",
+    experience: "Experience",
+    projects: "Projects",
+    certifications: "Certifications"
+  }[section] || "Skills");
+  const canAddDirectly = (item) => item?.recommendedSection === "skills";
+  const inferSkillGroup = (value = "") => {
+    const text = normalizeSkillText(value);
+    if (!text) return "general";
+    if (/ai|ml|llm|rag|vector|embedding|chatgpt|machine learning|genai|nlp/.test(text)) return "ai";
+    if (/devops|cloud|aws|azure|gcp|docker|kubernetes|terraform|ci cd|cicd/.test(text)) return "cloud";
+    if (/database|sql|nosql|postgres|mysql|mongodb|warehouse/.test(text)) return "database";
+    if (/analytics|analysis|bi|power bi|tableau|excel|reporting|dashboard|visualization/.test(text)) return "analytics";
+    if (/automation|workflow|integration|api|rest|json|zapier|power automate|n8n/.test(text)) return "automation";
+    if (/soft|communication|leadership|stakeholder|collaboration|teamwork/.test(text)) return "soft";
+    if (/programming|language|python|java|javascript|typescript|coding|code/.test(text)) return "programming";
+    if (/tools|software|platform/.test(text)) return "tools";
+    return "general";
+  };
+  const findBestSkillCategoryIndex = (skills, category, keyword) => {
+    if (!skills.length) return -1;
+
+    const normalizedCategory = normalizeSkillText(category);
+    const categoryTokens = tokenizeSkillText(category);
+    const keywordTokens = tokenizeSkillText(keyword);
+    const targetGroup = inferSkillGroup(`${category} ${keyword}`);
+    let bestIndex = -1;
+    let bestScore = -1;
+
+    skills.forEach((skill, index) => {
+      const label = skill.category || "";
+      const normalizedLabel = normalizeSkillText(label);
+      const labelTokens = tokenizeSkillText(label);
+      let score = 0;
+
+      if (normalizedCategory && (normalizedLabel === normalizedCategory || normalizedLabel.includes(normalizedCategory) || normalizedCategory.includes(normalizedLabel))) {
+        score += 12;
+      }
+
+      categoryTokens.forEach((token) => {
+        if (labelTokens.includes(token)) score += 3;
+      });
+
+      keywordTokens.forEach((token) => {
+        if (token.length > 2 && labelTokens.includes(token)) score += 1;
+      });
+
+      if (inferSkillGroup(label) === targetGroup) {
+        score += 5;
+      }
+
+      if (/technical skills|technical|skills|tools/i.test(label)) {
+        score += 1;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    });
+
+    if (bestScore <= 0) {
+      const technicalIndex = skills.findIndex((skill) => /technical skills|technical|skills|tools/i.test(skill.category || ""));
+      if (technicalIndex !== -1) return technicalIndex;
+      return 0;
+    }
+
+    return bestIndex;
+  };
+  const mergeKeywordIntoSkills = (skills, keyword, category) => {
+    const nextSkills = skills.map((skill) => ({ ...skill }));
+    const targetIndex = findBestSkillCategoryIndex(nextSkills, category, keyword);
+
+    if (targetIndex === -1) {
+      return {
+        changed: true,
+        assignedCategory: category || "Skills",
+        skills: [{ category: category || "Skills", items: keyword }]
+      };
+    }
+
+    const targetSkill = nextSkills[targetIndex];
+    const existingItems = (targetSkill.items || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (existingItems.some((item) => item.toLowerCase() === keyword.toLowerCase())) {
+      return {
+        changed: false,
+        assignedCategory: targetSkill.category || category || "Skills",
+        skills
+      };
+    }
+
+    nextSkills[targetIndex] = {
+      ...targetSkill,
+      items: existingItems.length ? `${existingItems.join(", ")}, ${keyword}` : keyword
+    };
+
+    return {
+      changed: true,
+      assignedCategory: targetSkill.category || category || "Skills",
+      skills: nextSkills
+    };
+  };
 
   const buildResumeText = () => {
-    const p = data.personal;
-    const parts = [
-      p.name, p.title, data.summary,
-      data.skills.map(s => s.items).join(", "),
-      data.experience.map(e => [e.role, e.company, ...(e.bullets || [])].join(" ")).join(" "),
-      data.projects.map(pr => [pr.name, pr.tech, ...(pr.bullets || [])].join(" ")).join(" "),
-      data.education.map(e => [e.degree, e.institution].join(" ")).join(" "),
-      data.certifications.map(c => c.name).join(", "),
-    ];
-    return parts.filter(Boolean).join("\n");
+    return buildResumeSnapshot(data).fullText;
   };
 
   const analyze = async () => {
-    if (!jdText.trim()) { setErrorMsg("Please paste a job description first."); return; }
-    setStatus("analyzing"); setErrorMsg(""); setAnalysis(null); setAdded({});
+    if (!jdText.trim()) {
+      setJdState(prev => ({ ...prev, error: "Please paste a job description first." }));
+      return;
+    }
+    setJdState(prev => ({ ...prev, status: "analyzing", error: "", analysis: null }));
+    setAdded({});
     try {
       const resumeText = buildResumeText();
       const resp = await fetch("/api/groq", {
@@ -1003,33 +1105,64 @@ function JDAnalyzerModal({ onClose, data, setData }) {
           response_format: { type: "json_object" },
           messages: [
             {
-              role: "system", content: `You are an ATS Resume Analyzer.
+              role: "system", content: `You are an ATS requirement extractor and resume optimizer.
 
-Analyze the Job Description (JD) and the Resume. Follow these strict rules:
+Extract structured requirements from the Job Description only.
+Do not score the resume yourself.
+Do not hallucinate experience.
+Treat unrelated tools as different unless the JD explicitly treats them as alternatives.
+Be conservative with technical aliases, especially for short terms such as R, C, BI, ML, SQL, and AI.
+Do not create broad aliases that could match ordinary words or text fragments.
 
-STEP 1 — EXTRACT ALL IMPORTANT KEYWORDS FROM THE JOB DESCRIPTION ONLY.
-Keywords can include: tools, technologies, programming languages, frameworks, AI/ML concepts, analytics methods, cloud platforms, important domain skills, databases, methodologies, certifications, libraries, APIs, protocols, operating systems, version control tools, CI/CD tools, testing frameworks, data formats, visualization tools.
-Extract EVERY SINGLE important keyword. Be EXHAUSTIVE — typically 20 to 50+ keywords. Do NOT skip any.
+Return only valid JSON.`
+            },
+            { role: "user", content: `Analyze the following Job Description and Resume.
 
-STEP 2 — MATCHING RULES:
-A keyword should be marked as MATCHED only if the EXACT keyword (case-insensitive) appears somewhere in the resume text (Skills, Summary, Experience bullets, Project bullets, Education, Certifications — anywhere).
+JOB DESCRIPTION:
+${jdText}
 
-STEP 3 — MISSING RULES:
-If the keyword appears in the JD but NOT anywhere in the resume text, mark it as MISSING.
-Do NOT guess or assume skills. Do NOT treat different tools as the same.
-Examples: Power BI ≠ Tableau, PyTorch ≠ TensorFlow, SQL ≠ PostgreSQL, AWS ≠ Azure, React ≠ Angular.
+RESUME CONTENT:
+${resumeText}
 
-STEP 4 — MATCH SCORE:
-matchScore = (number of matched keywords / total JD keywords) × 100, rounded to nearest integer.
+Return ONLY valid JSON using this exact shape:
+{
+  "jobTitle": "Data Analyst",
+  "seniority": "mid",
+  "requirements": [
+    {
+      "keyword": "Python",
+      "category": "Technical Skills",
+      "importance": "must",
+      "aliases": ["py"],
+      "evidenceTarget": "experience",
+      "exactRequired": false,
+      "critical": true,
+      "kind": "keyword"
+    }
+  ],
+  "softSkills": ["communication"],
+  "topTip": "One sentence job-specific recommendation",
+  "optimizedSummary": "40 to 55 word optimized summary",
+  "optimizedExperience": [
+    { "company": "Company Name", "role": "Role Name", "optimizedBullets": ["Bullet 1", "Bullet 2"] }
+  ],
+  "optimizedProjects": [
+    { "name": "Project Name", "optimizedBullets": ["Bullet 1", "Bullet 2"] }
+  ]
+}
 
-STEP 5 — OPTIMIZED SUMMARY:
-Write an optimized professional summary that is EXACTLY between 40 to 55 words. It must naturally incorporate the most important missing keywords from the JD. Make it ATS-friendly, impactful, and relevant to the job title detected.
-
-STEP 6 — OPTIMIZED BULLETS:
-Rewrite the existing Experience and Project bullet points to naturally incorporate missing keywords. Keep them impactful with action verbs and numbers. Do NOT invent new jobs or projects, only enhance existing bullets.
-
-Always respond with ONLY valid JSON.` },
-            { role: "user", content: `Analyze the following Job Description and Resume.\n\nJOB DESCRIPTION:\n${jdText}\n\nRESUME CONTENT:\n${resumeText}\n\nReturn ONLY valid JSON with this exact structure:\n{\n  "matchScore": 72,\n  "jobTitle": "Job title detected from JD",\n  "totalJDKeywords": 35,\n  "matched": [\n    { "keyword": "Python", "importance": "high", "category": "Technical Skills" }\n  ],\n  "missing": [\n    { "keyword": "Docker", "importance": "high", "category": "Tools / Software", "suggestion": "Add Docker to your Skills section under Tools" }\n  ],\n  "softSkills": ["communication", "teamwork"],\n  "topTip": "One sentence tip to improve resume for this specific job",\n  "optimizedSummary": "An optimized 40-55 word professional summary...",\n  "optimizedExperience": [\n    { "company": "Company Name", "role": "Role Name", "optimizedBullets": ["Optimized bullet 1", "Optimized bullet 2"] }\n  ],\n  "optimizedProjects": [\n    { "name": "Project Name", "optimizedBullets": ["Optimized bullet 1", "Optimized bullet 2"] }\n  ]\n}\n\nRules:\n- importance: high (required/appears 3+ times), medium (preferred), low (nice to have)\n- category: Technical Skills, Tools / Software, Frameworks, AI/ML, Cloud Platforms, Databases, Analytics, Domain Skills, Certifications, Other\n- Extract EVERY SINGLE meaningful keyword from the JD — be EXHAUSTIVE (20-50+ keywords)\n- matchScore = (matched count / total JD keywords) × 100\n- optimizedSummary MUST be between 40 and 55 words\n- NEVER guess. NEVER hallucinate. Only rely on the text provided.\n- Return ONLY the JSON, no explanation, no markdown` }
+Rules:
+- importance must be one of: must, preferred, nice
+- category must be one of: Technical Skills, Tools / Software, Frameworks, AI/ML, Cloud Platforms, Databases, Analytics, Domain Skills, Certifications, Other
+- aliases should include acronyms, full forms, and common written variants only when they are safe and unambiguous
+- do not use single-letter aliases unless the JD clearly uses that exact term as a standalone requirement
+- do not use partial-word aliases or broad synonyms that could create false exact matches
+- exactRequired should be true for requirements that must not be loosely substituted
+- critical should be true for clear must-have blockers
+- optimizedSummary must be 40 to 55 words
+- optimized bullets must improve existing content only
+- return JSON only`
+            }
           ]
         })
       });
@@ -1047,83 +1180,65 @@ Always respond with ONLY valid JSON.` },
       }
 
       const json = await resp.json();
-      const text = json.choices?.[0]?.message?.content || "";
-      const parsed = JSON.parse(text);
-      // Recalculate match score: (matched keywords / total JD keywords) × 100
-      const matchedCount = parsed.matched?.length || 0;
-      const missingCount = parsed.missing?.length || 0;
-      const totalJDKeywords = parsed.totalJDKeywords || (matchedCount + missingCount);
-      parsed.matchScore = totalJDKeywords > 0 ? Math.round((matchedCount / totalJDKeywords) * 100) : 0;
-      parsed.totalJDKeywords = totalJDKeywords;
-      setAnalysis(parsed);
-      setStatus("done");
-    } catch (err) { setErrorMsg(err.message || "Analysis failed."); setStatus("error"); }
+      const rawText = json.choices?.[0]?.message?.content || "{}";
+      const parsed = JSON.parse(rawText);
+      setJdState(prev => ({
+        ...prev,
+        status: "done",
+        error: "",
+        analysis: {
+          ...parsed,
+          requirements: Array.isArray(parsed.requirements) ? parsed.requirements : [],
+          softSkills: Array.isArray(parsed.softSkills) ? parsed.softSkills : [],
+          optimizedExperience: Array.isArray(parsed.optimizedExperience) ? parsed.optimizedExperience : [],
+          optimizedProjects: Array.isArray(parsed.optimizedProjects) ? parsed.optimizedProjects : [],
+        }
+      }));
+    } catch (err) {
+      setJdState(prev => ({ ...prev, error: err.message || "Analysis failed.", status: "error" }));
+    }
   };
 
-  const addKeyword = (keyword, category) => {
+  const addKeyword = (keyword, category, recommendedSection = "skills") => {
+    if (recommendedSection !== "skills") return;
     if (added[keyword]) return;
+    let assignedCategory = category || "Skills";
+    let changed = false;
     setData(prev => {
-      const skills = [...prev.skills];
-      const catLower = (category || "").toLowerCase();
-      let idx = skills.findIndex(s => {
-        const sl = (s.category || "").toLowerCase();
-        return sl === catLower || catLower.includes(sl.split(" ")[0]) || sl.includes(catLower.split(" ")[0]);
-      });
-      if (idx === -1 && skills.length > 0) idx = 0;
-      if (idx === -1) { skills.push({ category: "Job-Matched Skills", items: keyword }); }
-      else {
-        const existing = skills[idx].items.split(",").map(s => s.trim().toLowerCase());
-        if (existing.includes(keyword.toLowerCase())) return prev;
-        skills[idx] = { ...skills[idx], items: skills[idx].items ? `${skills[idx].items}, ${keyword}` : keyword };
-      }
-      return { ...prev, skills };
+      const merged = mergeKeywordIntoSkills(prev.skills || [], keyword, category);
+      assignedCategory = merged.assignedCategory;
+      changed = merged.changed;
+      if (!merged.changed) return prev;
+      return { ...prev, skills: merged.skills };
     });
-    setAdded(prev => ({ ...prev, [keyword]: category || "Skills" }));
+    if (changed) {
+      setAdded(prev => ({ ...prev, [keyword]: assignedCategory }));
+    }
   };
 
   const addAll = () => {
-    if (!analysis?.missing?.length) return;
+    if (!jdScore?.missing?.length) return;
+    const addedKeywords = {};
     setData(prev => {
-      const skills = [...prev.skills];
-      const aiCategory = "AI Suggested Keywords";
-      const existingIndex = skills.findIndex(
-        (skill) => (skill.category || "").trim().toLowerCase() === aiCategory.toLowerCase()
-      );
+      let nextSkills = [...(prev.skills || [])];
 
-      const existingItems = existingIndex >= 0
-        ? skills[existingIndex].items.split(",").map(item => item.trim()).filter(Boolean)
-        : [];
-
-      const existingSet = new Set(existingItems.map(item => item.toLowerCase()));
-      const keywordsToAdd = [];
-
-      analysis.missing.forEach((item) => {
+      jdScore.missing.forEach((item) => {
         const keyword = item.keyword?.trim();
-        if (!keyword || existingSet.has(keyword.toLowerCase())) return;
-        existingSet.add(keyword.toLowerCase());
-        keywordsToAdd.push(keyword);
+        if (!keyword || item.recommendedSection !== "skills") return;
+        const merged = mergeKeywordIntoSkills(nextSkills, keyword, item.category);
+        nextSkills = merged.skills;
+        if (merged.changed) {
+          addedKeywords[keyword] = merged.assignedCategory;
+        }
       });
 
-      if (!keywordsToAdd.length) return prev;
-
-      const mergedItems = [...existingItems, ...keywordsToAdd].join(", ");
-
-      if (existingIndex >= 0) {
-        skills[existingIndex] = { ...skills[existingIndex], items: mergedItems };
-      } else {
-        skills.push({ category: aiCategory, items: mergedItems });
-      }
-
-      return { ...prev, skills };
+      if (!Object.keys(addedKeywords).length) return prev;
+      return { ...prev, skills: nextSkills };
     });
 
-    setAdded(prev => {
-      const next = { ...prev };
-      analysis.missing.forEach((item) => {
-        if (item.keyword) next[item.keyword] = "AI Suggested Keywords";
-      });
-      return next;
-    });
+    if (Object.keys(addedKeywords).length) {
+      setAdded(prev => ({ ...prev, ...addedKeywords }));
+    }
   };
 
   const applyExperienceOptimization = (optExp) => {
@@ -1158,7 +1273,7 @@ Always respond with ONLY valid JSON.` },
   const applyAllAISuggestions = () => {
     if (!analysis) return;
 
-    if (analysis.missing?.length) {
+    if (jdScore?.missing?.length) {
       addAll();
     }
 
@@ -1180,13 +1295,15 @@ Always respond with ONLY valid JSON.` },
     });
   };
 
-  const allAdded = analysis?.missing?.length > 0 && analysis.missing.every(m => added[m.keyword]);
+  const skillReadyMissing = jdScore?.missing?.filter(canAddDirectly) || [];
+  const guidedMissing = jdScore?.missing?.filter((item) => !canAddDirectly(item)) || [];
+  const allAdded = skillReadyMissing.length > 0 && skillReadyMissing.every(m => added[m.keyword]);
   const allOptimizationsApplied = !!analysis && (
     (!analysis.optimizedSummary || appliedSummary) &&
     (analysis.optimizedExperience?.every(opt => appliedExp[`${opt.company}_${opt.role}`]) ?? true) &&
     (analysis.optimizedProjects?.every(opt => appliedProj[opt.name]) ?? true)
   );
-  const everythingApplied = !!analysis && (allAdded || !analysis.missing?.length) && allOptimizationsApplied;
+  const everythingApplied = !!analysis && (allAdded || !skillReadyMissing.length) && allOptimizationsApplied;
   const wordCount = jdText.trim().split(/\s+/).filter(Boolean).length;
 
   const impColor = (imp) => imp === "high" ? { c: "#dc2626", bg: "#fef2f2" } : imp === "medium" ? { c: "#b45309", bg: "#fffbeb" } : { c: "#6b7688", bg: "#f3f4f6" };
@@ -1260,7 +1377,7 @@ Always respond with ONLY valid JSON.` },
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
             <div style={{ width: 22, height: 22, background: "#3b82f6", color: "white", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11, minWidth: 22 }}>3</div>
-            <div style={{ fontSize: 11, paddingTop: 2 }}>Click the "Analyze Keywords" button</div>
+            <div style={{ fontSize: 11, paddingTop: 2 }}>Click the "Analyze Job Match" button</div>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
             <div style={{ width: 22, height: 22, background: "#3b82f6", color: "white", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11, minWidth: 22 }}>4</div>
@@ -1280,37 +1397,68 @@ Always respond with ONLY valid JSON.` },
     </div>
   );
 
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="jd-modal-inner" style={{ width: 900, maxWidth: "95vw", maxHeight: "90vh", background: "#fff", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", overflow: "hidden" }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 22 }}>🎯</span>
-            <div><div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>Job Description Analyzer</div><div style={{ fontSize: 11, color: "#94a3b8" }}>Paste a JD to find missing keywords and boost your ATS score</div></div>
+  const showPageSetup = pageMode && status === "idle" && !analysis;
+
+  if (showPageSetup) {
+    return (
+      <div className="jd-page-setup" style={{ display: "flex", flexDirection: "column", gap: 14, padding: 18, background: "rgba(255,255,255,0.88)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: 18, boxShadow: "0 18px 40px rgba(15,23,42,0.06)" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>Paste Job Description</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5, lineHeight: 1.45, color: "#64748b", maxWidth: 520 }}>
+              <div>• Find missing keywords</div>
+              <div>• See your job match</div>
+              <div>• Get resume suggestions</div>
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={() => setShowGuide(s => !s)} style={{ padding: "6px 12px", border: "1px solid #e5e7eb", background: showGuide ? "#eef2ff" : "#ffffff", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: showGuide ? "#4338ca" : "#475569" }}>
+        </div>
+        <textarea
+          value={jdText}
+          onChange={e => setJdState(prev => ({ ...prev, text: e.target.value }))}
+          placeholder="Paste the full job description here..."
+          style={{ minHeight: 120, maxHeight: 160, padding: 14, border: "1.5px solid #e5e7eb", borderRadius: 14, resize: "none", fontSize: 12, lineHeight: 1.6, fontFamily: "'Segoe UI', sans-serif", outline: "none", color: "#1a1a1a", background: "#fff", boxShadow: "inset 0 1px 2px rgba(15,23,42,0.04)" }}
+        />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 10.5, color: "#94a3b8" }}>{wordCount} words</div>
+          <button onClick={analyze} disabled={status === "analyzing"} style={{ minWidth: 220, padding: "12px 18px", background: status === "analyzing" ? "#bba8e3" : "linear-gradient(135deg, #7c5cbf, #6b4db0)", color: "#fff", border: "none", borderRadius: 12, fontSize: 13, fontWeight: 800, cursor: status === "analyzing" ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.2s", boxShadow: "0 10px 24px rgba(107, 77, 176, 0.18)" }}>
+            {status === "analyzing" ? <><span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⚙️</span> Analyzing...</> : <>Analyze Job Match</>}
+          </button>
+        </div>
+        {errorMsg && <div style={{ fontSize: 11, color: "#dc2626", background: "#fef2f2", padding: "8px 12px", borderRadius: 8 }}>❌ {errorMsg}</div>}
+      </div>
+    );
+  }
+
+  return (
+      <div className={`jd-modal-inner ${pageMode ? "jd-page-analyzer" : ""}`} style={{ width: "100%", height: "100%", background: pageMode ? "transparent" : "#fff", borderRadius: pageMode ? 0 : 16, boxShadow: pageMode ? "none" : "0 8px 24px rgba(15,23,42,0.08)", display: "flex", flexDirection: "column", overflow: pageMode ? "visible" : "hidden", border: "none" }}>
+        <div className={`jd-analyzer-topbar ${pageMode ? "jd-analyzer-topbar-page" : ""}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: pageMode ? "0 0 14px" : "16px 20px", borderBottom: pageMode ? "none" : "1px solid #e5e7eb", background: "transparent" }}>
+          <div className="jd-analyzer-title" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 22 }}>🎯</span>
+            <div><div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>{pageMode ? "Resume Tailored for the Job Description" : "Job Description Analyzer"}</div><div style={{ fontSize: 11, color: "#94a3b8" }}>{pageMode ? "Review keyword match, soft skills, and ATS-friendly AI tailoring suggestions." : "Paste a JD to find missing keywords and boost your ATS score"}</div></div>
+          </div>
+          <div className="jd-analyzer-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button className="jd-analyzer-guide-btn" onClick={() => setShowGuide(s => !s)} style={{ display: "none", padding: "6px 12px", border: "1px solid #e5e7eb", background: showGuide ? "#eef2ff" : "#ffffff", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: showGuide ? "#4338ca" : "#475569" }}>
               {guideRead ? "Guide ✓" : "Why this tool?"}
             </button>
-            <button onClick={onClose} style={{ width: 32, height: 32, border: "none", background: "#f3f4f6", borderRadius: 8, cursor: "pointer", fontSize: 16, color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            <button onClick={onClose} style={{ width: 32, height: 32, border: "none", background: "#f3f4f6", borderRadius: 8, cursor: "pointer", fontSize: 16, color: "#94a3b8", display: pageMode ? "none" : "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
           </div>
         </div>
 
         {/* Body — Two Panels */}
-        <div className="jd-modal-body" style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        <div className={`jd-modal-body ${pageMode ? "jd-page-analyzer-body" : ""}`} style={{ display: "flex", flex: 1, overflow: pageMode ? "visible" : "hidden", flexDirection: pageMode ? "column" : "row", background: pageMode ? "transparent" : "#fff", minHeight: 0 }}>
           {/* LEFT — JD Input */}
-          <div className="jd-modal-left" style={{ width: 300, flexShrink: 0, borderRight: "1px solid #e5e7eb", padding: 20, display: "flex", flexDirection: "column", gap: 12, background: "#fafbfc" }}>
-            <label style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>Paste Job Description</label>
-            <textarea value={jdText} onChange={e => setJdText(e.target.value)} placeholder="Paste the full job description here..." style={{ flex: 1, minHeight: 260, padding: 12, border: "1.5px solid #e5e7eb", borderRadius: 10, resize: "none", fontSize: 12, lineHeight: 1.6, fontFamily: "'Segoe UI', sans-serif", outline: "none", color: "#1a1a1a" }} />
+          <div className={`jd-modal-left ${pageMode ? "jd-page-input" : ""}`} style={{ width: pageMode ? 0 : 300, flexShrink: 0, borderRight: pageMode ? "none" : "1px solid #e5e7eb", borderBottom: pageMode ? "none" : "none", padding: pageMode ? 0 : 20, display: pageMode ? "none" : "flex", flexDirection: "column", gap: 12, background: pageMode ? "#fcfbff" : "#fafbfc" }}>
+            <label style={{ fontSize: pageMode ? 13 : 12, fontWeight: 700, color: "#374151" }}>Paste Job Description</label>
+            <textarea value={jdText} onChange={e => setJdState(prev => ({ ...prev, text: e.target.value }))} placeholder="Paste the full job description here..." style={{ flex: pageMode ? "0 0 auto" : 1, minHeight: pageMode ? 148 : 260, maxHeight: pageMode ? 190 : "none", padding: 14, border: "1.5px solid #e5e7eb", borderRadius: 14, resize: "none", fontSize: 12, lineHeight: 1.6, fontFamily: "'Segoe UI', sans-serif", outline: "none", color: "#1a1a1a", background: "#fff", boxShadow: "inset 0 1px 2px rgba(15,23,42,0.04)" }} />
             <div style={{ fontSize: 10, color: "#94a3b8" }}>{wordCount} words</div>
-            <button onClick={analyze} disabled={status === "analyzing"} style={{ padding: "11px 0", background: status === "analyzing" ? "#bba8e3" : "linear-gradient(135deg, #7c5cbf, #6b4db0)", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: status === "analyzing" ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.2s", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
-              {status === "analyzing" ? <><span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⚙️</span> Analyzing...</> : <>⚡ Analyze Keywords</>}
+            <button onClick={analyze} disabled={status === "analyzing"} style={{ padding: pageMode ? "12px 0" : "11px 0", background: status === "analyzing" ? "#bba8e3" : "linear-gradient(135deg, #7c5cbf, #6b4db0)", color: "#fff", border: "none", borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: status === "analyzing" ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.2s", boxShadow: pageMode ? "0 10px 24px rgba(107, 77, 176, 0.18)" : "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
+              {status === "analyzing" ? <><span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⚙️</span> Analyzing...</> : <>Analyze Job Match</>}
             </button>
             {errorMsg && <div style={{ fontSize: 11, color: "#dc2626", background: "#fef2f2", padding: "8px 12px", borderRadius: 8 }}>❌ {errorMsg}</div>}
           </div>
 
           {/* RIGHT — Results */}
-          <div className="jd-modal-right" style={{ flex: 1, overflowY: "auto", padding: 20, position: "relative", background: "#fff" }}>
+          <div className={`jd-modal-right ${pageMode ? "jd-page-results" : ""}`} style={{ flex: 1, overflowY: pageMode ? "visible" : "auto", padding: pageMode ? "4px 4px 18px 0" : 20, position: "relative", background: "transparent", minHeight: 0, height: "auto" }}>
             {showGuide && (
               <div style={{ position: "absolute", inset: 12, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, overflowY: "auto", zIndex: 5, boxShadow: "0 10px 30px rgba(0,0,0,0.12)" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -1331,12 +1479,12 @@ Always respond with ONLY valid JSON.` },
                   <span style={{ fontSize: 28 }}>🔍</span>
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "#64748b" }}>No analysis yet</div>
-                <div style={{ fontSize: 12, color: "#94a3b8", maxWidth: 320 }}>Paste a job description on the left and click "Analyze Keywords" to find missing skills</div>
+                <div style={{ fontSize: 12, color: "#94a3b8", maxWidth: 320 }}>Paste a job description and click "Analyze Job Match" to review missing skills and improvement opportunities.</div>
               </div>
             )}
 
             {status === "analyzing" && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 16 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: pageMode ? 320 : "100%", height: pageMode ? "auto" : "100%", gap: 16, padding: pageMode ? "56px 0 24px" : 0 }}>
                 <div style={{ width: 48, height: 48, border: "4px solid #e5e7eb", borderTopColor: "#f55036", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                 <div style={{ fontSize: 14, fontWeight: 700, color: "#475569" }}>Analyzing with AI...</div>
                 <div style={{ fontSize: 11, color: "#94a3b8" }}>Smart keyword analysis is in progress</div>
@@ -1344,27 +1492,90 @@ Always respond with ONLY valid JSON.` },
               </div>
             )}
 
-            {status === "done" && analysis && (() => {
-              const sc = scoreColor(analysis.matchScore);
+            {status === "done" && analysis && jdScore && (() => {
+              const sc = scoreColor(jdScore.overall);
               return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                  {/* Score Card */}
-                  <div style={{ background: sc.bg, border: `1.5px solid ${sc.bar}33`, borderRadius: 12, padding: 18, display: "flex", alignItems: "center", gap: 20 }}>
-                    <div style={{ width: 72, height: 72, borderRadius: "50%", border: `4px solid ${sc.bar}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#fff" }}>
-                      <span style={{ fontSize: 24, fontWeight: 900, color: sc.c }}>{analysis.matchScore}</span>
-                      <span style={{ fontSize: 8, fontWeight: 700, color: sc.c }}>MATCH</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 28 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                    <div style={{ background: "#fff7ed", border: "1.5px solid rgba(249,115,22,0.22)", borderRadius: 12, padding: 16 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: "#9a3412", letterSpacing: 0.4 }}>RESUME QUALITY SCORE (RQS)</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 10 }}>
+                        <div style={{ width: 64, height: 64, borderRadius: "50%", border: "4px solid #f97316", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+                          <span style={{ fontSize: 22, fontWeight: 900, color: "#9a3412" }}>{resumeScore?.overall ?? 0}</span>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: "#9a3412" }}>{resumeScore?.label || "Needs Work"}</div>
+                          <div style={{ fontSize: 11, color: "#7c2d12", marginTop: 4 }}>Your current ATS readiness based on resume structure, clarity, and evidence.</div>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: sc.c }}>{analysis.matchScore >= 75 ? "Great Match!" : analysis.matchScore >= 50 ? "Decent Match" : "Needs Work"}</div>
-                      {analysis.jobTitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>JD: {analysis.jobTitle}</div>}
-                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{analysis.matched?.length || 0} matched · {analysis.missing?.length || 0} missing · {analysis.totalJDKeywords || 0} total JD keywords</div>
+                    <div style={{ background: "#eff6ff", border: "1.5px solid rgba(59,130,246,0.22)", borderRadius: 12, padding: 16 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: "#1d4ed8", letterSpacing: 0.4 }}>JD MATCH SCORE (JMS)</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 10 }}>
+                        <div style={{ width: 64, height: 64, borderRadius: "50%", border: "4px solid #2563eb", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+                          <span style={{ fontSize: 22, fontWeight: 900, color: "#1d4ed8" }}>{jdScore.overall}</span>
+                          <span style={{ fontSize: 8, fontWeight: 700, color: "#1d4ed8" }}>MATCH</span>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: "#1d4ed8" }}>{jdScore.label}</div>
+                          <div style={{ fontSize: 11, color: "#1e3a8a", marginTop: 4 }}>How well your resume matches this specific job description.</div>
+                          {analysis.jobTitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>Target role: {analysis.jobTitle}</div>}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
+                  <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b" }}>CURRENT RESUME QUALITY</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", marginTop: 4 }}>{resumeScore?.overall ?? 0}/100</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b" }}>JOB MATCH SCORE</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", marginTop: 4 }}>{jdScore.overall}/100</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b" }}>TOP GAPS AFFECTING THIS JOB</div>
+                      <div style={{ fontSize: 12, color: "#334155", marginTop: 6, lineHeight: 1.5 }}>
+                        {jdScore.criticalGaps?.length ? jdScore.criticalGaps.slice(0, 3).join(", ") : "No critical gaps detected."}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Score Card */}
+                  <div style={{ background: sc.bg, border: `1.5px solid ${sc.bar}33`, borderRadius: 12, padding: 18, display: "flex", alignItems: "center", gap: 20 }}>
+                    <div style={{ width: 72, height: 72, borderRadius: "50%", border: `4px solid ${sc.bar}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+                      <span style={{ fontSize: 24, fontWeight: 900, color: sc.c }}>{jdScore.overall}</span>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: sc.c }}>MATCH</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: sc.c }}>{jdScore.label}</div>
+                      {analysis.jobTitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>JD: {analysis.jobTitle}</div>}
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{jdScore.totals?.matched || 0} exact · {jdScore.totals?.related || 0} related · {jdScore.totals?.missing || 0} missing · {jdScore.totals?.total || 0} total</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+                    {[
+                      ["Weighted Coverage", jdScore.factors.weightedKeywordCoverage],
+                      ["Keyword Placement", jdScore.factors.keywordPlacement],
+                      ["Evidence Strength", jdScore.factors.evidenceAlignment],
+                      ["Title Match", jdScore.factors.titleAlignment],
+                      ["Semantic Match", jdScore.factors.semanticEquivalence],
+                      ["Critical Gaps", jdScore.factors.criticalRequirementRisk],
+                    ].map(([label, value]) => (
+                      <div key={label} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "10px 12px", background: "#fff" }}>
+                        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>{label}</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", marginTop: 4 }}>{value}</div>
+                        <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4, lineHeight: 1.45 }}>{factorDescriptions[label]}</div>
+                      </div>
+                    ))}
+                  </div>
+
                   {/* Tip Banner */}
-                  {analysis.topTip && (
+                  {(analysis.topTip || jdScore.recommendations?.[0]) && (
                     <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#1e40af", display: "flex", gap: 8, alignItems: "flex-start" }}>
-                      <span>💡</span><span>{analysis.topTip}</span>
+                      <span>💡</span><span>{analysis.topTip || jdScore.recommendations[0]}</span>
                     </div>
                   )}
 
@@ -1385,23 +1596,31 @@ Always respond with ONLY valid JSON.` },
                         transition: "all 0.2s"
                       }}
                     >
-                      {everythingApplied ? "✓ Optimization Suggestions Applied" : "✨ Apply Recommended Improvements"}
+                      {everythingApplied ? "Recommended Improvements Applied" : "Apply Recommended Improvements"}
                     </button>
                   </div>
 
                   {/* Missing Keywords */}
-                  {analysis.missing?.length > 0 && (
+                  {jdScore.missing?.length > 0 && (
                     <div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>❌ Missing Keywords ({analysis.missing.length})</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Missing Keywords ({jdScore.missing.length})</div>
+                        {skillReadyMissing.length > 0 && (
                           <button onClick={addAll} style={{ padding: "6px 14px", fontSize: 11, fontWeight: 700, border: "none", borderRadius: 8, cursor: allAdded ? "default" : "pointer", background: allAdded ? "#dcfce7" : "#16a34a", color: allAdded ? "#15803d" : "#fff", transition: "all 0.2s" }}>
-                            {allAdded ? "✅ Added Below Skills" : "➕ Add All Below Skills"}
+                            {allAdded ? "Added to Skills" : `Add ${skillReadyMissing.length} Skill Keywords`}
                           </button>
+                        )}
                       </div>
+                      {guidedMissing.length > 0 && (
+                        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10, lineHeight: 1.5 }}>
+                          Some missing keywords should be used in your summary, experience, projects, or certifications. They are shown with guided placement instead of being added blindly to the skills section.
+                        </div>
+                      )}
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {analysis.missing.map((m, i) => {
-                          const ic = impColor(m.importance);
+                        {jdScore.missing.map((m, i) => {
+                          const ic = impColor(m.importance === "must" ? "high" : m.importance === "preferred" ? "medium" : "low");
                           const isAdded = added[m.keyword];
+                          const directAdd = canAddDirectly(m);
                           return (
                             <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", background: isAdded ? "#f0fdf4" : "#fff", border: "1px solid #e5e7eb", borderLeft: `4px solid ${isAdded ? "#22c55e" : ic.c}`, borderRadius: 8, transition: "all 0.2s" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1410,11 +1629,17 @@ Always respond with ONLY valid JSON.` },
                                 <span style={{ fontSize: 9, color: "#94a3b8" }}>{m.category}</span>
                               </div>
                               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                                <button onClick={() => addKeyword(m.keyword, m.category)} disabled={!!isAdded} style={{ padding: "4px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: isAdded ? "default" : "pointer", background: isAdded ? "#dcfce7" : "#16a34a", color: isAdded ? "#15803d" : "#fff", transition: "all 0.2s" }}>
-                                  {isAdded ? "✓ Added" : "+ Add"}
-                                </button>
-                                {isAdded && <span style={{ fontSize: 9, color: "#15803d" }}>✅ Added to Skills → {isAdded}</span>}
-                                {m.suggestion && !isAdded && <span style={{ fontSize: 9, color: "#64748b", fontStyle: "italic", marginTop: 2 }}>{m.suggestion}</span>}
+                                {directAdd ? (
+                                  <button onClick={() => addKeyword(m.keyword, m.category, m.recommendedSection)} disabled={!!isAdded} style={{ padding: "4px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: isAdded ? "default" : "pointer", background: isAdded ? "#dcfce7" : "#16a34a", color: isAdded ? "#15803d" : "#fff", transition: "all 0.2s" }}>
+                                    {isAdded ? "Added" : "Add to Skills"}
+                                  </button>
+                                ) : (
+                                  <div style={{ padding: "4px 12px", fontSize: 10, fontWeight: 700, borderRadius: 6, background: "#eff6ff", color: "#1d4ed8" }}>
+                                    Use in {getSectionLabel(m.recommendedSection)}
+                                  </div>
+                                )}
+                                {isAdded && <span style={{ fontSize: 9, color: "#15803d" }}>Added to Skills → {isAdded}</span>}
+                                {!isAdded && <span style={{ fontSize: 9, color: "#64748b", fontStyle: "italic", marginTop: 2 }}>Best placed in {getSectionLabel(m.recommendedSection)}</span>}
                               </div>
                             </div>
                           );
@@ -1424,12 +1649,23 @@ Always respond with ONLY valid JSON.` },
                   )}
 
                   {/* Matched Keywords */}
-                  {analysis.matched?.length > 0 && (
+                  {jdScore.matched?.length > 0 && (
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>✅ Matched Keywords ({analysis.matched.length})</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Exact Match ({jdScore.matched.length})</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {analysis.matched.map((m, i) => (
+                        {jdScore.matched.map((m, i) => (
                           <span key={i} style={{ fontSize: 11, fontWeight: 600, color: "#15803d", background: "#f0fdf4", border: "1px solid #86efac", padding: "4px 12px", borderRadius: 20 }}>{m.keyword}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {jdScore.related?.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Related Match ({jdScore.related.length})</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {jdScore.related.map((m, i) => (
+                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: "#1d4ed8", background: "#eff6ff", border: "1px solid #93c5fd", padding: "4px 12px", borderRadius: 20 }}>{m.keyword}</span>
                         ))}
                       </div>
                     </div>
@@ -1455,7 +1691,7 @@ Always respond with ONLY valid JSON.` },
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                           <div style={{ fontSize: 11, color: "#334155", lineHeight: 1.5, flex: 1, paddingRight: 10 }}>{analysis.optimizedSummary}</div>
                           <button onClick={() => applySummaryOptimization(analysis.optimizedSummary)} disabled={appliedSummary} style={{ padding: "5px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: appliedSummary ? "default" : "pointer", background: appliedSummary ? "#dcfce7" : "#3b82f6", color: appliedSummary ? "#15803d" : "#fff", transition: "all 0.2s", whiteSpace: "nowrap" }}>
-                            {appliedSummary ? "✓ Applied" : "Apply to Resume"}
+                            {appliedSummary ? "Applied" : "Apply Update"}
                           </button>
                         </div>
                       </div>
@@ -1477,7 +1713,7 @@ Always respond with ONLY valid JSON.` },
                                   <div style={{ fontSize: 10, color: "#64748b", fontStyle: "italic" }}>@ {opt.company}</div>
                                 </div>
                                 <button onClick={() => applyExperienceOptimization(opt)} disabled={isApplied} style={{ padding: "5px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: isApplied ? "default" : "pointer", background: isApplied ? "#dcfce7" : "#3b82f6", color: isApplied ? "#15803d" : "#fff", transition: "all 0.2s" }}>
-                                  {isApplied ? "✓ Applied" : "Apply to Resume"}
+                                  {isApplied ? "Applied" : "Apply Update"}
                                 </button>
                               </div>
                               <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: "#334155", lineHeight: 1.5 }}>
@@ -1502,7 +1738,7 @@ Always respond with ONLY valid JSON.` },
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                                 <div style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>{opt.name}</div>
                                 <button onClick={() => applyProjectOptimization(opt)} disabled={isApplied} style={{ padding: "5px 12px", fontSize: 10, fontWeight: 700, border: "none", borderRadius: 6, cursor: isApplied ? "default" : "pointer", background: isApplied ? "#dcfce7" : "#3b82f6", color: isApplied ? "#15803d" : "#fff", transition: "all 0.2s" }}>
-                                  {isApplied ? "✓ Applied" : "Apply to Resume"}
+                                  {isApplied ? "Applied" : "Apply Update"}
                                 </button>
                               </div>
                               <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: "#334155", lineHeight: 1.5 }}>
@@ -1529,12 +1765,203 @@ Always respond with ONLY valid JSON.` },
           </div>
         </div>
       </div>
-    </div>
   );
 }
 
 
 // ── Routing Wrapper ───────────────────────────────────────────────────────────
+function ResumePreviewPane({
+  data, activeTemplate, activeTemplateLabel, setShowTemplateModal, showFontPanel, setShowFontPanel,
+  headingFont, bodyFont, setHeadingFont, setBodyFont, resumeFontSize, setResumeFontSize,
+  resumeLineHeight, setResumeLineHeight, zoom, setZoom, handleResumeDownload,
+  template5Preview, setTemplate5Preview, previewRef, windowWidth
+}) {
+  return (
+    <div className="rb-preview-panel" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div className="rb-toolbar" style={{ padding: "9px 18px", background: C.toolbarBg, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginRight: 4 }}>Template:</span>
+        <button onClick={() => setShowTemplateModal(true)} style={{ padding: "5px 14px", border: `1.5px solid ${C.border}`, borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, background: "#fff", color: C.textLight, transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6 }}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg>
+          {activeTemplateLabel}
+        </button>
+        <div style={{ flex: 1 }} />
+        <div style={{ position: "relative" }} className="rb-font-panel-wrap-trigger">
+          <button onClick={() => setShowFontPanel(!showFontPanel)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", background: showFontPanel ? C.accentLight : "#fff", border: showFontPanel ? `1.5px solid ${C.accentBorder}` : `1.5px solid ${C.border}`, borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 600, color: showFontPanel ? C.accent : C.textLight, transition: "all 0.15s" }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>
+            Font
+          </button>
+          <FontPickerPanel
+            isOpen={showFontPanel}
+            onClose={() => setShowFontPanel(false)}
+            defaultHeading={headingFont?.name || "Inter"}
+            defaultBody={bodyFont?.name || "Roboto"}
+            onApply={(hName, bName) => {
+              const hFont = ATS_FONTS.find(f => f.name === hName) || ATS_FONTS[0];
+              const bFont = ATS_FONTS.find(f => f.name === bName) || ATS_FONTS[1];
+              setHeadingFont(hFont);
+              setBodyFont(bFont);
+              setShowFontPanel(false);
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 3, marginLeft: 4 }}>
+          <button onClick={() => setResumeFontSize(v => Math.max(8, v - 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>-</button>
+          <span style={{ fontSize: 12, color: C.text, fontWeight: 600, minWidth: 28, textAlign: "center" }}>{resumeFontSize}pt</span>
+          <button onClick={() => setResumeFontSize(v => Math.min(14, v + 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 3, marginLeft: 6 }}>
+          <span style={{ fontSize: 11, color: C.textLight }}>Spacing</span>
+          {[1.5, 1.8, 2].map(lh => (
+            <button key={lh} onClick={() => setResumeLineHeight(lh)} style={{ padding: "4px 8px", background: resumeLineHeight === lh ? C.accentLight : "#fff", border: `1px solid ${resumeLineHeight === lh ? C.accent : C.border}`, borderRadius: 5, color: resumeLineHeight === lh ? C.accent : C.textMuted, fontSize: 11, cursor: "pointer" }}>{lh}</button>
+          ))}
+        </div>
+        <div style={{ width: 1, background: C.border, height: 24, margin: "0 4px" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginRight: 12 }}>
+          <button onClick={() => setZoom(z => Math.max(30, z - 10))} style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>-</button>
+          <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, minWidth: 40, textAlign: "center", userSelect: "none" }}>{zoom}%</span>
+          <button onClick={() => setZoom(z => Math.min(150, z + 10))} style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+        </div>
+        <button disabled={activeTemplate === "5" && template5Preview.isCompiling} onClick={handleResumeDownload} style={{ height: 32, padding: "0 14px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.download} /></svg>
+          {activeTemplate === "5" && template5Preview.isCompiling ? "Compiling..." : "PDF"}
+        </button>
+      </div>
+      <div className="rb-preview-area" style={{ flex: 1, overflowY: "auto", background: C.previewBg, padding: "28px 0 60px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {activeTemplate === "5" ? (
+          <Template5Preview data={data} onPreviewChange={setTemplate5Preview} />
+        ) : (() => {
+          const scale = windowWidth <= 640 ? Math.max(0.3, (windowWidth - 16) / PAGE_W) : windowWidth <= 1024 ? Math.max(0.4, (windowWidth - 220) / PAGE_W) : zoom / 100;
+          const outerW = windowWidth <= 1024 ? Math.round(PAGE_W * scale) : PAGE_W;
+          return (
+            <div style={{ width: outerW, overflow: "visible", flexShrink: 0, display: "flex", justifyContent: "flex-start" }}>
+              <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: PAGE_W, marginBottom: `${PAGE_H * (scale - 1)}px`, flexShrink: 0 }}>
+                <PaginatedResume data={data} template={activeTemplate} exportRef={previewRef} headingFont={headingFont} bodyFont={bodyFont} fontSize={resumeFontSize} lineHeight={resumeLineHeight} />
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
+function JDMatchPage() {
+  const navigate = useNavigate();
+  const {
+    data, setData, showUpload, setShowUpload, showTemplateModal, setShowTemplateModal, showFontPanel, setShowFontPanel,
+    activeTemplate, setActiveTemplate, headingFont, setHeadingFont, bodyFont, setBodyFont, isFetching,
+    handleParsed, handleResumeDownload, zoom, setZoom, resumeFontSize, setResumeFontSize,
+    resumeLineHeight, setResumeLineHeight, template5Preview, setTemplate5Preview, previewRef, windowWidth, resumeScore
+  } = useResumeWorkspace();
+  const [jdState, setJdState] = useState({ text: "", status: "idle", error: "", analysis: null });
+  const snapshot = buildResumeSnapshot(data);
+  const hasResumeContent = snapshot.wordCount >= 20 || snapshot.expEntries.some(e => e.role) || snapshot.projectEntries.some(p => p.name);
+  const jdScore = jdState.analysis ? calculateJDScore(data, jdState.analysis) : null;
+  const activeTemplateLabel = activeTemplate === "A" ? "Classic" : activeTemplate === "B" ? "Modern" : activeTemplate === "C" ? "Minimal" : activeTemplate === "4" ? "Template 4" : "Template 5";
+  const showJDSetup = jdState.status === "idle" && !jdState.analysis;
+
+  return (
+    <div className="jd-page-shell" style={{ display: "flex", height: "calc(100dvh - 66px)", minHeight: 0, background: C.appBg, overflow: "hidden", position: "relative", fontFamily: "'Sora', sans-serif" }}>
+      {isFetching && !hasResumeContent && (
+        <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.85)", zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}>
+          <div style={{ width: 44, height: 44, border: `3.5px solid ${C.accentLight}`, borderTop: `3.5px solid ${C.accent}`, borderRadius: "50%", animation: "resume-fetch-spin 1s linear infinite", marginBottom: 18 }} />
+          <style>{`@keyframes resume-fetch-spin { to { transform: rotate(360deg); } }`}</style>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.accent }}>Loading your saved resume...</div>
+        </div>
+      )}
+
+      {showUpload && <UploadModal onClose={() => setShowUpload(false)} onParsed={handleParsed} />}
+      {showTemplateModal && <TemplateModal onClose={() => setShowTemplateModal(false)} activeTemplate={activeTemplate} onSelect={setActiveTemplate} />}
+
+      <div className="jd-page-sidebar" style={{ width: 700, maxWidth: "100%", background: "#fff", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", minHeight: 0, flexShrink: 0 }}>
+        <div className="jd-page-header" style={{ padding: "22px 24px 18px", borderBottom: `1px solid ${C.border}`, background: "linear-gradient(180deg, #ffffff 0%, #faf8ff 100%)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>Optimize Resume for This Job</div>
+              <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>Compare your resume with the job description and improve it with clear, ATS-friendly suggestions.</div>
+            </div>
+            <button onClick={() => navigate("/ats-resume-builder")} style={{ padding: "7px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: "#fff", color: C.textMuted, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              Back
+            </button>
+          </div>
+          {showJDSetup && <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginTop: 16 }} className="jd-top-cards">
+            <div style={{ border: "1px solid rgba(107,77,176,0.16)", borderRadius: 18, padding: "16px 16px 14px", background: "linear-gradient(180deg, rgba(124,92,191,0.08), rgba(255,255,255,0.98))", boxShadow: "0 10px 26px rgba(107,77,176,0.08)" }}>
+              <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(107,77,176,0.14)", color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={icons.upload} /></svg>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>Upload Resume</div>
+              <div style={{ fontSize: 11.5, lineHeight: 1.55, color: "#64748b", marginBottom: 12 }}>Upload your resume to start job matching.</div>
+              <button onClick={() => setShowUpload(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 12px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 12, color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d={icons.upload} /></svg>
+                Upload Resume
+              </button>
+            </div>
+            <div style={{ border: "1px solid rgba(37,99,235,0.16)", borderRadius: 18, padding: "16px 16px 14px", background: "linear-gradient(180deg, rgba(59,130,246,0.07), rgba(255,255,255,0.98))", boxShadow: "0 10px 26px rgba(59,130,246,0.06)" }}>
+              <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(59,130,246,0.12)", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></svg>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>Paste Job Description</div>
+              <div style={{ fontSize: 11.5, lineHeight: 1.55, color: "#64748b", marginBottom: 12 }}>Paste the job description to compare your resume.</div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 10px", borderRadius: 999, background: "#eff6ff", color: "#1d4ed8", fontSize: 11, fontWeight: 700 }}>
+                <span>📌</span>
+                Paste JD and analyze below
+              </div>
+            </div>
+          </div>}
+        </div>
+
+        <div className="jd-page-sidebar-body" style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: 24, display: "flex", flexDirection: "column" }}>
+          {!hasResumeContent ? (
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: 18, padding: 24, background: "#fff", boxShadow: "0 8px 24px rgba(15,23,42,0.05)" }}>
+              <div style={{ fontSize: 22, marginBottom: 10 }}>📄</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>No resume found yet</div>
+              <div style={{ fontSize: 13, lineHeight: 1.6, color: C.textMuted, marginBottom: 18 }}>
+                Build your resume first or upload an existing one. Then this page will compare it with the job description and show missing keywords, exact matches, and AI suggestions.
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button onClick={() => navigate("/ats-resume-builder")} style={{ padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: "#fff", color: C.text, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  Open Resume Builder
+                </button>
+                <button onClick={() => setShowUpload(true)} style={{ padding: "10px 14px", borderRadius: 10, border: "none", background: C.accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  Upload Resume
+                </button>
+              </div>
+            </div>
+          ) : (
+            <JDAnalyzerModal onClose={() => navigate("/ats-resume-builder")} data={data} setData={setData} jdState={jdState} setJdState={setJdState} jdScore={jdScore} resumeScore={resumeScore} pageMode />
+          )}
+        </div>
+      </div>
+
+      <div className="jd-page-preview">
+        <ResumePreviewPane
+          data={data}
+          activeTemplate={activeTemplate}
+          activeTemplateLabel={activeTemplateLabel}
+          setShowTemplateModal={setShowTemplateModal}
+          showFontPanel={showFontPanel}
+          setShowFontPanel={setShowFontPanel}
+          headingFont={headingFont}
+          bodyFont={bodyFont}
+          setHeadingFont={setHeadingFont}
+          setBodyFont={setBodyFont}
+          resumeFontSize={resumeFontSize}
+          setResumeFontSize={setResumeFontSize}
+          resumeLineHeight={resumeLineHeight}
+          setResumeLineHeight={setResumeLineHeight}
+          zoom={zoom}
+          setZoom={setZoom}
+          handleResumeDownload={handleResumeDownload}
+          template5Preview={template5Preview}
+          setTemplate5Preview={setTemplate5Preview}
+          previewRef={previewRef}
+          windowWidth={windowWidth}
+        />
+      </div>
+    </div>
+  );
+}
+
 import HomePage from '../HomePage/HomePage.jsx';
 import CoverLetterBuilder from '../CoverLetterBuilder/CoverLetterBuilder.jsx';
 import Header from '../../components/Header/Header.jsx';
@@ -1548,7 +1975,7 @@ import TermsAndConditions from '../Legal/TermsAndConditions.jsx';
 
 function App() {
   const location = useLocation();
-  const hideFooter = (location.pathname === "/builder" || location.pathname === "/ats-resume-builder" || location.pathname === "/cover-letter");
+  const hideFooter = (location.pathname === "/builder" || location.pathname === "/ats-resume-builder" || location.pathname === "/jd-match" || location.pathname === "/cover-letter");
   const siteUrl = import.meta.env.VITE_SITE_URL || "https://atsforge.co.in";
   const homeSchema = [
     {
@@ -1590,6 +2017,7 @@ function App() {
       <Routes>
         <Route path="/" element={<><SEOHead title="ATS Resume Builder, Cover Letter, Cold Email and 100+ Job Portals" description="ATSForge is a job-search suite with an ATS friendly resume builder, professional cover letter generator, personalized cold email and cold DM tools, LaTeX editor, and 100+ job portal links." path="/" keywords="ATS resume builder, ATS friendly resume builder, professional cover letter generator, cold email generator, cold DM generator, personalized outreach, 100+ job portals" schema={homeSchema} /><HomePage /></>} />
         <Route path="/ats-resume-builder" element={<><SEOHead title="ATS Friendly Resume Builder" description="Create ATS-friendly resumes with templates, resume upload auto-fill, keyword optimization, PDF export, and professional formatting for modern hiring systems." path="/ats-resume-builder" keywords="ATS friendly resume builder, ATS resume builder, resume templates, resume upload autofill, professional resume builder" /><ResumeBuilder /></>} />
+        <Route path="/jd-match" element={<><SEOHead title="JD Match Analyzer" description="Match your saved resume against a job description, find missing keywords, and apply AI suggestions with a full live preview." path="/jd-match" keywords="JD match analyzer, resume keyword match, job description analyzer, ATS keyword matching" /><JDMatchPage /></>} />
         <Route path="/builder" element={<Navigate to="/ats-resume-builder" replace state={location.state} />} />
         <Route path="/cover-letter" element={<><SEOHead title="Professional Cover Letter Generator" description="Generate professional cover letters tailored to your resume and target role with editable output, formatting controls, and PDF export support." path="/cover-letter" keywords="professional cover letter generator, AI cover letter, cover letter builder, job application cover letter" /><CoverLetterBuilder /></>} />
         <Route path="/latex-editor" element={<><SEOHead title="LaTeX Resume Editor" description="Write, edit, and compile LaTeX resumes with ready-made templates, live preview, and downloadable PDF output for technical and academic applications." path="/latex-editor" keywords="LaTeX resume editor, LaTeX CV builder, LaTeX resume templates, technical resume editor" /><LatexEditor /></>} />
@@ -1606,17 +2034,275 @@ function App() {
 }
 
 // ── Resume Builder Page ──────────────────────────────────────────────────────
+function useResumeWorkspace() {
+  const [data, setData] = useState(initialData);
+  const [showUpload, setShowUpload] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showFontPanel, setShowFontPanel] = useState(false);
+  const [showTips, setShowTips] = useState(false);
+  const [parseMeta, setParseMeta] = useState({ source: "builder", extractedTextLength: 0 });
+  const [resumeAiReview, setResumeAiReview] = useState(null);
+  const [resumeAiStatus, setResumeAiStatus] = useState("idle");
+  const [activeTemplate, setActiveTemplate] = useState("A");
+  const [headingFont, setHeadingFont] = useState(() => {
+    const saved = localStorage.getItem("resume-heading-font");
+    const found = saved ? ATS_FONTS.find(f => f.id === saved) : null;
+    return found || ATS_FONTS.find(f => f.id === "inter");
+  });
+  const [bodyFont, setBodyFont] = useState(() => {
+    const saved = localStorage.getItem("resume-body-font");
+    const found = saved ? ATS_FONTS.find(f => f.id === saved) : null;
+    return found || ATS_FONTS.find(f => f.id === "inter");
+  });
+  const [user, setUser] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [zoom, setZoom] = useState(100);
+  const [resumeFontSize, setResumeFontSize] = useState(9);
+  const [resumeLineHeight, setResumeLineHeight] = useState(1.45);
+  const [template5Preview, setTemplate5Preview] = useState({ pdfUrl: null, isCompiling: false, errors: [], latexCode: "" });
+  const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  const previewRef = useRef(null);
+  const fetchLockRef = useRef(null);
+  const resumeScore = calculateResumeScore(data, { parseMeta, aiReview: resumeAiReview });
+
+  const loadResumeData = useCallback((dbData) => {
+    if (dbData?.resume_data) {
+      let parsed = dbData.resume_data;
+      if (typeof parsed === "string") {
+        try { parsed = JSON.parse(parsed); } catch { /* keep raw object if parsing fails */ }
+      }
+      if (parsed && typeof parsed === "object") {
+        localStorage.setItem("resume-data-cache", JSON.stringify(parsed));
+        setData((prev) => {
+          const next = { ...prev, ...parsed, personal: { ...prev.personal, ...(parsed.personal || {}) } };
+          ["education", "experience", "projects", "certifications", "achievements", "skills"].forEach((field) => {
+            if (!next[field] || !Array.isArray(next[field])) next[field] = prev[field] || [];
+          });
+          return next;
+        });
+      }
+    }
+  }, []);
+
+  const fetchResumeFromDB = useCallback(async (userId) => {
+    if (!userId) return;
+    const now = Date.now();
+    if (fetchLockRef.current && fetchLockRef.current.userId === userId && (now - fetchLockRef.current.ts < 10000)) return;
+    setIsFetching(true);
+    try {
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Database Timeout (30s)")), 30000));
+      const query = supabase.from("resume_data").select("resume_data").eq("user_id", userId).maybeSingle();
+      const { data: dbData, error } = await Promise.race([query, timeout]);
+      if (error) throw error;
+      if (dbData) {
+        loadResumeData(dbData);
+        fetchLockRef.current = { userId, ts: Date.now() };
+      }
+    } catch (err) {
+      console.error("Fetch failure:", err.message);
+    } finally {
+      setIsFetching(false);
+    }
+  }, [loadResumeData]);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      const cache = localStorage.getItem("resume-data-cache");
+      if (cache) {
+        try {
+          const parsedCache = JSON.parse(cache);
+          if (parsedCache && typeof parsedCache === "object") setData(prev => ({ ...prev, ...parsedCache }));
+        } catch { /* ignore invalid local cache */ }
+      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!isMounted) return;
+      if (session?.user) {
+        setUser(session.user);
+        await fetchResumeFromDB(session.user.id);
+      }
+    })();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      if (session?.user) {
+        setUser(session.user);
+        if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+          await fetchResumeFromDB(session.user.id);
+        }
+      } else {
+        setUser(null);
+        setData(initialData);
+        localStorage.removeItem("resume-data-cache");
+      }
+    });
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchResumeFromDB]);
+
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => { loadFont(headingFont); loadFont(bodyFont); }, [headingFont, bodyFont]);
+  useEffect(() => { localStorage.setItem("resume-heading-font", headingFont.id); }, [headingFont]);
+  useEffect(() => { localStorage.setItem("resume-body-font", bodyFont.id); }, [bodyFont]);
+  useEffect(() => { window.__resumeHeadingFont = headingFont; window.__resumeBodyFont = bodyFont; }, [headingFont, bodyFont]);
+
+  const update = useCallback((path, value) => {
+    setData(prev => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const keys = path.split(".");
+      let obj = next;
+      for (let i = 0; i < keys.length - 1; i++) obj = obj[keys[i]];
+      obj[keys[keys.length - 1]] = value;
+      return next;
+    });
+  }, []);
+
+  const handleParsed = useCallback((parsed, nextParseMeta) => {
+    setData(prev => {
+      const merged = JSON.parse(JSON.stringify(prev));
+      Object.keys(parsed.personal || {}).forEach(k => {
+        if (!merged.personal[k] && parsed.personal[k]) merged.personal[k] = parsed.personal[k];
+      });
+      if (!merged.summary && parsed.summary) merged.summary = parsed.summary;
+      if (parsed.skills?.length) merged.skills = parsed.skills;
+      if (parsed.education?.some(e => e.degree)) merged.education = parsed.education;
+      if (parsed.experience?.some(e => e.role)) merged.experience = parsed.experience;
+      if (parsed.projects?.some(p => p.name)) {
+        const newProjects = parsed.projects.map((p, i) => {
+          const existingByName = prev.projects.find(ep => ep.name && p.name && ep.name.toLowerCase() === p.name.toLowerCase());
+          const existingByIndex = prev.projects[i];
+          let preservedLink = "";
+          if (existingByName?.link) preservedLink = existingByName.link;
+          else if (existingByIndex?.link) preservedLink = existingByIndex.link;
+          return { ...p, link: preservedLink || p.link || "" };
+        });
+        merged.projects = newProjects;
+      }
+      if (parsed.certifications?.some(c => c.name)) merged.certifications = parsed.certifications;
+      if (parsed.achievements?.some(a => a.title)) merged.achievements = parsed.achievements;
+      return merged;
+    });
+    setParseMeta(nextParseMeta || { source: "upload", extractedTextLength: 0 });
+  }, []);
+
+  useEffect(() => {
+    const snapshot = buildResumeSnapshot(data);
+    const enoughContent = snapshot.wordCount >= 120 && (snapshot.expEntries.some(e => e.role) || snapshot.projectEntries.some(p => p.name));
+    if (!enoughContent) {
+      setResumeAiReview(null);
+      setResumeAiStatus("idle");
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        setResumeAiStatus("loading");
+        const resp = await fetch("/api/groq", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            temperature: 0.1,
+            max_tokens: 500,
+            response_format: { type: "json_object" },
+            messages: [
+              { role: "system", content: "You are a resume quality reviewer. Return only JSON. Review role clarity and language quality. Never return a final ATS score." },
+              { role: "user", content: `Review this resume and return JSON using this exact shape:\n{\n  "roleClarityAdjustment": 0,\n  "languageQualityAdjustment": 0,\n  "notes": ["Short note 1", "Short note 2"]\n}\n\nRules:\n- roleClarityAdjustment and languageQualityAdjustment must be integers from -20 to 20\n- reward strong specificity, coherence, and recruiter readability\n- penalize vague, repetitive, or buzzword-heavy language\n- do not invent facts\n- return JSON only\n\nRESUME:\n${snapshot.fullText}` }
+            ]
+          })
+        });
+        if (!resp.ok) throw new Error("AI review failed");
+        const json = await resp.json();
+        const payload = json.choices?.[0]?.message?.content || "{}";
+        const parsed = JSON.parse(payload);
+        if (!cancelled) {
+          setResumeAiReview(formatResumeReviewPayload(parsed));
+          setResumeAiStatus("done");
+        }
+      } catch {
+        if (!cancelled) {
+          setResumeAiReview(null);
+          setResumeAiStatus("error");
+        }
+      }
+    }, 1200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [data]);
+
+  const handleSaveToDb = useCallback(async () => {
+    if (!user) {
+      alert("Please sign in or create an account to save your resume seamlessly.");
+      return;
+    }
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Network Timeout: Request took more than 10 seconds")), 10000));
+      const savePromise = supabase.from("resume_data").upsert({ user_id: user.id, resume_data: data, updated_at: new Date().toISOString() }, { onConflict: "user_id" }).select();
+      const { data: savedRows, error } = await Promise.race([savePromise, timeoutPromise]);
+      if (error) throw error;
+      if (!savedRows || savedRows.length === 0) throw new Error("Supabase returned no updated rows. Database RLS policy likely rejected the update.");
+      localStorage.setItem("resume-data-cache", JSON.stringify(data));
+      setSaveMessage("Saved!");
+      setTimeout(() => setSaveMessage(""), 2500);
+    } catch (err) {
+      console.error("Save error:", err);
+      setSaveMessage("Err: " + (err.message || "Failed"));
+      setTimeout(() => setSaveMessage(""), 4000);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [data, isSaving, user]);
+
+  const handleResumeDownload = useCallback(() => {
+    if (activeTemplate === "5") {
+      if (!template5Preview.pdfUrl) return;
+      const link = document.createElement("a");
+      link.href = template5Preview.pdfUrl;
+      link.download = `${data.personal.name || "Resume"}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+    exportPDF(previewRef, data.personal.name);
+  }, [activeTemplate, data.personal.name, template5Preview.pdfUrl]);
+
+  return {
+    data, setData, update, showUpload, setShowUpload, showTemplateModal, setShowTemplateModal, showFontPanel, setShowFontPanel,
+    showTips, setShowTips, activeTemplate, setActiveTemplate, headingFont, setHeadingFont, bodyFont, setBodyFont,
+    isSaving, isFetching, saveMessage, handleSaveToDb, handleParsed, handleResumeDownload, zoom, setZoom,
+    resumeFontSize, setResumeFontSize, resumeLineHeight, setResumeLineHeight, template5Preview, setTemplate5Preview,
+    previewRef, windowWidth, resumeScore, resumeAiStatus
+  };
+}
+
 function ResumeBuilder() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [data, setData] = useState(initialData);
   const [activeSection, setActiveSection] = useState("personal");
   const [activeTemplate, setActiveTemplate] = useState("A");
-  const [ats, setAts] = useState({ score: 0, tips: [] });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [showTips, setShowTips] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [parseMeta, setParseMeta] = useState({ source: "builder", extractedTextLength: 0 });
+  const [resumeAiReview, setResumeAiReview] = useState(null);
+  const [resumeAiStatus, setResumeAiStatus] = useState("idle");
+  const [jdState, setJdState] = useState({ text: "", status: "idle", error: "", analysis: null });
   const [headingFont, setHeadingFont] = useState(() => {
     const saved = localStorage.getItem("resume-heading-font");
     const found = saved ? ATS_FONTS.find(f => f.id === saved) : null;
@@ -1670,7 +2356,7 @@ function ResumeBuilder() {
     if (dbData?.resume_data) {
       let parsed = dbData.resume_data;
       if (typeof parsed === 'string') {
-        try { parsed = JSON.parse(parsed); } catch (e) { }
+        try { parsed = JSON.parse(parsed); } catch { /* keep raw object if parsing fails */ }
       }
       if (parsed && typeof parsed === 'object') {
         // Save to cache for next load
@@ -1705,7 +2391,7 @@ function ResumeBuilder() {
           if (parsedCache && typeof parsedCache === 'object') {
              setData(prev => ({ ...prev, ...parsedCache }));
           }
-        } catch (e) {}
+        } catch { /* ignore invalid local cache */ }
       }
 
       const { data: { session } } = await supabase.auth.getSession();
@@ -1792,18 +2478,17 @@ function ResumeBuilder() {
   // Open JD or Upload panel if coming from home page buttons
   useEffect(() => {
     if (location.state?.openJDPanel) {
-      setShowJD(true);
+      navigate("/jd-match", { replace: true });
       window.history.replaceState({}, document.title);
     }
     if (location.state?.openUpload) {
       setShowUpload(true);
       window.history.replaceState({}, document.title);
     }
-  }, [location.state]);
+  }, [location.state, navigate]);
 
   const [showJD, setShowJD] = useState(false);
   const previewRef = useRef(null);
-  const [numPages, setNumPages] = useState(1);
   const [zoom, setZoom] = useState(100);
   const [resumeFontSize, setResumeFontSize] = useState(9);
   const [resumeLineHeight, setResumeLineHeight] = useState(1.45);
@@ -1814,6 +2499,27 @@ function ResumeBuilder() {
   const [mobileTab, setMobileTab] = useState("form"); // "form" | "preview" | "sections"
   const [sectionDrawerOpen, setSectionDrawerOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  const [clJD, setClJD] = useState("");
+  const [clTone, setClTone] = useState("Professional");
+  const [clLength, setClLength] = useState("Medium");
+  const [clHiringManager, setClHiringManager] = useState("");
+  const [clCompany, setClCompany] = useState("");
+  const [clJobTitle, setClJobTitle] = useState("");
+  const [detectedJobTitle, setDetectedJobTitle] = useState("");
+  const [clLoading, setClLoading] = useState(false);
+  const [clError, setClError] = useState("");
+  const [coverLetter, setCoverLetter] = useState("");
+  const [clTemplate, setClTemplate] = useState("classic");
+  const [showClFontPanel, setShowClFontPanel] = useState(false);
+  const [clFontSize, setClFontSize] = useState(11);
+  const [clLineHeight, setClLineHeight] = useState(1.6);
+  const [clEditMode, setClEditMode] = useState(false);
+  const [clCopied, setClCopied] = useState(false);
+  const [clDownloading, setClDownloading] = useState(false);
+  const [clHeadingFont, setClHeadingFont] = useState("Georgia");
+  const [clBodyFont, setClBodyFont] = useState("Arial");
+  const resumeScore = calculateResumeScore(data, { parseMeta, aiReview: resumeAiReview });
+  const jdScore = jdState.analysis ? calculateJDScore(data, jdState.analysis) : null;
 
   useEffect(() => {
     const onResize = () => setWindowWidth(window.innerWidth);
@@ -1838,7 +2544,11 @@ function ResumeBuilder() {
     };
   }, [isDragging]);
 
-  useEffect(() => { setAts(calcATS(data)); }, [data]);
+  useEffect(() => {
+    if (jdState.analysis?.jobTitle) {
+      setDetectedJobTitle(jdState.analysis.jobTitle);
+    }
+  }, [jdState.analysis]);
 
   const update = useCallback((path, value) => {
     setData(prev => {
@@ -1852,7 +2562,7 @@ function ResumeBuilder() {
   }, []);
 
   // Merge parsed data — keep existing non-empty values, fill missing ones
-  const handleParsed = useCallback((parsed) => {
+  const handleParsed = useCallback((parsed, nextParseMeta) => {
     setData(prev => {
       const merged = JSON.parse(JSON.stringify(prev));
 
@@ -1893,8 +2603,79 @@ function ResumeBuilder() {
 
       return merged;
     });
+    setParseMeta(nextParseMeta || { source: "upload", extractedTextLength: 0 });
     setActiveSection("personal");
   }, []);
+
+  useEffect(() => {
+    const snapshot = buildResumeSnapshot(data);
+    const enoughContent = snapshot.wordCount >= 120 && (snapshot.expEntries.some(e => e.role) || snapshot.projectEntries.some(p => p.name));
+    if (!enoughContent) {
+      setResumeAiReview(null);
+      setResumeAiStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        setResumeAiStatus("loading");
+        const resp = await fetch("/api/groq", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            temperature: 0.1,
+            max_tokens: 500,
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "system",
+                content: "You are a resume quality reviewer. Return only JSON. Review role clarity and language quality. Never return a final ATS score."
+              },
+              {
+                role: "user",
+                content: `Review this resume and return JSON using this exact shape:
+{
+  "roleClarityAdjustment": 0,
+  "languageQualityAdjustment": 0,
+  "notes": ["Short note 1", "Short note 2"]
+}
+
+Rules:
+- roleClarityAdjustment and languageQualityAdjustment must be integers from -20 to 20
+- reward strong specificity, coherence, and recruiter readability
+- penalize vague, repetitive, or buzzword-heavy language
+- do not invent facts
+- return JSON only
+
+RESUME:
+${snapshot.fullText}`
+              }
+            ]
+          })
+        });
+        if (!resp.ok) throw new Error("AI review failed");
+        const json = await resp.json();
+        const payload = json.choices?.[0]?.message?.content || "{}";
+        const parsed = JSON.parse(payload);
+        if (!cancelled) {
+          setResumeAiReview(formatResumeReviewPayload(parsed));
+          setResumeAiStatus("done");
+        }
+      } catch {
+        if (!cancelled) {
+          setResumeAiReview(null);
+          setResumeAiStatus("error");
+        }
+      }
+    }, 1200);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [data]);
 
   const generateSummary = async () => {
     setAiLoading(true); setAiError("");
@@ -1916,8 +2697,97 @@ function ResumeBuilder() {
     setAiLoading(false);
   };
 
-  const atsColor = ats.score >= 75 ? "#15803d" : ats.score >= 50 ? "#b45309" : "#b91c1c";
-  const atsBar = ats.score >= 75 ? "#22c55e" : ats.score >= 50 ? "#f59e0b" : "#ef4444";
+  const generateCoverLetter = async () => {
+    if (!clJD.trim()) {
+      setClError("Please paste a job description first.");
+      return;
+    }
+    setClLoading(true);
+    setClError("");
+    try {
+      const snapshot = buildResumeSnapshot(data);
+      const resp = await fetch("/api/groq", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          max_tokens: 1400,
+          messages: [
+            {
+              role: "system",
+              content: "You write concise, ATS-aware cover letters. Return only the letter text."
+            },
+            {
+              role: "user",
+              content: `Write a ${clTone.toLowerCase()} cover letter of ${clLength.toLowerCase()} length for this role.
+
+Candidate name: ${data.personal.name || "Candidate"}
+Target title: ${clJobTitle || detectedJobTitle || data.personal.title || ""}
+Company: ${clCompany || "the company"}
+Hiring manager: ${clHiringManager || "Hiring Manager"}
+
+RESUME:
+${snapshot.fullText}
+
+JOB DESCRIPTION:
+${clJD}`
+            }
+          ]
+        })
+      });
+      if (!resp.ok) throw new Error("Cover letter generation failed.");
+      const json = await resp.json();
+      const text = json.choices?.[0]?.message?.content || "";
+      setCoverLetter(text.trim());
+      if (!clJobTitle && detectedJobTitle) setClJobTitle(detectedJobTitle);
+    } catch (err) {
+      setClError(err.message || "Cover letter generation failed.");
+    } finally {
+      setClLoading(false);
+    }
+  };
+
+  const handleCopyCL = async () => {
+    if (!coverLetter) return;
+    try {
+      await navigator.clipboard.writeText(coverLetter);
+      setClCopied(true);
+      setTimeout(() => setClCopied(false), 1800);
+    } catch {
+      setClCopied(false);
+    }
+  };
+
+  const downloadCoverLetterPDF = async () => {
+    if (!coverLetter) return;
+    setClDownloading(true);
+    try {
+      const node = document.createElement("div");
+      node.style.padding = "36px";
+      node.style.fontFamily = clBodyFont;
+      node.style.fontSize = `${clFontSize}pt`;
+      node.style.lineHeight = clLineHeight;
+      node.style.color = "#111827";
+      node.style.background = "#ffffff";
+      node.style.width = "800px";
+      node.innerHTML = `<div style="font-family:${clHeadingFont};font-size:24pt;font-weight:700;margin-bottom:8px;">${data.personal.name || "Your Name"}</div>
+        <div style="font-size:10pt;color:#64748b;margin-bottom:18px;">${[data.personal.email, data.personal.phone, data.personal.location].filter(Boolean).join(" · ")}</div>
+        <div style="white-space:pre-wrap;">${cleanCoverLetter(coverLetter, data.personal.name)}</div>`;
+      document.body.appendChild(node);
+      await html2pdf().set({
+        margin: 8,
+        filename: `Cover_Letter_${(data.personal.name || "Resume").replace(/\s+/g, "_")}.pdf`,
+        html2canvas: { scale: 2, backgroundColor: "#ffffff" },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      }).from(node).save();
+      document.body.removeChild(node);
+    } catch {
+      setClError("Could not export the cover letter PDF.");
+    } finally {
+      setClDownloading(false);
+    }
+  };
+
   const activeTemplateLabel = activeTemplate === "A" ? "Classic" : activeTemplate === "B" ? "Modern" : activeTemplate === "C" ? "Minimal" : activeTemplate === "4" ? "Template 4" : "Template 5";
 
   const handleResumeDownload = () => {
@@ -1973,15 +2843,15 @@ function ResumeBuilder() {
         }
       `}</style>
 
-      {showJD && <JDAnalyzerModal onClose={() => setShowJD(false)} data={data} setData={setData} isMobile={typeof window !== 'undefined' && window.innerWidth <= 900} />}
+      {showJD && <JDAnalyzerModal onClose={() => setShowJD(false)} data={data} setData={setData} jdState={jdState} setJdState={setJdState} jdScore={jdScore} resumeScore={resumeScore} />}
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} onParsed={handleParsed} />}
       {showTemplateModal && <TemplateModal onClose={() => setShowTemplateModal(false)} activeTemplate={activeTemplate} onSelect={setActiveTemplate} />}
 
       {/* ── Mobile ATS strip (tablet/mobile) ── */}
       <div className="rb-mobile-ats">
-        <svg width={14} height={14} viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="transparent" stroke="#e5e7eb" strokeWidth="3"/><circle cx="18" cy="18" r="15.9" fill="transparent" stroke={C.accent} strokeWidth="3" strokeDasharray={`${ats.score}, 100`} strokeLinecap="round" style={{ transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}/></svg>
-        ATS Score: <span style={{ fontSize: 13, color: ats.score >= 75 ? "#15803d" : ats.score >= 50 ? "#b45309" : "#b91c1c" }}>{ats.score}/100</span>
-        {ats.tips.length > 0 && <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 400 }}>· {ats.tips[0]}</span>}
+        <svg width={14} height={14} viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="transparent" stroke="#e5e7eb" strokeWidth="3"/><circle cx="18" cy="18" r="15.9" fill="transparent" stroke={C.accent} strokeWidth="3" strokeDasharray={`${resumeScore.overall}, 100`} strokeLinecap="round" style={{ transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}/></svg>
+        Resume Quality: <span style={{ fontSize: 13, color: resumeScore.overall >= 75 ? "#15803d" : resumeScore.overall >= 50 ? "#b45309" : "#b91c1c" }}>{resumeScore.overall}/100</span>
+        {resumeScore.tips.length > 0 && <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 400 }}>· {resumeScore.tips[0]}</span>}
       </div>
 
       {/* ── Sidebar with Icons + Labels ── */}
@@ -1989,22 +2859,35 @@ function ResumeBuilder() {
 
         {/* ATS Score Circular */}
         <div className="rb-ats-score" style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#000", letterSpacing: 1.2, marginBottom: 10, marginTop: -12 }} className="rb-ats-label">ATS SCORE</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#000", letterSpacing: 1.2, marginBottom: 10, marginTop: -12 }} className="rb-ats-label">RESUME QUALITY</div>
           <div style={{ background: "#ffffff", border: `1.5px solid ${C.accentBorder}`, borderRadius: 16, padding: "14px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, boxShadow: "0 4px 12px rgba(107,77,176,0.08)", width: "88%", boxSizing: "border-box" }}>
             <div style={{ position: "relative", width: 100, height: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="100" height="100" viewBox="0 0 36 36" style={{ transform: "rotate(-90deg)" }}>
                 <circle cx="18" cy="18" r="15.91549430918954" fill="transparent" stroke="#e5e7eb" strokeWidth="2.5"></circle>
-                <circle cx="18" cy="18" r="15.91549430918954" fill="transparent" stroke={C.accent} strokeWidth="2.5" strokeDasharray={`${ats.score}, 100`} strokeLinecap="round" style={{ transition: "stroke-dasharray 0.5s ease" }}></circle>
+                <circle cx="18" cy="18" r="15.91549430918954" fill="transparent" stroke={C.accent} strokeWidth="2.5" strokeDasharray={`${resumeScore.overall}, 100`} strokeLinecap="round" style={{ transition: "stroke-dasharray 0.5s ease" }}></circle>
               </svg>
-              <div style={{ position: "absolute", fontSize: 24, fontWeight: 900, color: "#000" }}>{ats.score}</div>
+              <div style={{ position: "absolute", fontSize: 24, fontWeight: 900, color: "#000" }}>{resumeScore.overall}</div>
             </div>
             <button onClick={() => setShowTips(!showTips)} style={{ background: "none", border: "none", cursor: "pointer", color: C.textLight, display: "flex", alignItems: "center", gap: 3, fontSize: 11 }}>
-              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.info} /></svg> Tips
+              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.info} /></svg> {resumeScore.label} · {resumeAiStatus === "loading" ? "checking..." : "score details"}
             </button>
           </div>
-          {showTips && ats.tips.length > 0 && (
+          {showTips && (
             <div style={{ marginTop: 8, background: "#fff", borderRadius: 8, padding: "8px 10px", border: `1px solid ${C.border}`, width: "90%", boxSizing: "border-box", fontSize: 10 }}>
-              {ats.tips.map((t, i) => (
+              <div style={{ display: "grid", gap: 4, marginBottom: resumeScore.tips.length ? 8 : 0 }}>
+                {[
+                  ["Details", resumeScore.factors.sectionCoverage],
+                  ["Achievements", resumeScore.factors.impactAchievement],
+                  ["Format", resumeScore.factors.structuralIntegrity],
+                  ["Job Fit", resumeScore.factors.roleClarity],
+                  ["Writing", resumeScore.factors.languageQuality],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", gap: 8, color: "#475569" }}>
+                    <span>{label}</span><strong style={{ color: "#0f172a" }}>{value}</strong>
+                  </div>
+                ))}
+              </div>
+              {resumeScore.tips.map((t, i) => (
                 <div key={i} style={{ color: "#92400e", marginBottom: 3, display: "flex", alignItems: "flex-start", gap: 5, lineHeight: 1.3 }}>
                   <span style={{ fontSize: 10 }}>⚡</span><span>{t}</span>
                 </div>
@@ -2012,6 +2895,23 @@ function ResumeBuilder() {
             </div>
           )}
         </div>
+        {jdScore && (
+          <div className="rb-ats-score" style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#000", letterSpacing: 1.2, marginBottom: 10, marginTop: -12 }} className="rb-ats-label">JD MATCH</div>
+            <div style={{ background: "#ffffff", border: "1.5px solid rgba(37,99,235,0.18)", borderRadius: 16, padding: "14px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, boxShadow: "0 4px 12px rgba(37,99,235,0.08)", width: "88%", boxSizing: "border-box" }}>
+              <div style={{ position: "relative", width: 100, height: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="100" height="100" viewBox="0 0 36 36" style={{ transform: "rotate(-90deg)" }}>
+                  <circle cx="18" cy="18" r="15.91549430918954" fill="transparent" stroke="#e5e7eb" strokeWidth="2.5"></circle>
+                  <circle cx="18" cy="18" r="15.91549430918954" fill="transparent" stroke="#2563eb" strokeWidth="2.5" strokeDasharray={`${jdScore.overall}, 100`} strokeLinecap="round" style={{ transition: "stroke-dasharray 0.5s ease" }}></circle>
+                </svg>
+                <div style={{ position: "absolute", fontSize: 24, fontWeight: 900, color: "#0f172a" }}>{jdScore.overall}</div>
+              </div>
+              <button onClick={() => navigate("/jd-match")} style={{ background: "none", border: "none", cursor: "pointer", color: "#2563eb", display: "flex", alignItems: "center", gap: 3, fontSize: 11, fontWeight: 700 }}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.info} /></svg> {jdScore.label}
+              </button>
+            </div>
+          </div>
+        )}
         {sideNav.map(s => (
           <button key={s.id} onClick={() => setActiveSection(s.id)} title={s.label}
             style={{
@@ -2073,7 +2973,7 @@ function ResumeBuilder() {
                 )} {saveMessage || "Save"}
               </button>
               {/* Match JD button */}
-              <button onClick={() => setShowJD(true)}
+              <button onClick={() => navigate("/jd-match")}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}>
                 <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
                 Match JD

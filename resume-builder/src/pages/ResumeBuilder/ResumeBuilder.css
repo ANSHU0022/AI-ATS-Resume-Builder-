@@ -107,10 +107,141 @@
 /* ── Section drawer — hidden by default ── */
 .rb-section-drawer { display: none; }
 
+.jd-page-shell {
+    display: grid !important;
+    grid-template-columns: minmax(640px, 700px) minmax(0, 1fr);
+    min-height: 0;
+}
+
+.jd-page-sidebar {
+    box-shadow: 10px 0 30px rgba(15, 23, 42, 0.05);
+    position: relative;
+    z-index: 2;
+    overflow: hidden;
+    height: 100%;
+    min-height: 0;
+}
+
+.jd-page-sidebar-body {
+    background:
+        radial-gradient(circle at top left, rgba(124, 92, 191, 0.08), transparent 36%),
+        linear-gradient(180deg, #fcfbff 0%, #f8fafc 100%);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.jd-page-sidebar-body > * {
+    min-height: 0;
+}
+
+.jd-page-preview {
+    min-width: 0;
+    display: flex;
+    height: 100%;
+    min-height: 0;
+}
+
+.jd-page-preview .rb-preview-panel {
+    min-width: 0;
+}
+
+.jd-page-preview .rb-preview-area {
+    padding: 36px 32px 64px !important;
+}
+
+.jd-page-preview .rb-toolbar {
+    padding: 12px 18px !important;
+    flex-wrap: wrap;
+    row-gap: 10px;
+}
+
+.jd-page-analyzer {
+    border-radius: 0 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    min-height: 0;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+}
+
+.jd-page-analyzer-body {
+    overflow: visible !important;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.jd-page-input {
+    gap: 14px !important;
+}
+
+.jd-page-results {
+    background: transparent !important;
+    min-height: 0;
+    overflow: visible !important;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+.jd-top-cards {
+    align-items: stretch;
+}
+
+.jd-analyzer-topbar-page {
+    gap: 12px;
+}
+
+.jd-analyzer-title {
+    min-width: 0;
+}
+
+.jd-analyzer-actions {
+    flex-shrink: 0;
+}
+
+.jd-analyzer-guide-btn {
+    white-space: nowrap;
+}
+
 /* ═══════════════════════════════════════════════════
    TABLET  (≤ 1024px)
 ═══════════════════════════════════════════════════ */
 @media (max-width: 1024px) {
+    .jd-page-shell {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+        min-height: calc(100dvh - 66px);
+        overflow: auto !important;
+    }
+    .jd-page-sidebar {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-shadow: none !important;
+        border-right: none !important;
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+    .jd-top-cards {
+        grid-template-columns: 1fr !important;
+    }
+    .jd-page-preview {
+        min-height: 620px;
+    }
+    .jd-page-preview .rb-preview-area {
+        padding: 18px 10px 42px !important;
+    }
+    .jd-analyzer-topbar-page {
+        flex-wrap: wrap;
+        align-items: flex-start !important;
+    }
+    .jd-analyzer-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
     .rb-layout {
         flex-direction: column !important;
         height: auto !important;
@@ -176,6 +307,27 @@
    MOBILE  (≤ 640px)
 ═══════════════════════════════════════════════════ */
 @media (max-width: 640px) {
+    .jd-top-cards {
+        grid-template-columns: 1fr !important;
+    }
+    .jd-analyzer-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .jd-analyzer-guide-btn {
+        white-space: normal;
+        line-height: 1.25;
+        text-align: center;
+    }
+    .jd-page-header {
+        padding: 16px 16px 14px !important;
+    }
+    .jd-page-sidebar-body {
+        padding: 16px !important;
+    }
+    .jd-page-preview {
+        min-height: 500px;
+    }
     .rb-layout {
         padding-bottom: 72px;
     }
