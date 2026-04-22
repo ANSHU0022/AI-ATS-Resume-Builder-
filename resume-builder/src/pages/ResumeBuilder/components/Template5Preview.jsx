@@ -147,8 +147,8 @@ export default function Template5Preview({ data, onPreviewChange }) {
     <div style={{ width: "100%", maxWidth: 980, display: "flex", flexDirection: "column", gap: 14, alignItems: "center" }}>
       <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: "#1f2937" }}>Template 5 Preview</div>
-          <div style={{ fontSize: 11, color: "#6b7280" }}>LaTeX PDF preview generated from the same uploaded and edited builder data.</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: "#1f2937" }}>Tech friendly</div>
+          <div style={{ fontSize: 11, color: "#6b7280" }}>Latex PDF preview generate for the same uploaded and editable bullet data.</div>
         </div>
         {isCompiling && <div style={{ fontSize: 12, fontWeight: 700, color: "#6B4DB0" }}>Compiling Template 5...</div>}
       </div>
@@ -160,7 +160,16 @@ export default function Template5Preview({ data, onPreviewChange }) {
         </div>
       )}
 
-      <div ref={previewContainerRef} style={{ width: "100%", minHeight: isMobileOrTablet ? 420 : 1080, background: "#fff", borderRadius: 18, boxShadow: "0 14px 34px rgba(15, 23, 42, 0.12)", overflow: "hidden", border: "1px solid rgba(226, 232, 240, 0.9)" }}>
+      <div ref={previewContainerRef} style={{ width: "100%", minHeight: isMobileOrTablet ? 420 : 1080, background: "#fff", borderRadius: 18, boxShadow: "0 14px 34px rgba(15, 23, 42, 0.12)", overflow: "hidden", border: "1px solid rgba(226, 232, 240, 0.9)", position: "relative" }}>
+        {isCompiling && (
+          <div className="rb-template5-loading-overlay">
+            <div className="rb-template5-loading-card">
+              <div className="rb-template5-loading-ring" />
+              <div className="rb-template5-loading-title">Compiling Template 5</div>
+              <div className="rb-template5-loading-text">Please wait while we generate the PDF preview.</div>
+            </div>
+          </div>
+        )}
         {pdfUrl && !isMobileOrTablet ? (
           <iframe
             src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1`}

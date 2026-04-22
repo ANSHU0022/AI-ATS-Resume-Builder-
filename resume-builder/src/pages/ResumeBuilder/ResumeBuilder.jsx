@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
-import html2pdf from "html2pdf.js";
+import { exportResumePDF, exportCoverLetterPDF } from "../../lib/pdfExport";
 import * as pdfjsLib from "pdfjs-dist";
 // Use Vite's ?url syntax to get the worker path statically
 import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.js?url";
@@ -93,33 +93,8 @@ function MH({ title, headingFontFamily }) {
 }
 
 // ── PDF Export ────────────────────────────────────────────────────────────────
-async function exportPDF(ref, name) {
-  const node = ref.current;
-  if (!node) return;
-
-  const opt = {
-    margin: [3, 0, 3, 0], // 3mm top & bottom — subtle on page 1, gives breathing room on page 2+
-    filename: `${name || "Resume"}.pdf`,
-    image: { type: "jpeg", quality: 1.0 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
-    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    pagebreak: { mode: ['css', 'legacy'] }
-  };
-
-  // Inject Google Font links for PDF export
-  const fontLinksForPdf = [window.__resumeHeadingFont, window.__resumeBodyFont]
-    .filter(f => f && f.googleUrl)
-    .map(f => f.googleUrl);
-  fontLinksForPdf.forEach(url => {
-    const existing = document.querySelector(`link[href="${url}"]`);
-    if (!existing) {
-      const l = document.createElement("link");
-      l.rel = "stylesheet"; l.href = url;
-      document.head.appendChild(l);
-    }
-  });
-  await html2pdf().set(opt).from(node).save();
-}
+// Uses direct jsPDF + html2canvas (see src/lib/pdfExport.js)
+const exportPDF = exportResumePDF;
 
 // ── PAGINATED RESUME WRAPPER ──────────────────────────────────────────────────
 const PAGE_W = 794;  // 210mm
@@ -2246,7 +2221,7 @@ function ResumePreviewPane({
         </button>
         <div style={{ flex: 1 }} />
         <div style={{ position: "relative" }} className="rb-font-panel-wrap-trigger">
-          <button onClick={() => setShowFontPanel(!showFontPanel)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", background: showFontPanel ? C.accentLight : "#fff", border: showFontPanel ? `1.5px solid ${C.accentBorder}` : `1.5px solid ${C.border}`, borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 600, color: showFontPanel ? C.accent : C.textLight, transition: "all 0.15s" }}>
+          <button disabled={activeTemplate === "5"} onClick={() => setShowFontPanel(!showFontPanel)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", background: showFontPanel ? C.accentLight : "#fff", border: showFontPanel ? `1.5px solid ${C.accentBorder}` : `1.5px solid ${C.border}`, borderRadius: 8, cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1, fontSize: 11, fontWeight: 600, color: showFontPanel ? C.accent : C.textLight, transition: "all 0.15s" }}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>
             Font
           </button>
@@ -2265,21 +2240,21 @@ function ResumePreviewPane({
           />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 3, marginLeft: 4 }}>
-          <button onClick={() => setResumeFontSize(v => Math.max(8, v - 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>-</button>
-          <span style={{ fontSize: 12, color: C.text, fontWeight: 600, minWidth: 28, textAlign: "center" }}>{resumeFontSize}pt</span>
-          <button onClick={() => setResumeFontSize(v => Math.min(14, v + 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+          <button disabled={activeTemplate === "5"} onClick={() => setResumeFontSize(v => Math.max(8, v - 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1, fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>-</button>
+          <span style={{ fontSize: 12, color: C.text, fontWeight: 600, minWidth: 28, textAlign: "center", opacity: activeTemplate === "5" ? 0.5 : 1 }}>{resumeFontSize}pt</span>
+          <button disabled={activeTemplate === "5"} onClick={() => setResumeFontSize(v => Math.min(14, v + 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1, fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 3, marginLeft: 6 }}>
-          <span style={{ fontSize: 11, color: C.textLight }}>Spacing</span>
+          <span style={{ fontSize: 11, color: C.textLight, opacity: activeTemplate === "5" ? 0.5 : 1 }}>Spacing</span>
           {[1.5, 1.8, 2].map(lh => (
-            <button key={lh} onClick={() => setResumeLineHeight(lh)} style={{ padding: "4px 8px", background: resumeLineHeight === lh ? C.accentLight : "#fff", border: `1px solid ${resumeLineHeight === lh ? C.accent : C.border}`, borderRadius: 5, color: resumeLineHeight === lh ? C.accent : C.textMuted, fontSize: 11, cursor: "pointer" }}>{lh}</button>
+            <button key={lh} disabled={activeTemplate === "5"} onClick={() => setResumeLineHeight(lh)} style={{ padding: "4px 8px", background: resumeLineHeight === lh ? C.accentLight : "#fff", border: `1px solid ${resumeLineHeight === lh ? C.accent : C.border}`, borderRadius: 5, color: resumeLineHeight === lh ? C.accent : C.textMuted, fontSize: 11, cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1 }}>{lh}</button>
           ))}
         </div>
         <div style={{ width: 1, background: C.border, height: 24, margin: "0 4px" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 4, marginRight: 12 }}>
-          <button onClick={() => setZoom(z => Math.max(30, z - 10))} style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>-</button>
-          <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, minWidth: 40, textAlign: "center", userSelect: "none" }}>{zoom}%</span>
-          <button onClick={() => setZoom(z => Math.min(150, z + 10))} style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+          <button disabled={activeTemplate === "5"} onClick={() => setZoom(z => Math.max(30, z - 10))} style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1, fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>-</button>
+          <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, minWidth: 40, textAlign: "center", userSelect: "none", opacity: activeTemplate === "5" ? 0.5 : 1 }}>{zoom}%</span>
+          <button disabled={activeTemplate === "5"} onClick={() => setZoom(z => Math.min(150, z + 10))} style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1, fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
         </div>
         <button disabled={activeTemplate === "5" && template5Preview.isCompiling} onClick={handleResumeDownload} style={{ height: 32, padding: "0 14px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.download} /></svg>
@@ -2619,7 +2594,7 @@ function useResumeWorkspace() {
   const [parseMeta, setParseMeta] = useState({ source: "builder", extractedTextLength: 0 });
   const [resumeAiReview, setResumeAiReview] = useState(null);
   const [resumeAiStatus, setResumeAiStatus] = useState("idle");
-  const [activeTemplate, setActiveTemplate] = useState("A");
+  const [activeTemplate, setActiveTemplate] = useState("5");
   const [headingFont, setHeadingFont] = useState(() => {
     const saved = localStorage.getItem("resume-heading-font");
     const found = saved ? ATS_FONTS.find(f => f.id === saved) : null;
@@ -2869,7 +2844,7 @@ function ResumeBuilder() {
   const navigate = useNavigate();
   const [data, setData] = useState(initialData);
   const [activeSection, setActiveSection] = useState("personal");
-  const [activeTemplate, setActiveTemplate] = useState("A");
+  const [activeTemplate, setActiveTemplate] = useState("5");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [showTips, setShowTips] = useState(false);
@@ -3341,23 +3316,16 @@ ${clJD}`
     setClDownloading(true);
     try {
       const node = document.createElement("div");
-      node.style.padding = "36px";
-      node.style.fontFamily = clBodyFont;
-      node.style.fontSize = `${clFontSize}pt`;
-      node.style.lineHeight = clLineHeight;
-      node.style.color = "#111827";
-      node.style.background = "#ffffff";
-      node.style.width = "800px";
-      node.innerHTML = `<div style="font-family:${clHeadingFont};font-size:24pt;font-weight:700;margin-bottom:8px;">${data.personal.name || "Your Name"}</div>
+      node.style.cssText = "position:absolute;left:0;top:0;width:794px;background:#fff;z-index:-9999;pointer-events:none;";
+      node.innerHTML = `<div style="padding:36px;font-family:${clBodyFont};font-size:${clFontSize}pt;line-height:${clLineHeight};color:#111827;background:#ffffff;">
+        <div style="font-family:${clHeadingFont};font-size:24pt;font-weight:700;margin-bottom:8px;">${data.personal.name || "Your Name"}</div>
         <div style="font-size:10pt;color:#64748b;margin-bottom:18px;">${[data.personal.email, data.personal.phone, data.personal.location].filter(Boolean).join(" · ")}</div>
-        <div style="white-space:pre-wrap;">${cleanCoverLetter(coverLetter, data.personal.name)}</div>`;
+        <div style="white-space:pre-wrap;">${cleanCoverLetter(coverLetter, data.personal.name)}</div>
+      </div>`;
       document.body.appendChild(node);
-      await html2pdf().set({
-        margin: 8,
-        filename: `Cover_Letter_${(data.personal.name || "Resume").replace(/\s+/g, "_")}.pdf`,
-        html2canvas: { scale: 2, backgroundColor: "#ffffff" },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      }).from(node).save();
+      await new Promise(r => setTimeout(r, 300));
+      const el = node.firstElementChild || node;
+      await exportCoverLetterPDF(el, `Cover_Letter_${(data.personal.name || "Resume").replace(/\s+/g, "_")}.pdf`);
       document.body.removeChild(node);
     } catch {
       setClError("Could not export the cover letter PDF.");
@@ -3754,8 +3722,8 @@ ${clJD}`
 
               {/* Font Picker */}
               <div style={{ position: "relative" }} className="rb-font-panel-wrap-trigger">
-                <button onClick={() => setShowFontPanel(!showFontPanel)}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", background: showFontPanel ? C.accentLight : "#fff", border: showFontPanel ? `1.5px solid ${C.accentBorder}` : `1.5px solid ${C.border}`, borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 600, color: showFontPanel ? C.accent : C.textLight, transition: "all 0.15s" }}>
+                <button disabled={activeTemplate === "5"} onClick={() => setShowFontPanel(!showFontPanel)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", background: showFontPanel ? C.accentLight : "#fff", border: showFontPanel ? `1.5px solid ${C.accentBorder}` : `1.5px solid ${C.border}`, borderRadius: 8, cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1, fontSize: 11, fontWeight: 600, color: showFontPanel ? C.accent : C.textLight, transition: "all 0.15s" }}>
                   <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>
                   Font
                 </button>
@@ -3776,16 +3744,16 @@ ${clJD}`
 
               {/* Font Size Controls */}
               <div style={{ display: "flex", alignItems: "center", gap: 3, marginLeft: 4 }}>
-                <button onClick={() => setResumeFontSize(v => Math.max(8, v - 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-                <span style={{ fontSize: 12, color: C.text, fontWeight: 600, minWidth: 28, textAlign: "center" }}>{resumeFontSize}pt</span>
-                <button onClick={() => setResumeFontSize(v => Math.min(14, v + 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                <button disabled={activeTemplate === "5"} onClick={() => setResumeFontSize(v => Math.max(8, v - 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1, fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                <span style={{ fontSize: 12, color: C.text, fontWeight: 600, minWidth: 28, textAlign: "center", opacity: activeTemplate === "5" ? 0.5 : 1 }}>{resumeFontSize}pt</span>
+                <button disabled={activeTemplate === "5"} onClick={() => setResumeFontSize(v => Math.min(14, v + 0.5))} style={{ width: 26, height: 26, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1, fontSize: 14, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
               </div>
 
               {/* Line Spacing Controls */}
               <div style={{ display: "flex", alignItems: "center", gap: 3, marginLeft: 6 }}>
-                <span style={{ fontSize: 11, color: C.textLight }}>Spacing</span>
+                <span style={{ fontSize: 11, color: C.textLight, opacity: activeTemplate === "5" ? 0.5 : 1 }}>Spacing</span>
                 {[1.5, 1.8, 2].map(lh => (
-                  <button key={lh} onClick={() => setResumeLineHeight(lh)} style={{ padding: "4px 8px", background: resumeLineHeight === lh ? C.accentLight : "#fff", border: `1px solid ${resumeLineHeight === lh ? C.accent : C.border}`, borderRadius: 5, color: resumeLineHeight === lh ? C.accent : C.textMuted, fontSize: 11, cursor: "pointer" }}>{lh}</button>
+                  <button key={lh} disabled={activeTemplate === "5"} onClick={() => setResumeLineHeight(lh)} style={{ padding: "4px 8px", background: resumeLineHeight === lh ? C.accentLight : "#fff", border: `1px solid ${resumeLineHeight === lh ? C.accent : C.border}`, borderRadius: 5, color: resumeLineHeight === lh ? C.accent : C.textMuted, fontSize: 11, cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1 }}>{lh}</button>
                 ))}
               </div>
 
@@ -3793,13 +3761,13 @@ ${clJD}`
 
               {/* Zoom Controls */}
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginRight: 12 }}>
-                <button onClick={() => setZoom(z => Math.max(30, z - 10))}
-                  style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <button disabled={activeTemplate === "5"} onClick={() => setZoom(z => Math.max(30, z - 10))}
+                  style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1, fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   −
                 </button>
-                <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, minWidth: 40, textAlign: "center", userSelect: "none" }}>{zoom}%</span>
-                <button onClick={() => setZoom(z => Math.min(150, z + 10))}
-                  style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, minWidth: 40, textAlign: "center", userSelect: "none", opacity: activeTemplate === "5" ? 0.5 : 1 }}>{zoom}%</span>
+                <button disabled={activeTemplate === "5"} onClick={() => setZoom(z => Math.min(150, z + 10))}
+                  style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1, fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   +
                 </button>
               </div>

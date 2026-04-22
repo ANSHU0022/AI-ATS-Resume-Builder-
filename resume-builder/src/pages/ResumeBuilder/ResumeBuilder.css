@@ -6,6 +6,186 @@
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
 }
 
+.resume-export-root {
+    width: 794px;
+    background: #fff;
+}
+
+.resume-export-page {
+    width: 794px;
+    height: 1123px;
+    background: #fff;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+}
+
+.resume-export-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+}
+
+.rb-template5-loading-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 100px 24px 24px;
+    background: rgba(248, 250, 252, 0.76);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.rb-template5-loading-card {
+    min-width: min(320px, 100%);
+    padding: 28px 24px;
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(245,243,255,0.96));
+    border: 1px solid rgba(107, 77, 176, 0.18);
+    box-shadow: 0 20px 40px rgba(107, 77, 176, 0.16);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.rb-template5-loading-ring {
+    width: 86px;
+    height: 86px;
+    border-radius: 50%;
+    border: 7px solid rgba(107, 77, 176, 0.18);
+    border-top-color: #6b4db0;
+    animation: rb-template5-spin 0.9s linear infinite;
+    margin-bottom: 20px;
+}
+
+.rb-template5-loading-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #3b0764;
+    margin-bottom: 8px;
+}
+
+.rb-template5-loading-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #6b7280;
+    max-width: 240px;
+}
+
+.rb-template-trigger {
+    position: relative;
+    isolation: isolate;
+    min-height: 40px;
+    padding: 6px 13px 6px 9px;
+    border-radius: 14px;
+    border: 1px solid rgba(251, 146, 60, 0.45);
+    background: linear-gradient(180deg, #fff7ed 0%, #ffe4d6 48%, #ffd1cb 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.9),
+        inset 0 -4px 10px rgba(249,115,22,0.1),
+        0 10px 18px rgba(249,115,22,0.16),
+        0 3px 0 rgba(194,65,12,0.14);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transform: translateY(0);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    overflow: hidden;
+}
+
+.rb-template-trigger:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.95),
+        inset 0 -6px 12px rgba(249,115,22,0.13),
+        0 14px 22px rgba(249,115,22,0.18),
+        0 4px 0 rgba(194,65,12,0.16);
+    filter: saturate(1.06);
+}
+
+.rb-template-trigger:active {
+    transform: translateY(1px);
+    box-shadow:
+        inset 0 2px 6px rgba(194,65,12,0.16),
+        0 8px 16px rgba(249,115,22,0.16);
+}
+
+.rb-template-trigger:focus-visible {
+    outline: 2px solid rgba(234, 88, 12, 0.5);
+    outline-offset: 3px;
+}
+
+.rb-template-trigger__shine {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.08) 36%, rgba(255,255,255,0) 70%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+.rb-template-trigger__icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    flex-shrink: 0;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.35),
+        0 8px 16px rgba(234,88,12,0.28);
+}
+
+.rb-template-trigger__copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    line-height: 1.05;
+}
+
+.rb-template-trigger__title {
+    font-size: 14px;
+    font-weight: 900;
+    color: #7c2d12;
+    letter-spacing: -0.02em;
+}
+
+.rb-template-trigger__meta {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #c2410c;
+    margin-top: 3px;
+}
+
+.rb-template-trigger__badge {
+    margin-left: 2px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.85);
+    border: 1px solid rgba(251, 146, 60, 0.38);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9a3412;
+}
+
+@keyframes rb-template5-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 @page { size: A4; margin: 0; }
 
 @media print {

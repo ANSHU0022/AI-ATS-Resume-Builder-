@@ -11,6 +11,85 @@ const RESUME_IMAGES = [
     '/Anshu Prasad (2)_pages-to-jpg-0001.jpg',
 ];
 
+const HERO_FEATURES = [
+    {
+        label: 'ATS Resume Builder',
+        path: '/ats-resume-builder',
+        icon: (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M8 13h8" />
+                <path d="M8 17h6" />
+            </svg>
+        ),
+    },
+    {
+        label: 'All Job Portals',
+        path: '/job-portals',
+        icon: (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <circle cx="12" cy="12" r="5" />
+                <circle cx="12" cy="12" r="1.5" />
+            </svg>
+        ),
+    },
+    {
+        label: 'JD Keyword Matching',
+        path: '/jd-match',
+        icon: (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="8.5" cy="11.5" r="3.5" />
+                <path d="M12 11.5h9M18 11.5v2M21 11.5v2" />
+            </svg>
+        ),
+    },
+    {
+        label: 'Cover Letter Generator',
+        path: '/cover-letter',
+        icon: (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <path d="M3 7l9 6 9-6" />
+            </svg>
+        ),
+    },
+    {
+        label: 'LaTeX Editor',
+        path: '/latex-editor',
+        icon: (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="6" width="18" height="12" rx="2" />
+                <path d="M7 10h.01M10 10h.01M13 10h.01M16 10h.01" />
+                <path d="M7 14h10" />
+            </svg>
+        ),
+    },
+    {
+        label: 'AI Resume Analysis',
+        path: '/ats-resume-builder',
+        icon: (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="4" y="7" width="16" height="12" rx="3" />
+                <path d="M9 11h.01M15 11h.01" />
+                <path d="M8 15h8" />
+                <path d="M12 7V4" />
+            </svg>
+        ),
+    },
+    {
+        label: 'Ai Cold Email & Dm',
+        path: '/network-outreach',
+        icon: (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+            </svg>
+        ),
+    },
+];
+
 function ResumeCard3D() {
     const cardRef = useRef(null);
     const [activeImg, setActiveImg] = useState(0);
@@ -146,61 +225,17 @@ export default function HomePage() {
                     <p className="hero-desc">Upload your existing CV — our AI instantly parses, refines, and rebuilds a fully ATS-optimized resume. Score your resume, match JD keywords, generate cover letters, and compile LaTeX — all in one place.</p>
 
                     <div className="features-text">
-                        <span>
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                <path d="M14 2v6h6" />
-                                <path d="M8 13h8" />
-                                <path d="M8 17h6" />
-                            </svg>
-                            ATS Resume Builder
-                        </span>
-                        <span>
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <circle cx="12" cy="12" r="9" />
-                                <circle cx="12" cy="12" r="5" />
-                                <circle cx="12" cy="12" r="1.5" />
-                            </svg>
-                            All Job Portals
-                        </span>
-                        <span>
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <circle cx="8.5" cy="11.5" r="3.5" />
-                                <path d="M12 11.5h9M18 11.5v2M21 11.5v2" />
-                            </svg>
-                            JD Keyword Matching
-                        </span>
-                        <span>
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <rect x="3" y="5" width="18" height="14" rx="2" />
-                                <path d="M3 7l9 6 9-6" />
-                            </svg>
-                            Cover Letter Generator
-                        </span>
-                        <span>
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <rect x="3" y="6" width="18" height="12" rx="2" />
-                                <path d="M7 10h.01M10 10h.01M13 10h.01M16 10h.01" />
-                                <path d="M7 14h10" />
-                            </svg>
-                            LaTeX Editor
-                        </span>
-                        <span>
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <rect x="4" y="7" width="16" height="12" rx="3" />
-                                <path d="M9 11h.01M15 11h.01" />
-                                <path d="M8 15h8" />
-                                <path d="M12 7V4" />
-                            </svg>
-                            AI Resume Analysis
-                        </span>
-                        <span>
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                                <polyline points="22,6 12,13 2,6" />
-                            </svg>
-                            Ai Cold Email & Dm
-                        </span>
+                        {HERO_FEATURES.map((feature) => (
+                            <button
+                                key={feature.label}
+                                className="feature-chip"
+                                type="button"
+                                onClick={() => navigate(feature.path)}
+                            >
+                                {feature.icon}
+                                {feature.label}
+                            </button>
+                        ))}
                     </div>
 
                     <div className="cta-group">

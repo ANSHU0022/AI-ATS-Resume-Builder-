@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.js?url";
 import { supabase } from "../../lib/supabase";
+import { exportCoverLetterPDF } from "../../lib/pdfExport";
 import "./CoverLetterBuilder.css";
 
 // ── PDF Worker Setup (same as ResumeBuilder) ──────────────────────────────────
@@ -71,13 +72,7 @@ const detectJobTitle = (jdText) => {
     return "the position";
 };
 
-const loadHtml2Pdf = () => new Promise((resolve, reject) => {
-    if (window.html2pdf) { resolve(); return; }
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-    script.onload = resolve; script.onerror = reject;
-    document.head.appendChild(script);
-});
+
 
 const cleanCoverLetter = (text) => {
     if (!text) return "";
@@ -387,11 +382,10 @@ STRICT RULES:
         if (!coverLetter) return;
         setClDownloading(true);
         try {
-            await loadHtml2Pdf();
             let bodyHtml = "";
             const fontLinks = [clHeadingFont, clBodyFont].map(f => CL_FONTS.find(x => x.family === f)).filter(f => f?.url).map(f => `<link rel="stylesheet" href="${f.url}">`).join("\n");
             if (clTemplate === "executive") {
-                bodyHtml = `${fontLinks}<div style="font-family:${clBodyFont};padding:56px 64px;background:#fff;color:#1e293b;">
+                bodyHtml = `<div style="font-family:${clBodyFont};padding:56px 64px;background:#fff;color:#1e293b;">
           <div style="font-family:${clHeadingFont};font-size:26pt;font-weight:700;color:#0f172a;margin-bottom:5px;">${name || "Your Name"}</div>
           <div style="font-size:10.5pt;font-weight:600;color:#2563eb;margin-bottom:8px;">Applying for: ${jt}</div>
           <div style="font-size:9pt;color:#64748b;">${[email, phone, location].filter(Boolean).join(" · ")}${links.length ? " · " + links.join(" · ") : ""}</div>
@@ -405,7 +399,7 @@ STRICT RULES:
           <div style="margin-top:28px;"><div style="font-size:11pt;margin-bottom:30px;">Sincerely,</div><div style="width:160px;height:1px;background:#cbd5e1;margin-bottom:6px;"></div><div style="font-family:${clHeadingFont};font-size:13pt;font-weight:700;color:#0f172a;margin-bottom:2px;">${name || ""}</div><div style="font-size:9pt;color:#64748b;">Applying for: ${jt}</div></div>
         </div>`;
             } else if (clTemplate === "modern") {
-                bodyHtml = `${fontLinks}<div style="display:flex;font-family:${clBodyFont};">
+                bodyHtml = `<div style="display:flex;font-family:${clBodyFont};">
           <div style="width:30%;background:#0f172a;color:#fff;padding:40px 20px;">
             <div style="font-family:${clHeadingFont};font-size:16pt;font-weight:700;color:#fff;margin-bottom:4px;">${name || "Your Name"}</div>
             <div style="font-size:8pt;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px;">Applying for</div>
@@ -427,7 +421,7 @@ STRICT RULES:
           </div>
         </div>`;
             } else {
-                bodyHtml = `${fontLinks}<div style="font-family:${clBodyFont};padding:64px 80px;background:#fff;color:#374151;">
+                bodyHtml = `<div style="font-family:${clBodyFont};padding:64px 80px;background:#fff;color:#374151;">
           <div style="font-family:${clHeadingFont};font-size:22pt;font-weight:700;color:#111827;letter-spacing:-0.5px;margin-bottom:3px;">${name || "Your Name"}</div>
           <div style="font-size:10pt;color:#6b7280;font-weight:500;margin-bottom:10px;">Applying for: ${jt}</div>
           <div style="font-size:8.5pt;color:#9ca3af;">${[email, phone, location].filter(Boolean).join("  |  ")}</div>
@@ -440,24 +434,28 @@ STRICT RULES:
         </div>`;
             }
             const container = document.createElement("div");
-            container.style.cssText = "position:absolute;left:0;top:0;width:210mm;z-index:-9999;overflow:hidden;opacity:0;";
+            container.style.cssText = "position:absolute;left:0;top:0;width:794px;background:#fff;z-index:-9999;pointer-events:none;";
             container.innerHTML = bodyHtml;
             document.body.appendChild(container);
+            // Inject font links into <head> (they don't work inside a div for html2canvas)
             const fontEls = [clHeadingFont, clBodyFont].map(f => CL_FONTS.find(x => x.family === f)).filter(f => f?.url);
-            fontEls.forEach(f => loadCLFont(f.url));
+            const _addedFontLinks = [];
+            fontEls.forEach(f => {
+                if (!document.querySelector(`link[href="${f.url}"]`)) {
+                    const lnk = document.createElement("link");
+                    lnk.rel = "stylesheet"; lnk.href = f.url;
+                    document.head.appendChild(lnk);
+                    _addedFontLinks.push(lnk);
+                }
+                loadCLFont(f.url);
+            });
             await new Promise(r => setTimeout(r, 800));
             const jtClean = jt.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
             const nameClean = (name || "").replace(/\s+/g, "_");
             const el = container.firstElementChild || container;
-            await window.html2pdf().set({
-                margin: 0,
-                filename: `Cover_Letter_${nameClean}${jtClean ? "_" + jtClean : ""}.pdf`,
-                image: { type: "jpeg", quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, logging: false, width: el.scrollWidth, height: el.scrollHeight },
-                jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-                pagebreak: { mode: ["avoid-all", "css", "legacy"] }
-            }).from(el).save();
+            await exportCoverLetterPDF(el, `Cover_Letter_${nameClean}${jtClean ? "_" + jtClean : ""}.pdf`);
             document.body.removeChild(container);
+            if (typeof _addedFontLinks !== "undefined") _addedFontLinks.forEach(l => l.remove());
         } catch (e) {
             console.error("PDF download error:", e);
             alert("PDF download failed: " + e.message);
