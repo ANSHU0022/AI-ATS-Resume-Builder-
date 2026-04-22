@@ -8,7 +8,7 @@ const path = require("path");
 const dotenv = require("dotenv");
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const ENV_FILE = path.join(__dirname, ".env");
 
 // ── Model Fallback Chain ──────────────────────────────────────────────────────
@@ -20,9 +20,13 @@ const MODEL_FALLBACK_CHAIN = [
 ];
 
 function getGroqApiKey() {
-  // Always reload the app-local .env so key swaps take effect immediately
-  // and stale shell-level values do not win.
-  const result = dotenv.config({ path: ENV_FILE, override: true, quiet: true });
+  const runtimeKey = (process.env.GROQ_API_KEY || "").trim();
+  if (runtimeKey) {
+    return runtimeKey;
+  }
+
+  // Local development fallback: read from app-local .env when present.
+  const result = dotenv.config({ path: ENV_FILE, quiet: true });
   if (result.error) {
     return "";
   }
@@ -33,7 +37,11 @@ function getGroqApiKey() {
 const initialGroqApiKey = getGroqApiKey();
 console.log(
   "GROQ_API_KEY status:",
-  initialGroqApiKey ? `Loaded from ${ENV_FILE}` : `Missing from ${ENV_FILE}`
+  initialGroqApiKey
+    ? (process.env.GROQ_API_KEY || "").trim()
+      ? "Loaded from runtime environment"
+      : `Loaded from ${ENV_FILE}`
+    : `Missing from runtime environment and ${ENV_FILE}`
 );
 
 app.use(cors()); // Allow all origins — browser can now call this server

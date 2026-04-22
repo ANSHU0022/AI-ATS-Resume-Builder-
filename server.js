@@ -14,7 +14,12 @@ const DIST_DIR = path.join(__dirname, "resume-builder", "dist");
 const ENV_FILE = path.join(__dirname, "resume-builder", ".env");
 
 function getGroqApiKey() {
-  const result = dotenv.config({ path: ENV_FILE, override: true, quiet: true });
+  const runtimeKey = (process.env.GROQ_API_KEY || "").trim();
+  if (runtimeKey) {
+    return runtimeKey;
+  }
+
+  const result = dotenv.config({ path: ENV_FILE, quiet: true });
   if (result.error) {
     return "";
   }
@@ -33,7 +38,9 @@ app.post("/api/groq", async (req, res) => {
   try {
     const GROQ_API_KEY = getGroqApiKey();
     if (!GROQ_API_KEY) {
-      return res.status(500).json({ error: { message: `GROQ_API_KEY not found in ${ENV_FILE}` } });
+      return res.status(500).json({
+        error: { message: `GROQ_API_KEY not found in runtime environment or ${ENV_FILE}` },
+      });
     }
 
     // Dynamic import of node-fetch (ESM compatible)
