@@ -20,18 +20,15 @@ function getBackendHealthEndpoint() {
   return pdfEndpoint.replace(/\/api\/pdf\/render$/, "/api/health");
 }
 
-function ensureDownloadFrame() {
-  const frameName = "pdf-download-frame";
-  let frame = document.querySelector(`iframe[name="${frameName}"]`);
-
-  if (!frame) {
-    frame = document.createElement("iframe");
-    frame.name = frameName;
-    frame.style.display = "none";
-    document.body.appendChild(frame);
-  }
-
-  return frameName;
+function triggerBlobDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
 function buildHtmlDocument(node, title) {
@@ -84,27 +81,31 @@ async function exportNodeViaServer(node, filename) {
   }
 
   const html = buildHtmlDocument(node, filename);
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = getPdfRenderEndpoint();
-  form.target = ensureDownloadFrame();
-  form.style.display = "none";
+  const response = await fetch(getPdfRenderEndpoint(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ html, filename }),
+  });
 
-  const htmlInput = document.createElement("input");
-  htmlInput.type = "hidden";
-  htmlInput.name = "html";
-  htmlInput.value = html;
+  if (!response.ok) {
+    let message = "PDF export failed.";
+    try {
+      const data = await response.json();
+      message = data?.error?.message || data?.message || message;
+    } catch {
+      // Keep generic fallback message.
+    }
+    throw new Error(message);
+  }
 
-  const filenameInput = document.createElement("input");
-  filenameInput.type = "hidden";
-  filenameInput.name = "filename";
-  filenameInput.value = filename;
+  const blob = await response.blob();
+  if (!blob || blob.size === 0) {
+    throw new Error("PDF export failed. Please try again.");
+  }
 
-  form.appendChild(htmlInput);
-  form.appendChild(filenameInput);
-  document.body.appendChild(form);
-  form.submit();
-  form.remove();
+  triggerBlobDownload(blob, filename);
 }
 
 export async function exportResumePDF(ref, name) {

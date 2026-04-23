@@ -2251,8 +2251,7 @@ function ResumePreviewPane({
     <div className="rb-preview-panel" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <style>{`@keyframes resume-pdf-spin { to { transform: rotate(360deg); } }`}</style>
       <div className="rb-toolbar" style={{ padding: "9px 18px", background: C.toolbarBg, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginRight: 4 }}>Template:</span>
-        <button onClick={() => setShowTemplateModal(true)} style={{ padding: "5px 14px", border: `1.5px solid ${C.border}`, borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, background: "#fff", color: C.textLight, transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6 }}>
+        <button onClick={() => setShowTemplateModal(true)} style={{ padding: "10px 18px", border: "1px solid rgba(107,77,176,0.20)", borderRadius: 14, cursor: "pointer", fontSize: 13, fontWeight: 800, background: "linear-gradient(180deg, #ffffff 0%, #f7f1ff 58%, #f0e6ff 100%)", color: "#5b3ea6", transition: "all 0.18s ease", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 12px 24px rgba(107,77,176,0.12), inset 0 1px 0 rgba(255,255,255,0.98), inset 0 -3px 8px rgba(107,77,176,0.08), 0 2px 0 rgba(107,77,176,0.10)" }}>
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg>
           {activeTemplateLabel}
         </button>
@@ -2875,7 +2874,7 @@ function useResumeWorkspace() {
         return;
       }
       await exportPDF(previewRef, data.personal.name);
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+      await new Promise((resolve) => setTimeout(resolve, 400));
     } finally {
       setIsPdfDownloading(false);
     }
@@ -3405,7 +3404,7 @@ ${clJD}`
       }
 
       await exportPDF(previewRef, data.personal.name);
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+      await new Promise((resolve) => setTimeout(resolve, 400));
     } finally {
       setIsPdfDownloading(false);
     }
@@ -3773,9 +3772,8 @@ ${clJD}`
             <style>{`@keyframes resume-pdf-spin { to { transform: rotate(360deg); } }`}</style>
             {/* Toolbar */}
             <div className="rb-toolbar" style={{ padding: "9px 18px", background: C.toolbarBg, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginRight: 4 }}>Template:</span>
               <button onClick={() => setShowTemplateModal(true)}
-                style={{ padding: "5px 14px", border: `1.5px solid ${C.border}`, borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, background: "#fff", color: C.textLight, transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6 }}>
+                style={{ padding: "10px 18px", border: "1px solid rgba(107,77,176,0.20)", borderRadius: 14, cursor: "pointer", fontSize: 13, fontWeight: 800, background: "linear-gradient(180deg, #ffffff 0%, #f7f1ff 58%, #f0e6ff 100%)", color: "#5b3ea6", transition: "all 0.18s ease", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 12px 24px rgba(107,77,176,0.12), inset 0 1px 0 rgba(255,255,255,0.98), inset 0 -3px 8px rgba(107,77,176,0.08), 0 2px 0 rgba(107,77,176,0.10)" }}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg>
                 {activeTemplateLabel}
               </button>
@@ -3840,7 +3838,7 @@ ${clJD}`
                 ) : (
                   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.download} /></svg>
                 )}
-                {isPdfDownloading ? "Preparing..." : activeTemplate === "5" && template5Preview.isCompiling ? "Compiling..." : "PDF"}
+          {isPdfDownloading ? "Generating PDF..." : activeTemplate === "5" && template5Preview.isCompiling ? "Compiling..." : "PDF"}
               </button>
             </div>
 
@@ -3918,7 +3916,7 @@ ${clJD}`
           ) : (
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={icons.download} /></svg>
           )}
-          {isPdfDownloading ? "Preparing" : activeTemplate === "5" && template5Preview.isCompiling ? "Compiling" : "PDF"}
+          {isPdfDownloading ? "Generating" : activeTemplate === "5" && template5Preview.isCompiling ? "Compiling" : "PDF"}
         </button>
       </nav>
     </div>

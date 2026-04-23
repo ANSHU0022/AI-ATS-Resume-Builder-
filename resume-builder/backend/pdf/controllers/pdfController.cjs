@@ -17,8 +17,13 @@ exports.render = async (req, res) => {
       return res.status(400).json({ error: "A full HTML document string is required." });
     }
 
-    const pdfBuffer = await renderPdfFromHtml({ html, headerHtml, footerHtml });
+    const pdfBytes = await renderPdfFromHtml({ html, headerHtml, footerHtml });
+    const pdfBuffer = Buffer.isBuffer(pdfBytes) ? pdfBytes : Buffer.from(pdfBytes);
     const safeFilename = sanitizeFilename(filename);
+
+    if (!pdfBuffer.length || pdfBuffer.subarray(0, 4).toString("utf8") !== "%PDF") {
+      throw new Error("Generated file is not a valid PDF.");
+    }
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
