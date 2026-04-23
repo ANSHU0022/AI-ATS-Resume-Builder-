@@ -4,6 +4,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.js?url";
 import { supabase } from "../../lib/supabase";
 import { exportCoverLetterPDF } from "../../lib/pdfExport";
+import { getSafeAIMessageFromError, getSafeAIMessageFromResponse } from "../../lib/aiError";
 import "./CoverLetterBuilder.css";
 
 // ── PDF Worker Setup (same as ResumeBuilder) ──────────────────────────────────
@@ -227,15 +228,7 @@ RESUME TEXT:
                 })
             });
             if (!parseResp.ok) {
-                let errStr = "";
-                try {
-                    const errData = await parseResp.json();
-                    errStr = errData?.error?.message || errData?.message || JSON.stringify(errData);
-                } catch {
-                    errStr = "The backend server was unreachable or returned an invalid response. Please make sure `npm run dev` is running.";
-                }
-                if (parseResp.status === 429) errStr = "Groq API rate limit exceeded. Please wait a moment and try again.";
-                throw new Error(errStr || `Groq API error ${parseResp.status}. Please try again.`);
+                throw new Error(await getSafeAIMessageFromResponse(parseResp, "Resume parsing is temporarily unavailable. Please try again in a few minutes."));
             }
             const parsed = await parseResp.json();
             const raw = parsed.choices?.[0]?.message?.content || "";
@@ -259,7 +252,7 @@ RESUME TEXT:
             if (data.personal?.github) setGithub(data.personal.github);
             setLeftTab("cv");
         } catch (e) {
-            setCvError("Parse error: " + e.message);
+            setCvError(getSafeAIMessageFromError(e, "Resume parsing is temporarily unavailable. Please try again in a few minutes."));
             setCvFile(null);
         }
         setCvParsing(false);
@@ -351,21 +344,13 @@ STRICT RULES:
                 })
             });
             if (!resp.ok) {
-                let errStr = "";
-                try {
-                    const errData = await resp.json();
-                    errStr = errData?.error?.message || errData?.message || JSON.stringify(errData);
-                } catch {
-                    errStr = "The backend server was unreachable or returned an invalid response. Please make sure `npm run dev` is running.";
-                }
-                if (resp.status === 429) errStr = "Groq API rate limit exceeded. Please wait a moment and try again.";
-                throw new Error(errStr || `Groq API error ${resp.status}. Please try again.`);
+                throw new Error(await getSafeAIMessageFromResponse(resp, "Cover letter generation is temporarily unavailable. Please try again in a few minutes."));
             }
             const json = await resp.json();
             const text = json.choices?.[0]?.message?.content?.trim() || "";
             if (text) { setCoverLetter(text); setClEditMode(false); }
-            else setClError("Generation failed. Please try again.");
-        } catch (e) { setClError("API error: " + e.message); }
+            else setClError("Cover letter generation is temporarily unavailable. Please try again in a few minutes.");
+        } catch (e) { setClError(getSafeAIMessageFromError(e, "Cover letter generation is temporarily unavailable. Please try again in a few minutes.")); }
         setClLoading(false);
     };
 

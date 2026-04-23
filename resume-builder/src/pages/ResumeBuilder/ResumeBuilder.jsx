@@ -10,6 +10,7 @@ import { supabase } from "../../lib/supabase";
 import Template4 from "./templates/Template4";
 import Template5Preview from "./components/Template5Preview";
 import { buildResumeSnapshot, calculateJDScore, calculateResumeScore, formatResumeReviewPayload } from "./scoring";
+import { getSafeAIMessageFromError, getSafeAIMessageFromResponse } from "../../lib/aiError";
 import "./ResumeBuilder.css";
 // Set the workerSrc for PDF.js globally
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
@@ -213,13 +214,54 @@ function PaginatedResume({ data, template, exportRef, headingFont, bodyFont, fon
     return pageBreaks.length + Math.max(0, Math.ceil(remaining / PAGE_H) - 1);
   })();
 
+  const renderPage = (pi, mode = "preview") => {
+    const TOP_GAP = 32;
+    const pageStart = pageBreaks[pi] ?? (pageBreaks[pageBreaks.length - 1] + PAGE_H);
+    const nextPageStart = pageBreaks[pi + 1];
+    const vTop = pi === 0 ? 0 : TOP_GAP;
+    const contentHeight = nextPageStart != null
+      ? nextPageStart - pageStart
+      : totalH - pageStart;
+    const vHeight = Math.min(contentHeight, PAGE_H - vTop);
+    const cTop = -pageStart;
+    const isExport = mode === "export";
+
+    return (
+      <div
+        key={`${mode}-${pi}`}
+        className={isExport ? "resume-export-page" : undefined}
+        style={{
+          width: PAGE_W,
+          height: PAGE_H,
+          background: "#fff",
+          overflow: "hidden",
+          position: "relative",
+          boxShadow: isExport ? "none" : "0 4px 24px rgba(0,0,0,0.13)",
+          borderRadius: isExport ? 0 : 2,
+          marginBottom: isExport ? 0 : 24,
+        }}
+      >
+        <div style={{ position: "absolute", top: vTop, left: 0, width: PAGE_W, height: vHeight, overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: cTop, left: 0, width: PAGE_W }}>
+            <div className="resume-container" style={{ boxShadow: "none", minHeight: vHeight }}>
+              <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} fontSize={fontSize} lineHeight={lineHeight} />
+            </div>
+          </div>
+        </div>
+        <div style={{ position: "absolute", bottom: 8, right: 14, fontSize: 8.5, color: "#c0c8d2", fontFamily: "'Segoe UI', sans-serif", letterSpacing: 0.5, pointerEvents: "none" }}>
+          {pi + 1} / {numPages}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
 
-      {/* Hidden continuous container for html2pdf */}
+      {/* Hidden export tree that mirrors the visible preview pages exactly */}
       <div style={{ position: "fixed", top: 0, left: -9999, width: PAGE_W, pointerEvents: "none", zIndex: -1 }}>
-        <div ref={exportRef} className="resume-container">
-          <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} fontSize={fontSize} lineHeight={lineHeight} />
+        <div ref={exportRef} className="resume-export-root">
+          {Array.from({ length: numPages }).map((_, pi) => renderPage(pi, "export"))}
         </div>
       </div>
 
@@ -232,35 +274,9 @@ function PaginatedResume({ data, template, exportRef, headingFont, bodyFont, fon
 
       {/* Visible sliced page cards using content-aware break points */}
       {Array.from({ length: numPages }).map((_, pi) => {
-        const TOP_GAP = 32;
-        const pageStart = pageBreaks[pi] ?? (pageBreaks[pageBreaks.length - 1] + PAGE_H);
-        const nextPageStart = pageBreaks[pi + 1];
-        const vTop = pi === 0 ? 0 : TOP_GAP;
-
-        const contentHeight = nextPageStart != null
-          ? nextPageStart - pageStart
-          : totalH - pageStart;
-        const vHeight = Math.min(contentHeight, PAGE_H - vTop);
-        const cTop = -pageStart;
-
         return (
           <div key={pi} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <div style={{
-              width: PAGE_W, height: PAGE_H, background: "#fff", overflow: "hidden",
-              position: "relative", boxShadow: "0 4px 24px rgba(0,0,0,0.13)", borderRadius: 2,
-              marginBottom: 24,
-            }}>
-              <div style={{ position: "absolute", top: vTop, left: 0, width: PAGE_W, height: vHeight, overflow: "hidden" }}>
-                <div style={{ position: "absolute", top: cTop, left: 0, width: PAGE_W }}>
-                  <div className="resume-container" style={{ boxShadow: "none", minHeight: vHeight }}>
-                    <TemplateComp data={data} headingFont={headingFont} bodyFont={bodyFont} fontSize={fontSize} lineHeight={lineHeight} />
-                  </div>
-                </div>
-              </div>
-              <div style={{ position: "absolute", bottom: 8, right: 14, fontSize: 8.5, color: "#c0c8d2", fontFamily: "'Segoe UI', sans-serif", letterSpacing: 0.5, pointerEvents: "none" }}>
-                {pi + 1} / {numPages}
-              </div>
-            </div>
+            {renderPage(pi, "preview")}
           </div>
         );
       })}
@@ -269,18 +285,58 @@ function PaginatedResume({ data, template, exportRef, headingFont, bodyFont, fon
 }
 
 const LinkIconSVG = () => (
-  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 3, verticalAlign: "middle" }}>
-    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    <polyline points="15 3 21 3 21 9" />
-    <line x1="10" y1="14" x2="21" y2="3" />
-  </svg>
+  <span
+    aria-hidden="true"
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: 13,
+      height: 13,
+      marginLeft: 4,
+      flexShrink: 0,
+      overflow: "visible",
+      lineHeight: 1,
+      padding: 1,
+      boxSizing: "content-box",
+    }}
+  >
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: "block", overflow: "visible" }}
+    >
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  </span>
 );
 
 const WithLinkIcon = ({ url, text, color = "#1a1a1a", dec = "none" }) => {
   if (!url) return <span style={{ color }}>{text}</span>;
   const href = url.startsWith("http") ? url : `https://${url}`;
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color, textDecoration: dec, display: "inline-flex", alignItems: "center" }} title={url}>
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        color,
+        textDecoration: dec,
+        display: "inline-flex",
+        alignItems: "center",
+        lineHeight: 1.2,
+        overflow: "visible",
+      }}
+      title={url}
+    >
       <span>{text}</span>
       <LinkIconSVG />
     </a>
@@ -781,19 +837,7 @@ RESUME TEXT:
       });
 
       if (!resp.ok) {
-        let errStr = "";
-        try {
-          const errData = await resp.json();
-          errStr = errData?.error?.message || errData?.message || JSON.stringify(errData);
-        } catch {
-          errStr = "The backend server was unreachable or returned an invalid response. Please make sure `npm run dev` is running.";
-        }
-
-        if (resp.status === 429) {
-          errStr = "Groq API rate limit exceeded. Please wait a moment and try again.";
-        }
-
-        throw new Error(errStr || `Groq API error ${resp.status}. Please try again.`);
+        throw new Error(await getSafeAIMessageFromResponse(resp, "Resume parsing is temporarily unavailable. Please try again in a few minutes."));
       }
 
       const json = await resp.json();
@@ -820,7 +864,7 @@ RESUME TEXT:
       setTimeout(() => { onParsed(parsed, parseMeta); onClose(); }, 900);
     } catch (e) {
       setStatus("error");
-      setErrorMsg(e.message || "Failed to parse resume. Please try again or fill manually.");
+      setErrorMsg(getSafeAIMessageFromError(e, "Resume parsing is temporarily unavailable. Please try again in a few minutes."));
     }
   };
 
@@ -1483,15 +1527,7 @@ Rules:
       });
 
       if (!resp.ok) {
-        let errStr = "";
-        try {
-          const errData = await resp.json();
-          errStr = errData?.error?.message || errData?.message || JSON.stringify(errData);
-        } catch {
-          errStr = "The backend server was unreachable or returned an invalid response. Please make sure `npm run dev` is running.";
-        }
-        if (resp.status === 429) errStr = "Groq API rate limit exceeded. Please wait a moment and try again.";
-        throw new Error(errStr || `Groq API error ${resp.status}.`);
+        throw new Error(await getSafeAIMessageFromResponse(resp, "Analysis is temporarily unavailable. Please try again in a few minutes."));
       }
 
       const json = await resp.json();
@@ -1517,7 +1553,7 @@ Rules:
         }
       }));
     } catch (err) {
-      setJdState(prev => ({ ...prev, error: err.message || "Analysis failed.", status: "error" }));
+      setJdState(prev => ({ ...prev, error: getSafeAIMessageFromError(err, "Analysis is temporarily unavailable. Please try again in a few minutes."), status: "error" }));
     }
   };
 
@@ -2208,11 +2244,12 @@ Rules:
 function ResumePreviewPane({
   data, activeTemplate, activeTemplateLabel, setShowTemplateModal, showFontPanel, setShowFontPanel,
   headingFont, bodyFont, setHeadingFont, setBodyFont, resumeFontSize, setResumeFontSize,
-  resumeLineHeight, setResumeLineHeight, zoom, setZoom, handleResumeDownload,
+  resumeLineHeight, setResumeLineHeight, zoom, setZoom, handleResumeDownload, isPdfDownloading,
   template5Preview, setTemplate5Preview, previewRef, windowWidth
 }) {
   return (
     <div className="rb-preview-panel" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <style>{`@keyframes resume-pdf-spin { to { transform: rotate(360deg); } }`}</style>
       <div className="rb-toolbar" style={{ padding: "9px 18px", background: C.toolbarBg, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginRight: 4 }}>Template:</span>
         <button onClick={() => setShowTemplateModal(true)} style={{ padding: "5px 14px", border: `1.5px solid ${C.border}`, borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, background: "#fff", color: C.textLight, transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6 }}>
@@ -2256,9 +2293,13 @@ function ResumePreviewPane({
           <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, minWidth: 40, textAlign: "center", userSelect: "none", opacity: activeTemplate === "5" ? 0.5 : 1 }}>{zoom}%</span>
           <button disabled={activeTemplate === "5"} onClick={() => setZoom(z => Math.min(150, z + 10))} style={{ width: 28, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, background: "#fff", cursor: activeTemplate === "5" ? "not-allowed" : "pointer", opacity: activeTemplate === "5" ? 0.5 : 1, fontSize: 16, fontWeight: 700, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
         </div>
-        <button disabled={activeTemplate === "5" && template5Preview.isCompiling} onClick={handleResumeDownload} style={{ height: 32, padding: "0 14px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
-          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.download} /></svg>
-          {activeTemplate === "5" && template5Preview.isCompiling ? "Compiling..." : "PDF"}
+        <button disabled={isPdfDownloading || (activeTemplate === "5" && template5Preview.isCompiling)} onClick={handleResumeDownload} style={{ height: 32, padding: "0 14px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, cursor: isPdfDownloading ? "wait" : "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)", opacity: isPdfDownloading ? 0.9 : 1 }}>
+          {isPdfDownloading ? (
+            <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "#fff", display: "inline-block", animation: "resume-pdf-spin 0.8s linear infinite" }} />
+          ) : (
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.download} /></svg>
+          )}
+          {isPdfDownloading ? "Preparing..." : activeTemplate === "5" && template5Preview.isCompiling ? "Compiling..." : "PDF"}
         </button>
       </div>
       <div className="rb-preview-area" style={{ flex: 1, overflowY: "auto", background: C.previewBg, padding: "28px 0 60px", display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -2285,7 +2326,7 @@ function JDMatchPage() {
   const {
     data, setData, update, showUpload, setShowUpload, showTemplateModal, setShowTemplateModal, showFontPanel, setShowFontPanel,
     activeTemplate, setActiveTemplate, headingFont, setHeadingFont, bodyFont, setBodyFont, isFetching,
-    handleParsed, handleResumeDownload, zoom, setZoom, resumeFontSize, setResumeFontSize,
+    handleParsed, handleResumeDownload, isPdfDownloading, zoom, setZoom, resumeFontSize, setResumeFontSize,
     resumeLineHeight, setResumeLineHeight, template5Preview, setTemplate5Preview, previewRef, windowWidth, resumeScore
   } = useResumeWorkspace();
   const [jdState, setJdState] = useState({ text: "", status: "idle", error: "", analysis: null });
@@ -2433,6 +2474,7 @@ function JDMatchPage() {
           zoom={zoom}
           setZoom={setZoom}
           handleResumeDownload={handleResumeDownload}
+          isPdfDownloading={isPdfDownloading}
           template5Preview={template5Preview}
           setTemplate5Preview={setTemplate5Preview}
           previewRef={previewRef}
@@ -2590,6 +2632,7 @@ function useResumeWorkspace() {
   const [showUpload, setShowUpload] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showFontPanel, setShowFontPanel] = useState(false);
+  const [isPdfDownloading, setIsPdfDownloading] = useState(false);
   const [showTips, setShowTips] = useState(false);
   const [parseMeta, setParseMeta] = useState({ source: "builder", extractedTextLength: 0 });
   const [resumeAiReview, setResumeAiReview] = useState(null);
@@ -2816,24 +2859,32 @@ function useResumeWorkspace() {
     }
   }, [data, isSaving, user]);
 
-  const handleResumeDownload = useCallback(() => {
-    if (activeTemplate === "5") {
-      if (!template5Preview.pdfUrl) return;
-      const link = document.createElement("a");
-      link.href = template5Preview.pdfUrl;
-      link.download = `${data.personal.name || "Resume"}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      return;
+  const handleResumeDownload = useCallback(async () => {
+    if (isPdfDownloading) return;
+    setIsPdfDownloading(true);
+    try {
+      if (activeTemplate === "5") {
+        if (!template5Preview.pdfUrl) return;
+        const link = document.createElement("a");
+        link.href = template5Preview.pdfUrl;
+        link.download = `${data.personal.name || "Resume"}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        return;
+      }
+      await exportPDF(previewRef, data.personal.name);
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    } finally {
+      setIsPdfDownloading(false);
     }
-    exportPDF(previewRef, data.personal.name);
-  }, [activeTemplate, data.personal.name, template5Preview.pdfUrl]);
+  }, [activeTemplate, data.personal.name, isPdfDownloading, template5Preview.pdfUrl]);
 
   return {
     data, setData, update, showUpload, setShowUpload, showTemplateModal, setShowTemplateModal, showFontPanel, setShowFontPanel,
     showTips, setShowTips, activeTemplate, setActiveTemplate, headingFont, setHeadingFont, bodyFont, setBodyFont,
-    isSaving, isFetching, saveMessage, handleSaveToDb, handleParsed, handleResumeDownload, zoom, setZoom,
+    isSaving, isFetching, saveMessage, handleSaveToDb, handleParsed, handleResumeDownload, isPdfDownloading, zoom, setZoom,
     resumeFontSize, setResumeFontSize, resumeLineHeight, setResumeLineHeight, template5Preview, setTemplate5Preview,
     previewRef, windowWidth, resumeScore, resumeAiStatus
   };
@@ -3044,6 +3095,7 @@ function ResumeBuilder() {
   const [resumeFontSize, setResumeFontSize] = useState(9);
   const [resumeLineHeight, setResumeLineHeight] = useState(1.45);
   const [template5Preview, setTemplate5Preview] = useState({ pdfUrl: null, isCompiling: false, errors: [], latexCode: "" });
+  const [isPdfDownloading, setIsPdfDownloading] = useState(false);
 
   const [formWidth, setFormWidth] = useState(480);
   const [isDragging, setIsDragging] = useState(false);
@@ -3288,13 +3340,13 @@ ${clJD}`
           ]
         })
       });
-      if (!resp.ok) throw new Error("Cover letter generation failed.");
+      if (!resp.ok) throw new Error(await getSafeAIMessageFromResponse(resp, "Cover letter generation is temporarily unavailable. Please try again in a few minutes."));
       const json = await resp.json();
       const text = json.choices?.[0]?.message?.content || "";
       setCoverLetter(text.trim());
       if (!clJobTitle && detectedJobTitle) setClJobTitle(detectedJobTitle);
     } catch (err) {
-      setClError(err.message || "Cover letter generation failed.");
+      setClError(getSafeAIMessageFromError(err, "Cover letter generation is temporarily unavailable. Please try again in a few minutes."));
     } finally {
       setClLoading(false);
     }
@@ -3336,19 +3388,27 @@ ${clJD}`
 
   const activeTemplateLabel = activeTemplate === "A" ? "Classic" : activeTemplate === "B" ? "Modern" : activeTemplate === "C" ? "Minimal" : activeTemplate === "4" ? "Template 4" : "Template 5";
 
-  const handleResumeDownload = () => {
-    if (activeTemplate === "5") {
-      if (!template5Preview.pdfUrl) return;
-      const link = document.createElement("a");
-      link.href = template5Preview.pdfUrl;
-      link.download = `${data.personal.name || "Resume"}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      return;
-    }
+  const handleResumeDownload = async () => {
+    if (isPdfDownloading) return;
+    setIsPdfDownloading(true);
+    try {
+      if (activeTemplate === "5") {
+        if (!template5Preview.pdfUrl) return;
+        const link = document.createElement("a");
+        link.href = template5Preview.pdfUrl;
+        link.download = `${data.personal.name || "Resume"}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        return;
+      }
 
-    exportPDF(previewRef, data.personal.name);
+      await exportPDF(previewRef, data.personal.name);
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    } finally {
+      setIsPdfDownloading(false);
+    }
   };
 
 
@@ -3710,6 +3770,7 @@ ${clJD}`
           </>
         ) : (
           <>
+            <style>{`@keyframes resume-pdf-spin { to { transform: rotate(360deg); } }`}</style>
             {/* Toolbar */}
             <div className="rb-toolbar" style={{ padding: "9px 18px", background: C.toolbarBg, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginRight: 4 }}>Template:</span>
@@ -3772,10 +3833,14 @@ ${clJD}`
                 </button>
               </div>
               {/* Export button */}
-              <button disabled={aiLoading || (activeTemplate === "5" && template5Preview.isCompiling)} onClick={handleResumeDownload}
-                style={{ height: 32, padding: "0 14px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.download} /></svg>
-                {activeTemplate === "5" && template5Preview.isCompiling ? "Compiling..." : "PDF"}
+              <button disabled={aiLoading || isPdfDownloading || (activeTemplate === "5" && template5Preview.isCompiling)} onClick={handleResumeDownload}
+                style={{ height: 32, padding: "0 14px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, cursor: isPdfDownloading ? "wait" : "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)", opacity: isPdfDownloading ? 0.9 : 1 }}>
+                {isPdfDownloading ? (
+                  <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "#fff", display: "inline-block", animation: "resume-pdf-spin 0.8s linear infinite" }} />
+                ) : (
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.download} /></svg>
+                )}
+                {isPdfDownloading ? "Preparing..." : activeTemplate === "5" && template5Preview.isCompiling ? "Compiling..." : "PDF"}
               </button>
             </div>
 
@@ -3847,9 +3912,13 @@ ${clJD}`
           <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           Preview
         </button>
-        <button onClick={handleResumeDownload} disabled={activeTemplate === "5" && template5Preview.isCompiling}>
-          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={icons.download} /></svg>
-          {activeTemplate === "5" && template5Preview.isCompiling ? "Compiling" : "PDF"}
+        <button onClick={handleResumeDownload} disabled={isPdfDownloading || (activeTemplate === "5" && template5Preview.isCompiling)}>
+          {isPdfDownloading ? (
+            <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "#fff", display: "inline-block", animation: "resume-pdf-spin 0.8s linear infinite" }} />
+          ) : (
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={icons.download} /></svg>
+          )}
+          {isPdfDownloading ? "Preparing" : activeTemplate === "5" && template5Preview.isCompiling ? "Compiling" : "PDF"}
         </button>
       </nav>
     </div>

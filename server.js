@@ -13,6 +13,16 @@ const PORT = process.env.PORT || 3001;
 const DIST_DIR = path.join(__dirname, "resume-builder", "dist");
 const ENV_FILE = path.join(__dirname, "resume-builder", ".env");
 
+function buildSafeGroqError(status) {
+  if (status === 429) {
+    return { error: { message: "AI is busy right now. Please try again in a few minutes.", code: "AI_RATE_LIMITED" } };
+  }
+  if (status >= 500) {
+    return { error: { message: "AI is temporarily unavailable. Please try again in a few minutes.", code: "AI_UNAVAILABLE" } };
+  }
+  return { error: { message: "We could not complete that AI request. Please try again in a few minutes.", code: "AI_REQUEST_FAILED" } };
+}
+
 function getGroqApiKey() {
   const runtimeKey = (process.env.GROQ_API_KEY || "").trim();
   if (runtimeKey) {
@@ -29,6 +39,7 @@ function getGroqApiKey() {
 
 app.use(cors()); // Allow all origins — browser can now call this server
 app.use(express.json({ limit: "10mb" })); // Allow large resume payloads
+app.use(express.urlencoded({ limit: "25mb", extended: true }));
 
 // Serve the built React app (Vite build output)
 app.use(express.static(DIST_DIR));
@@ -58,13 +69,14 @@ app.post("/api/groq", async (req, res) => {
     const data = await groqResp.json();
 
     if (!groqResp.ok) {
-      return res.status(groqResp.status).json(data);
+      console.error("Groq proxy upstream error:", groqResp.status, data?.error?.message || data);
+      return res.status(groqResp.status).json(buildSafeGroqError(groqResp.status));
     }
 
     res.json(data);
   } catch (err) {
     console.error("Groq proxy error:", err.message);
-    res.status(500).json({ error: { message: err.message } });
+    res.status(500).json(buildSafeGroqError(500));
   }
 });
 
@@ -73,6 +85,7 @@ app.get("/api/health", (_, res) => res.json({ status: "ok", service: "Groq Proxy
 
 // ── Proxy endpoint: /api/latex ─────────────────────────────────────────────────
 app.use('/api/latex', require('./resume-builder/backend/latex-editor/routes/latexRoutes.cjs'));
+app.use('/api/pdf', require('./resume-builder/backend/pdf/routes/pdfRoutes.cjs'));
 
 // Fallback: serve React app for all other routes (SPA routing)
 app.get("*", (_, res) => res.sendFile(path.join(DIST_DIR, "index.html")));

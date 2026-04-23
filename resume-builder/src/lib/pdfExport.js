@@ -1,235 +1,140 @@
-// ── PDF Export Utility ─────────────────────────────────────────────────────────
-// Direct jsPDF + html2canvas approach — replaces html2pdf.js wrapper
-// Benefits: precise page slicing, no phantom blank pages, no opacity bugs
+function cloneHeadForPrint() {
+  const nodes = Array.from(document.head.querySelectorAll('style, link[rel="stylesheet"]'));
+  return nodes.map((node) => node.outerHTML).join("\n");
+}
 
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
+function getPdfRenderEndpoint() {
+  const envUrl = import.meta.env.VITE_PDF_RENDER_URL;
+  if (envUrl) return envUrl;
 
-const A4_W_MM = 210;
-const A4_H_MM = 297;
-
-// Minimum content height (in canvas px) to qualify as a real page.
-// Anything below this is rounding noise and gets discarded.
-// At scale=2, 1 CSS pixel = 2 canvas pixels.  A 10-CSS-px sliver
-// (≈ 2.6 mm) is definitely not a real page.
-const MIN_PAGE_CONTENT_PX = 20;
-
-/**
- * Shared logic: canvas → sliced A4 pages → jsPDF → save.
- * @param {HTMLCanvasElement} canvas
- * @param {string} filename
- * @param {Array<{href:string, x:number, y:number, w:number, h:number}>} links
- */
-function canvasToPDF(canvas, filename, links = []) {
-  const imgW = canvas.width;
-  const imgH = canvas.height;
-
-  const pxPerMM = imgW / A4_W_MM;
-  const pageHpx = Math.round(A4_H_MM * pxPerMM); // use round instead of floor
-
-  // Calculate real page count, but discard a trailing sliver
-  const rawPages = imgH / pageHpx;
-  const remainder = imgH - Math.floor(rawPages) * pageHpx;
-  const totalPages = (remainder > MIN_PAGE_CONTENT_PX)
-    ? Math.ceil(rawPages)
-    : Math.floor(rawPages) || 1;   // at least 1 page
-
-  const pdf = new jsPDF("p", "mm", "a4");
-
-  for (let i = 0; i < totalPages; i++) {
-    if (i > 0) pdf.addPage();
-
-    const srcY = i * pageHpx;
-    const srcH = Math.min(pageHpx, imgH - srcY);
-
-    // Safety: skip truly empty slivers
-    if (srcH <= MIN_PAGE_CONTENT_PX) continue;
-
-    // Slice this page out of the big canvas
-    const pageCanvas = document.createElement("canvas");
-    pageCanvas.width = imgW;
-    pageCanvas.height = srcH;
-    const ctx = pageCanvas.getContext("2d");
-    ctx.drawImage(canvas, 0, srcY, imgW, srcH, 0, 0, imgW, srcH);
-
-    const pageImg = pageCanvas.toDataURL("image/jpeg", 0.98);
-    const drawH = srcH / pxPerMM; // height in mm for this slice
-    pdf.addImage(pageImg, "JPEG", 0, 0, A4_W_MM, drawH);
-
-    // Apply clickable links to this page
-    const pageStartY = i * A4_H_MM;
-    const pageEndY = (i + 1) * A4_H_MM;
-    
-    links.forEach(l => {
-      // Check if the link intersects this page vertically
-      if (l.y + l.h > pageStartY && l.y < pageEndY) {
-        // Calculate coordinates relative to this page
-        const linkYOnPage = l.y - pageStartY;
-        pdf.link(l.x, linkYOnPage, l.w, l.h, { url: l.href });
-      }
-    });
+  if (import.meta.env.DEV) {
+    const { protocol, hostname } = window.location;
+    return `${protocol}//${hostname}:3001/api/pdf/render`;
   }
 
-  pdf.save(filename);
+  return "/api/pdf/render";
 }
 
-/**
- * Smart Pagination: Injects marginTop to push elements that cross page boundaries,
- * enforcing a strict top and bottom margin for every sliced page.
- * Returns a cleanup function to restore the DOM.
- */
-function applySmartPagination(node) {
-  const cssPxPerMM = node.offsetWidth / A4_W_MM;
-  const pageHeightPx = A4_H_MM * cssPxPerMM;
-  
-  // Define safe zones (margins)
-  const topMarginPx = 10 * cssPxPerMM; // 10mm top margin
-  const botMarginPx = 10 * cssPxPerMM; // 10mm bottom margin
-  
-  // Select all block-level elements that shouldn't be split
-  // (using div, p, li catches almost everything while ignoring inline spans)
-  const selectors = [
-    'div', 'li', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
-  ];
-  const els = Array.from(node.querySelectorAll(selectors.join(',')));
-  
-  const cleanups = [];
-  
-  for (const el of els) {
-    const rect = el.getBoundingClientRect();
-    const nodeRect = node.getBoundingClientRect();
-    
-    const topPx = rect.top - nodeRect.top;
-    const bottomPx = rect.bottom - nodeRect.top;
-    const heightPx = bottomPx - topPx;
-    
-    // Ignore elements that are huge (can't be pushed effectively)
-    if (heightPx > pageHeightPx * 0.8) continue;
+function getBackendHealthEndpoint() {
+  const pdfEndpoint = getPdfRenderEndpoint();
+  return pdfEndpoint.replace(/\/api\/pdf\/render$/, "/api/health");
+}
 
-    const pageIndex = Math.floor(topPx / pageHeightPx);
-    const pageStart = pageIndex * pageHeightPx;
-    const pageEnd = pageStart + pageHeightPx;
-    
-    let pushAmount = 0;
+function ensureDownloadFrame() {
+  const frameName = "pdf-download-frame";
+  let frame = document.querySelector(`iframe[name="${frameName}"]`);
 
-    // Rule A: Element crosses the bottom margin safe zone (or straddles boundary entirely)
-    if (bottomPx > pageEnd - botMarginPx) {
-      // Push it to start exactly at the top margin of the NEXT page
-      pushAmount = (pageEnd + topMarginPx) - topPx;
-    } 
-    // Rule B: Element naturally starts inside the top margin of a new page (page > 1)
-    else if (pageIndex > 0 && topPx < pageStart + topMarginPx) {
-      pushAmount = (pageStart + topMarginPx) - topPx;
-    }
-
-    if (pushAmount > 1) { // >1px to ignore subpixel noise
-      const originalMarginTop = el.style.marginTop;
-      const currentMarginTop = parseFloat(window.getComputedStyle(el).marginTop) || 0;
-      
-      el.style.marginTop = `${currentMarginTop + pushAmount}px`;
-      
-      cleanups.push(() => {
-        el.style.marginTop = originalMarginTop;
-      });
-    }
+  if (!frame) {
+    frame = document.createElement("iframe");
+    frame.name = frameName;
+    frame.style.display = "none";
+    document.body.appendChild(frame);
   }
-  
-  return () => cleanups.forEach(fn => fn());
+
+  return frameName;
 }
 
-/**
- * Extract exact positions of all hyperlinks to overlay on the PDF.
- */
-function extractLinks(node) {
-  const links = [];
-  const anchors = node.querySelectorAll('a[href]');
-  const nodeRect = node.getBoundingClientRect();
-  const cssPxPerMM = node.offsetWidth / A4_W_MM;
-  
-  anchors.forEach(a => {
-    let url = a.href;
-    const rawHref = a.getAttribute('href') || '';
-    
-    // Fix incorrectly resolved relative URLs (e.g. user typed "www.linkedin.com")
-    if (!rawHref.startsWith('http') && !rawHref.startsWith('mailto:') && !rawHref.startsWith('tel:')) {
-      if (rawHref.includes('.') && !rawHref.startsWith('/')) {
-        url = 'https://' + rawHref;
+function buildHtmlDocument(node, title) {
+  const clonedNode = node.cloneNode(true);
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${title}</title>
+    ${cloneHeadForPrint()}
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      html, body { margin: 0; padding: 0; background: #ffffff; }
+      body { width: 794px; margin: 0 auto; overflow: visible; }
+      .resume-export-root { width: 794px; background: #fff; }
+      .resume-export-page {
+        width: 794px;
+        height: 1123px;
+        background: #fff;
+        overflow: hidden;
+        position: relative;
+        break-after: page;
+        page-break-after: always;
       }
-    }
-
-    const rect = a.getBoundingClientRect();
-    links.push({
-      href: url,
-      x: (rect.left - nodeRect.left) / cssPxPerMM,
-      y: (rect.top - nodeRect.top) / cssPxPerMM,
-      w: rect.width / cssPxPerMM,
-      h: rect.height / cssPxPerMM
-    });
-  });
-  return links;
+      .resume-export-page:last-child {
+        break-after: auto;
+        page-break-after: auto;
+      }
+      @page { size: A4; margin: 0; }
+    </style>
+  </head>
+  <body>${clonedNode.outerHTML}</body>
+</html>`;
 }
 
-/**
- * exportResumePDF — captures the export-root DOM node, slices it into
- * exact A4-sized pages, and saves as PDF.  No blank trailing page.
- */
+async function exportNodeViaServer(node, filename) {
+  let healthOk = false;
+  try {
+    const resp = await fetch(getBackendHealthEndpoint(), { method: "GET" });
+    healthOk = resp.ok;
+  } catch {
+    healthOk = false;
+  }
+
+  if (!healthOk) {
+    throw new Error("PDF server is not running. Start the backend on port 3001 and try again.");
+  }
+
+  const html = buildHtmlDocument(node, filename);
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = getPdfRenderEndpoint();
+  form.target = ensureDownloadFrame();
+  form.style.display = "none";
+
+  const htmlInput = document.createElement("input");
+  htmlInput.type = "hidden";
+  htmlInput.name = "html";
+  htmlInput.value = html;
+
+  const filenameInput = document.createElement("input");
+  filenameInput.type = "hidden";
+  filenameInput.name = "filename";
+  filenameInput.value = filename;
+
+  form.appendChild(htmlInput);
+  form.appendChild(filenameInput);
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+}
+
 export async function exportResumePDF(ref, name) {
   const node = ref.current;
   if (!node) return;
 
-  // Inject Google Font links so html2canvas can render them
   const fontLinksForPdf = [window.__resumeHeadingFont, window.__resumeBodyFont]
-    .filter(f => f && f.googleUrl)
-    .map(f => f.googleUrl);
-  fontLinksForPdf.forEach(url => {
+    .filter((font) => font && font.googleUrl)
+    .map((font) => font.googleUrl);
+
+  fontLinksForPdf.forEach((url) => {
     if (!document.querySelector(`link[href="${url}"]`)) {
-      const l = document.createElement("link");
-      l.rel = "stylesheet"; l.href = url;
-      document.head.appendChild(l);
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = url;
+      document.head.appendChild(link);
     }
   });
 
-  // 1) Push elements that straddle the A4 boundary
-  const cleanupPagination = applySmartPagination(node);
-
-  // 2) Extract link coordinates AFTER pagination is applied
-  const links = extractLinks(node);
-
-  // Capture the full export root as a single canvas
-  const canvas = await html2canvas(node, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    backgroundColor: "#ffffff",
-  });
-
-  // Restore DOM
-  cleanupPagination();
-
-  // 3) Convert to PDF and overlay links
-  canvasToPDF(canvas, `${name || "Resume"}.pdf`, links);
+  try {
+    await exportNodeViaServer(node, `${name || "Resume"}.pdf`);
+  } catch (error) {
+    alert(error.message || "PDF export failed.");
+  }
 }
 
-/**
- * exportCoverLetterPDF — renders an off-screen HTML element to PDF.
- * Handles fonts, multi-page, no blank pages.
- */
 export async function exportCoverLetterPDF(el, filename) {
-  // 1) Apply smart pagination
-  const cleanupPagination = applySmartPagination(el);
-
-  // 2) Extract links
-  const links = extractLinks(el);
-
-  const canvas = await html2canvas(el, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    backgroundColor: "#ffffff",
-  });
-
-  // Restore DOM
-  cleanupPagination();
-
-  canvasToPDF(canvas, filename, links);
+  try {
+    await exportNodeViaServer(el, filename);
+  } catch (error) {
+    alert(error.message || "PDF export failed.");
+  }
 }

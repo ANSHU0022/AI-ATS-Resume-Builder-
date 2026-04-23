@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { getSafeAIMessageFromError, getSafeAIMessageFromResponse } from '../../lib/aiError';
 import './Networking.css';
 
 const Networking = () => {
@@ -151,6 +152,9 @@ Output ONLY the DM text. No explanations.`;
                     ]
                 })
             });
+            if (!resp.ok) {
+                throw new Error(await getSafeAIMessageFromResponse(resp, "AI is temporarily unavailable. Please try again in a few minutes."));
+            }
             const json = await resp.json();
             let output = json.choices?.[0]?.message?.content || "Failed to generate.";
             // Replace any remaining placeholders with actual name
@@ -161,7 +165,7 @@ Output ONLY the DM text. No explanations.`;
             }
             setOutput(output);
         } catch (err) {
-            setOutput("Error connecting to AI. Please try again.");
+            setOutput(getSafeAIMessageFromError(err, "AI is temporarily unavailable. Please try again in a few minutes."));
         } finally {
             isLoading(false);
         }

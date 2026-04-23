@@ -19,6 +19,16 @@ const MODEL_FALLBACK_CHAIN = [
   "llama-3.2-3b-preview",       // Fallback 2: smallest, most lenient limits
 ];
 
+function buildSafeGroqError(status) {
+  if (status === 429) {
+    return { error: { message: "AI is busy right now. Please try again in a few minutes.", code: "AI_RATE_LIMITED" } };
+  }
+  if (status >= 500) {
+    return { error: { message: "AI is temporarily unavailable. Please try again in a few minutes.", code: "AI_UNAVAILABLE" } };
+  }
+  return { error: { message: "We could not complete that AI request. Please try again in a few minutes.", code: "AI_REQUEST_FAILED" } };
+}
+
 function getGroqApiKey() {
   const runtimeKey = (process.env.GROQ_API_KEY || "").trim();
   if (runtimeKey) {
@@ -45,7 +55,8 @@ console.log(
 );
 
 app.use(cors()); // Allow all origins — browser can now call this server
-app.use(express.json({ limit: "10mb" })); // Allow large resume payloads
+app.use(express.json({ limit: "25mb" })); // Allow large resume/PDF payloads
+app.use(express.urlencoded({ limit: "25mb", extended: true }));
 
 // Serve the built React app (if using Vite/CRA build output)
 app.use(express.static(path.join(__dirname, "dist")));
@@ -146,10 +157,10 @@ app.post("/api/groq", async (req, res) => {
     const fetch = (await import('node-fetch')).default;
     const result = await callGroqWithRetry(fetch, GROQ_API_KEY, req.body);
 
-    return res.status(result.status).json(result.data);
+    return res.status(result.status).json(result.ok ? result.data : buildSafeGroqError(result.status));
   } catch (err) {
     console.error("Groq proxy error:", err.message);
-    res.status(500).json({ error: { message: err.message } });
+    res.status(500).json(buildSafeGroqError(500));
   }
 });
 
@@ -157,6 +168,10 @@ app.post("/api/groq", async (req, res) => {
 // ── New endpoint: /api/latex ──────────────────────────────────────────────────
 const latexRoutes = require('./backend/latex-editor/routes/latexRoutes.cjs');
 app.use('/api/latex', latexRoutes);
+
+// PDF render endpoint
+const pdfRoutes = require('./backend/pdf/routes/pdfRoutes.cjs');
+app.use('/api/pdf', pdfRoutes);
 
 // Health check
 app.get("/api/health", (_, res) => res.json({ status: "ok", service: "Groq Proxy", models: MODEL_FALLBACK_CHAIN }));
