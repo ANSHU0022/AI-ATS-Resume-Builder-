@@ -59,6 +59,71 @@ const initialData = {
   achievements: [{ title: "", url: "" }],
 };
 
+const normalizeOptimizationText = (value = "") => value.toString().replace(/\s+/g, " ").trim().toLowerCase();
+const createOptimizationKey = (...parts) => parts.map((part) => normalizeOptimizationText(part || "")).filter(Boolean).join("::");
+const limitOptimizationBullets = (bullets = []) => (Array.isArray(bullets) ? bullets : []).map((bullet) => (bullet || "").toString().trim()).filter(Boolean).slice(0, 3);
+const cleanOptimizationText = (value = "") => (
+  (value || "")
+    .replace(/\s+using [^.]*? to support [^.]*?requirements\.?/gi, "")
+    .replace(/\s+to better support [^.]*?requirements\.?/gi, "")
+    .replace(/\s+with strengths in [^.]+\.?/gi, "")
+    .replace(/,\s*including\s+([^.,]+)\s+including\s+/gi, ", including ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\s+([.,])/g, "$1")
+);
+const stripSummaryNamePrefix = (summary = "", candidateName = "") => {
+  const cleanSummary = (summary || "").trim();
+  const name = (candidateName || "").trim();
+  if (!cleanSummary || !name) return cleanSummary;
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let next = cleanSummary
+    .replace(new RegExp(`^${escapedName}\\s+is\\s+(an?\\s+)?`, "i"), "")
+    .replace(new RegExp(`^${escapedName}\\s*,?\\s*`, "i"), "")
+    .trim();
+  if (next) next = next.charAt(0).toUpperCase() + next.slice(1);
+  return next;
+};
+const findExperienceEntryIndex = (entries = [], company = "", role = "") => {
+  const targetKey = createOptimizationKey(company, role);
+  return (entries || []).findIndex((item) => createOptimizationKey(item.company, item.role) === targetKey);
+};
+const findProjectEntryIndex = (entries = [], name = "") => {
+  const targetKey = createOptimizationKey(name);
+  return (entries || []).findIndex((item) => createOptimizationKey(item.name) === targetKey);
+};
+const findAchievementEntryIndex = (entries = [], title = "", indexHint = -1) => {
+  const targetKey = createOptimizationKey(title);
+  const exactIndex = (entries || []).findIndex((item) => createOptimizationKey(item.title) === targetKey);
+  if (exactIndex !== -1) return exactIndex;
+  if (indexHint >= 0 && indexHint < (entries || []).length) return indexHint;
+  return -1;
+};
+const areOptimizationBulletListsEqual = (left = [], right = []) => {
+  const a = limitOptimizationBullets(left).map(normalizeOptimizationText);
+  const b = limitOptimizationBullets(right).map(normalizeOptimizationText);
+  return a.length === b.length && a.every((bullet, index) => bullet === b[index]);
+};
+const cloneResumeDataForOptimization = (data = initialData) => ({
+  ...data,
+  personal: { ...(data.personal || {}) },
+  skills: (data.skills || []).map((item) => ({ ...item })),
+  education: (data.education || []).map((item) => ({ ...item })),
+  experience: (data.experience || []).map((item) => ({ ...item, bullets: [...(item.bullets || [])] })),
+  projects: (data.projects || []).map((item) => ({ ...item, bullets: [...(item.bullets || [])] })),
+  certifications: (data.certifications || []).map((item) => ({ ...item })),
+  achievements: (data.achievements || []).map((item) => ({ ...item })),
+});
+const hasResumeOptimizationContent = (data = initialData) => {
+  const snapshot = buildResumeSnapshot(data);
+  return !!(
+    snapshot.summary ||
+    snapshot.expEntries.some((item) => item.role || item.company || item.bullets.length) ||
+    snapshot.projectEntries.some((item) => item.name || item.tech || item.bullets.length) ||
+    snapshot.achievementEntries.some((item) => item.title)
+  );
+};
+
 // ── ATS Scoring ───────────────────────────────────────────────────────────────
 // ── Resume sub-components ─────────────────────────────────────────────────────
 function BIcon({ path, size = 9 }) {
@@ -971,6 +1036,649 @@ RESUME TEXT:
   );
 }
 
+
+
+function AIOptimizationModal({ onClose, data, setData, parseMeta, resumeAiReview, resumeScore }) {
+  const sourceDataRef = useRef(cloneResumeDataForOptimization(data));
+  const sourceData = sourceDataRef.current;
+  const [status, setStatus] = useState("loading");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [result, setResult] = useState(null);
+  const [selected, setSelected] = useState({ summary: false, experience: {}, projects: {}, achievements: {} });
+  const [applied, setApplied] = useState({ summary: false, experience: {}, projects: {}, achievements: {} });
+
+  const ringColors = (score) => {
+    if (score >= 80) return { fg: "#16a34a", bg: "#dcfce7", text: "#166534" };
+    if (score >= 60) return { fg: "#d97706", bg: "#fef3c7", text: "#92400e" };
+    return { fg: "#dc2626", bg: "#fee2e2", text: "#991b1b" };
+  };
+
+  const getExperienceKey = (item) => createOptimizationKey(item.company, item.role);
+  const getProjectKey = (item) => createOptimizationKey(item.name);
+  const getAchievementKey = (item) => createOptimizationKey(item.currentTitle || item.title, item.index);
+
+  const hydrateOptimizationResult = useCallback((raw) => {
+    const personalName = sourceData.personal?.name || "";
+    const nextSummary = cleanOptimizationText(stripSummaryNamePrefix(raw?.optimizedSummary || "", personalName));
+    const experience = (Array.isArray(raw?.optimizedExperience) ? raw.optimizedExperience : []).map((item) => {
+      const entryIndex = findExperienceEntryIndex(sourceData.experience || [], item.company, item.role);
+      const currentEntry = entryIndex >= 0 ? sourceData.experience[entryIndex] : null;
+      return {
+        company: item.company || currentEntry?.company || "",
+        role: item.role || currentEntry?.role || "",
+        currentBullets: limitOptimizationBullets(item.currentBullets?.length ? item.currentBullets : currentEntry?.bullets || []),
+        optimizedBullets: limitOptimizationBullets((item.optimizedBullets || []).map((bullet) => cleanOptimizationText(bullet))),
+      };
+    }).filter((item) => (item.company || item.role) && item.optimizedBullets.length && !areOptimizationBulletListsEqual(item.currentBullets, item.optimizedBullets));
+
+    const projects = (Array.isArray(raw?.optimizedProjects) ? raw.optimizedProjects : []).map((item) => {
+      const entryIndex = findProjectEntryIndex(sourceData.projects || [], item.name);
+      const currentEntry = entryIndex >= 0 ? sourceData.projects[entryIndex] : null;
+      return {
+        name: item.name || currentEntry?.name || "",
+        currentBullets: limitOptimizationBullets(item.currentBullets?.length ? item.currentBullets : currentEntry?.bullets || []),
+        optimizedBullets: limitOptimizationBullets((item.optimizedBullets || []).map((bullet) => cleanOptimizationText(bullet))),
+      };
+    }).filter((item) => item.name && item.optimizedBullets.length && !areOptimizationBulletListsEqual(item.currentBullets, item.optimizedBullets));
+
+    const achievements = (Array.isArray(raw?.optimizedAchievements) ? raw.optimizedAchievements : []).map((item, index) => {
+      const entryIndex = findAchievementEntryIndex(sourceData.achievements || [], item.title, index);
+      const currentEntry = entryIndex >= 0 ? sourceData.achievements[entryIndex] : null;
+      const currentTitle = (currentEntry?.title || item.title || "").trim();
+      const optimizedTitle = cleanOptimizationText(item.optimizedTitle || "");
+      return {
+        index: entryIndex >= 0 ? entryIndex : index,
+        currentTitle,
+        optimizedTitle,
+        url: currentEntry?.url || item.url || "",
+      };
+    }).filter((item) => item.currentTitle && item.optimizedTitle && normalizeOptimizationText(item.currentTitle) !== normalizeOptimizationText(item.optimizedTitle));
+
+    return {
+      summary: sourceData.summary && nextSummary && normalizeOptimizationText(stripSummaryNamePrefix(sourceData.summary || "", personalName)) !== normalizeOptimizationText(nextSummary)
+        ? nextSummary
+        : "",
+      experience,
+      projects,
+      achievements,
+    };
+  }, [sourceData]);
+
+  const buildInitialFlags = useCallback((preparedResult) => {
+    const expApplied = Object.fromEntries(preparedResult.experience.map((item) => {
+      const idx = findExperienceEntryIndex(sourceData.experience || [], item.company, item.role);
+      const currentBullets = idx >= 0 ? sourceData.experience[idx]?.bullets || [] : [];
+      return [getExperienceKey(item), areOptimizationBulletListsEqual(currentBullets, item.optimizedBullets)];
+    }));
+    const projApplied = Object.fromEntries(preparedResult.projects.map((item) => {
+      const idx = findProjectEntryIndex(sourceData.projects || [], item.name);
+      const currentBullets = idx >= 0 ? sourceData.projects[idx]?.bullets || [] : [];
+      return [getProjectKey(item), areOptimizationBulletListsEqual(currentBullets, item.optimizedBullets)];
+    }));
+    const achApplied = Object.fromEntries(preparedResult.achievements.map((item) => {
+      const idx = findAchievementEntryIndex(sourceData.achievements || [], item.currentTitle, item.index);
+      const currentTitle = idx >= 0 ? sourceData.achievements[idx]?.title || "" : "";
+      return [getAchievementKey(item), normalizeOptimizationText(currentTitle) === normalizeOptimizationText(item.optimizedTitle)];
+    }));
+
+    return {
+      applied: {
+        summary: !!preparedResult.summary && normalizeOptimizationText(stripSummaryNamePrefix(sourceData.summary || "", sourceData.personal?.name || "")) === normalizeOptimizationText(preparedResult.summary),
+        experience: expApplied,
+        projects: projApplied,
+        achievements: achApplied,
+      },
+      selected: {
+        summary: !!preparedResult.summary,
+        experience: Object.fromEntries(preparedResult.experience.map((item) => [getExperienceKey(item), true])),
+        projects: Object.fromEntries(preparedResult.projects.map((item) => [getProjectKey(item), true])),
+        achievements: Object.fromEntries(preparedResult.achievements.map((item) => [getAchievementKey(item), true])),
+      }
+    };
+  }, [sourceData]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!hasResumeOptimizationContent(sourceData)) {
+        setStatus("error");
+        setErrorMsg("Add some summary, experience, projects, or awards first so AI has real content to improve.");
+        return;
+      }
+
+      setStatus("loading");
+      setErrorMsg("");
+      try {
+        const payload = {
+          summary: sourceData.summary || "",
+          experience: (sourceData.experience || []).map((item) => ({
+            role: item.role || "",
+            company: item.company || "",
+            bullets: limitOptimizationBullets(item.bullets || []),
+          })).filter((item) => (item.role || item.company) && item.bullets.length),
+          projects: (sourceData.projects || []).map((item) => ({
+            name: item.name || "",
+            tech: item.tech || "",
+            bullets: limitOptimizationBullets(item.bullets || []),
+          })).filter((item) => item.name && item.bullets.length),
+          achievements: (sourceData.achievements || []).map((item) => ({
+            title: item.title || "",
+            url: item.url || "",
+          })).filter((item) => item.title),
+        };
+
+        const resp = await fetch("/api/groq", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "llama-3.1-8b-instant",
+            temperature: 0.2,
+            max_tokens: 1800,
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "system",
+                content: `You are a professional resume writing optimizer.
+Return only valid JSON.
+Improve existing resume wording for ATS, clarity, and specificity.
+Do not invent fake metrics, fake tools, fake projects, or fake awards.
+Rewrite only from the content already present.
+Keep the candidate truthful.
+Use concise, recruiter-friendly language.
+Experience and project bullets should be 10 to 28 words and start with strong action language when natural.`
+              },
+              {
+                role: "user",
+                content: `Optimize this resume content and return JSON using this exact shape:
+{
+  "optimizedSummary": "string",
+  "optimizedExperience": [
+    {
+      "company": "string",
+      "role": "string",
+      "currentBullets": ["string"],
+      "optimizedBullets": ["string"]
+    }
+  ],
+  "optimizedProjects": [
+    {
+      "name": "string",
+      "currentBullets": ["string"],
+      "optimizedBullets": ["string"]
+    }
+  ],
+  "optimizedAchievements": [
+    {
+      "title": "string",
+      "optimizedTitle": "string",
+      "url": "string"
+    }
+  ]
+}
+
+Rules:
+- Preserve the same number of bullets when possible, maximum 3 bullets per experience/project item.
+- Only optimize sections that already have content.
+- Keep summary between 45 and 75 words when present.
+- Awards/achievements must remain single-line title improvements, not bullet lists.
+- Return JSON only.
+
+RESUME CONTENT:
+${JSON.stringify(payload)}`
+              }
+            ]
+          })
+        });
+
+        if (!resp.ok) {
+          throw new Error(await getSafeAIMessageFromResponse(resp, "AI optimization is temporarily unavailable. Please try again in a moment."));
+        }
+
+        const json = await resp.json();
+        const rawText = json.choices?.[0]?.message?.content || "{}";
+        const parsed = JSON.parse(rawText);
+        const prepared = hydrateOptimizationResult(parsed);
+        const flags = buildInitialFlags(prepared);
+
+        if (!cancelled) {
+          setResult(prepared);
+          setApplied(flags.applied);
+          setSelected(flags.selected);
+          setStatus("done");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setStatus("error");
+          setErrorMsg(getSafeAIMessageFromError(err, "AI optimization failed. Please try again."));
+        }
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
+  }, [buildInitialFlags, hydrateOptimizationResult, sourceData]);
+
+  const buildProjectedData = () => {
+    const next = cloneResumeDataForOptimization(data);
+    if (!result) return next;
+
+    if (result.summary && selected.summary && !applied.summary) {
+      next.summary = result.summary;
+    }
+
+    result.experience.forEach((item) => {
+      const key = getExperienceKey(item);
+      if (!selected.experience[key] || applied.experience[key]) return;
+      const idx = findExperienceEntryIndex(next.experience || [], item.company, item.role);
+      if (idx !== -1) next.experience[idx] = { ...next.experience[idx], bullets: [...item.optimizedBullets] };
+    });
+
+    result.projects.forEach((item) => {
+      const key = getProjectKey(item);
+      if (!selected.projects[key] || applied.projects[key]) return;
+      const idx = findProjectEntryIndex(next.projects || [], item.name);
+      if (idx !== -1) next.projects[idx] = { ...next.projects[idx], bullets: [...item.optimizedBullets] };
+    });
+
+    result.achievements.forEach((item) => {
+      const key = getAchievementKey(item);
+      if (!selected.achievements[key] || applied.achievements[key]) return;
+      const idx = findAchievementEntryIndex(next.achievements || [], item.currentTitle, item.index);
+      if (idx !== -1) next.achievements[idx] = { ...next.achievements[idx], title: item.optimizedTitle };
+    });
+
+    return next;
+  };
+
+  const projectedData = buildProjectedData();
+  const projectedScore = calculateResumeScore(projectedData, { parseMeta, aiReview: resumeAiReview });
+  const hasSuggestions = !!(result && (result.summary || result.experience.length || result.projects.length || result.achievements.length));
+  const pendingCount = (result ? [
+    result.summary && selected.summary && !applied.summary ? 1 : 0,
+    ...result.experience.map((item) => selected.experience[getExperienceKey(item)] && !applied.experience[getExperienceKey(item)] ? 1 : 0),
+    ...result.projects.map((item) => selected.projects[getProjectKey(item)] && !applied.projects[getProjectKey(item)] ? 1 : 0),
+    ...result.achievements.map((item) => selected.achievements[getAchievementKey(item)] && !applied.achievements[getAchievementKey(item)] ? 1 : 0),
+  ] : []).reduce((sum, value) => sum + value, 0);
+
+  const toggleSelected = (section, key, forcedValue = null) => {
+    setSelected((prev) => {
+      if (section === "summary") {
+        return { ...prev, summary: forcedValue == null ? !prev.summary : forcedValue };
+      }
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [key]: forcedValue == null ? !prev[section][key] : forcedValue,
+        }
+      };
+    });
+  };
+
+  const applySummary = () => {
+    if (!result?.summary || applied.summary) return;
+    setData((prev) => ({ ...prev, summary: result.summary }));
+    setApplied((prev) => ({ ...prev, summary: true }));
+    setSelected((prev) => ({ ...prev, summary: false }));
+  };
+
+  const applyExperience = (item) => {
+    const key = getExperienceKey(item);
+    if (applied.experience[key]) return;
+    setData((prev) => {
+      const next = cloneResumeDataForOptimization(prev);
+      const idx = findExperienceEntryIndex(next.experience || [], item.company, item.role);
+      if (idx !== -1) next.experience[idx] = { ...next.experience[idx], bullets: [...item.optimizedBullets] };
+      return next;
+    });
+    setApplied((prev) => ({ ...prev, experience: { ...prev.experience, [key]: true } }));
+    toggleSelected("experience", key, false);
+  };
+
+  const applyProject = (item) => {
+    const key = getProjectKey(item);
+    if (applied.projects[key]) return;
+    setData((prev) => {
+      const next = cloneResumeDataForOptimization(prev);
+      const idx = findProjectEntryIndex(next.projects || [], item.name);
+      if (idx !== -1) next.projects[idx] = { ...next.projects[idx], bullets: [...item.optimizedBullets] };
+      return next;
+    });
+    setApplied((prev) => ({ ...prev, projects: { ...prev.projects, [key]: true } }));
+    toggleSelected("projects", key, false);
+  };
+
+  const applyAchievement = (item) => {
+    const key = getAchievementKey(item);
+    if (applied.achievements[key]) return;
+    setData((prev) => {
+      const next = cloneResumeDataForOptimization(prev);
+      const idx = findAchievementEntryIndex(next.achievements || [], item.currentTitle, item.index);
+      if (idx !== -1) next.achievements[idx] = { ...next.achievements[idx], title: item.optimizedTitle };
+      return next;
+    });
+    setApplied((prev) => ({ ...prev, achievements: { ...prev.achievements, [key]: true } }));
+    toggleSelected("achievements", key, false);
+  };
+
+  const applyAll = () => {
+    if (!result || pendingCount === 0) return;
+    setData((prev) => {
+      const next = cloneResumeDataForOptimization(prev);
+      if (result.summary && selected.summary && !applied.summary) {
+        next.summary = result.summary;
+      }
+      result.experience.forEach((item) => {
+        const key = getExperienceKey(item);
+        if (!selected.experience[key] || applied.experience[key]) return;
+        const idx = findExperienceEntryIndex(next.experience || [], item.company, item.role);
+        if (idx !== -1) next.experience[idx] = { ...next.experience[idx], bullets: [...item.optimizedBullets] };
+      });
+      result.projects.forEach((item) => {
+        const key = getProjectKey(item);
+        if (!selected.projects[key] || applied.projects[key]) return;
+        const idx = findProjectEntryIndex(next.projects || [], item.name);
+        if (idx !== -1) next.projects[idx] = { ...next.projects[idx], bullets: [...item.optimizedBullets] };
+      });
+      result.achievements.forEach((item) => {
+        const key = getAchievementKey(item);
+        if (!selected.achievements[key] || applied.achievements[key]) return;
+        const idx = findAchievementEntryIndex(next.achievements || [], item.currentTitle, item.index);
+        if (idx !== -1) next.achievements[idx] = { ...next.achievements[idx], title: item.optimizedTitle };
+      });
+      return next;
+    });
+
+    setApplied((prev) => ({
+      summary: !!(prev.summary || (result.summary && selected.summary)),
+      experience: {
+        ...prev.experience,
+        ...Object.fromEntries(result.experience.map((item) => [getExperienceKey(item), prev.experience[getExperienceKey(item)] || !!selected.experience[getExperienceKey(item)]])),
+      },
+      projects: {
+        ...prev.projects,
+        ...Object.fromEntries(result.projects.map((item) => [getProjectKey(item), prev.projects[getProjectKey(item)] || !!selected.projects[getProjectKey(item)]])),
+      },
+      achievements: {
+        ...prev.achievements,
+        ...Object.fromEntries(result.achievements.map((item) => [getAchievementKey(item), prev.achievements[getAchievementKey(item)] || !!selected.achievements[getAchievementKey(item)]])),
+      },
+    }));
+    setSelected((prev) => ({
+      summary: false,
+      experience: Object.fromEntries(Object.keys(prev.experience).map((key) => [key, false])),
+      projects: Object.fromEntries(Object.keys(prev.projects).map((key) => [key, false])),
+      achievements: Object.fromEntries(Object.keys(prev.achievements).map((key) => [key, false])),
+    }));
+  };
+
+  const sectionHeading = (title, count) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>{title}</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>{count}</div>
+    </div>
+  );
+
+  const comparisonCardStyle = (isApplied) => ({
+    border: `1px solid ${isApplied ? "#86efac" : "#e5e7eb"}`,
+    background: isApplied ? "#f0fdf4" : "#fff",
+    borderRadius: 14,
+    padding: 16,
+  });
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.42)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
+      <div className="modal-enter card" style={{ background: "#fff", width: "min(980px, calc(100vw - 24px))", maxHeight: "min(88vh, calc(100vh - 24px))", borderRadius: 24, boxShadow: "0 28px 60px rgba(2, 6, 23, 0.28)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "18px 22px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>AI Optimization Panel</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>Compare your current resume text with AI-optimized suggestions before applying them.</div>
+          </div>
+          <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: 10, border: "none", background: "#f3f4f6", color: "#64748b", cursor: "pointer", fontSize: 18 }}>×</button>
+        </div>
+
+        <div style={{ padding: 20, overflowY: "auto", display: "flex", flexDirection: "column", gap: 18 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px solid #e5e7eb", paddingBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: "#475569", letterSpacing: 0.4 }}>ATS SCORE</span>
+                <span style={{ fontSize: 20, fontWeight: 900, color: ringColors(resumeScore.overall).text }}>{resumeScore.overall}/100</span>
+                <span style={{ fontSize: 12, color: "#64748b" }}>Current</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, color: "#64748b" }}>Projected</span>
+                <span style={{ fontSize: 20, fontWeight: 900, color: ringColors(projectedScore.overall).text }}>{projectedScore.overall}/100</span>
+                {projectedScore.overall !== resumeScore.overall && (
+                  <span style={{ fontSize: 11, fontWeight: 800, color: projectedScore.overall > resumeScore.overall ? "#15803d" : "#b45309" }}>
+                    {projectedScore.overall > resumeScore.overall ? `+${projectedScore.overall - resumeScore.overall}` : `${projectedScore.overall - resumeScore.overall}`}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 12, color: "#64748b" }}>
+                {pendingCount ? "AI optimization notable. Projected score updates from your selected suggestions." : "Select suggestions to preview ATS score impact."}
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
+                Selected improvements: <strong style={{ color: "#111827" }}>{pendingCount}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", paddingBottom: 4 }}>
+            <div style={{ fontSize: 12, color: "#6b7280" }}>
+              Apply one by one, or apply all selected suggestions at once.
+            </div>
+            <button
+              onClick={applyAll}
+              disabled={pendingCount === 0 || status !== "done"}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 10,
+                border: "none",
+                background: pendingCount === 0 || status !== "done" ? "#e5e7eb" : "linear-gradient(135deg, #6d28d9, #2563eb)",
+                color: pendingCount === 0 || status !== "done" ? "#94a3b8" : "#fff",
+                fontSize: 12,
+                fontWeight: 800,
+                cursor: pendingCount === 0 || status !== "done" ? "default" : "pointer",
+                boxShadow: pendingCount === 0 || status !== "done" ? "none" : "0 10px 24px rgba(99, 102, 241, 0.18)",
+                whiteSpace: "nowrap"
+              }}
+            >
+              {pendingCount === 0 ? "All Selected Suggestions Applied" : `Apply All Selected (${pendingCount})`}
+            </button>
+          </div>
+
+          {status === "loading" && (
+            <div style={{ minHeight: 280, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
+              <div style={{ width: 46, height: 46, borderRadius: "50%", border: "4px solid #e5e7eb", borderTopColor: "#7c5cbf", animation: "spin 0.8s linear infinite" }} />
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#475569" }}>Analyzing your resume with AI...</div>
+              <div style={{ fontSize: 11, color: "#94a3b8" }}>Preparing side-by-side improvements for summary, bullets, and awards.</div>
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            </div>
+          )}
+
+          {status === "error" && (
+            <div style={{ padding: "2px 0 0", color: "#b91c1c" }}>
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>Optimization unavailable</div>
+              <div style={{ fontSize: 12, lineHeight: 1.6 }}>{errorMsg}</div>
+            </div>
+          )}
+
+          {status === "done" && !hasSuggestions && (
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: "18px 20px", color: "#475569" }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", marginBottom: 6 }}>No meaningful rewrites suggested</div>
+              <div style={{ fontSize: 12, lineHeight: 1.6 }}>Your current summary, bullets, and awards already look close to the optimized version. Try adding more detailed bullets if you want stronger ATS-focused rewrites.</div>
+            </div>
+          )}
+
+          {status === "done" && hasSuggestions && (
+            <>
+              {result.summary && (
+                <div>
+                  {sectionHeading("Summary", applied.summary ? "Applied" : selected.summary ? "Selected for preview" : "Excluded from preview")}
+                  <div style={comparisonCardStyle(applied.summary)}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#1f2937" }}>Professional summary</div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {!applied.summary && (
+                          <button onClick={() => toggleSelected("summary")} style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${selected.summary ? "#8b5cf6" : "#cbd5e1"}`, background: selected.summary ? "#f5f3ff" : "#fff", color: selected.summary ? "#6d28d9" : "#475569", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                            {selected.summary ? "Included in Preview" : "Include in Preview"}
+                          </button>
+                        )}
+                        <button onClick={applySummary} disabled={applied.summary} style={{ padding: "7px 12px", borderRadius: 10, border: "none", background: applied.summary ? "#dcfce7" : "#2563eb", color: applied.summary ? "#15803d" : "#fff", fontSize: 11, fontWeight: 800, cursor: applied.summary ? "default" : "pointer" }}>
+                          {applied.summary ? "Applied" : "Apply Summary"}
+                        </button>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+                      <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 14 }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", marginBottom: 8 }}>CURRENT</div>
+                        <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.7 }}>{sourceData.summary || "No summary added yet."}</div>
+                      </div>
+                      <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: 14 }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "#2563eb", marginBottom: 8 }}>AI OPTIMIZED</div>
+                        <div style={{ fontSize: 12, color: "#1e3a8a", lineHeight: 1.7 }}>{result.summary}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {result.experience.length > 0 && (
+                <div>
+                  {sectionHeading("Experience Bullets", `${result.experience.length} suggestion${result.experience.length > 1 ? "s" : ""}`)}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {result.experience.map((item) => {
+                      const key = getExperienceKey(item);
+                      const isApplied = !!applied.experience[key];
+                      return (
+                        <div key={key} style={comparisonCardStyle(isApplied)}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{item.role || "Role"}</div>
+                              <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{item.company || "Company"}</div>
+                            </div>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              {!isApplied && (
+                                <button onClick={() => toggleSelected("experience", key)} style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${selected.experience[key] ? "#8b5cf6" : "#cbd5e1"}`, background: selected.experience[key] ? "#f5f3ff" : "#fff", color: selected.experience[key] ? "#6d28d9" : "#475569", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                                  {selected.experience[key] ? "Included in Preview" : "Include in Preview"}
+                                </button>
+                              )}
+                              <button onClick={() => applyExperience(item)} disabled={isApplied} style={{ padding: "7px 12px", borderRadius: 10, border: "none", background: isApplied ? "#dcfce7" : "#2563eb", color: isApplied ? "#15803d" : "#fff", fontSize: 11, fontWeight: 800, cursor: isApplied ? "default" : "pointer" }}>
+                                {isApplied ? "Applied" : "Apply Bullets"}
+                              </button>
+                            </div>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+                            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 14 }}>
+                              <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", marginBottom: 8 }}>CURRENT</div>
+                              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#334155", lineHeight: 1.75 }}>
+                                {item.currentBullets.map((bullet, index) => <li key={index} style={{ marginBottom: 6 }}>{bullet}</li>)}
+                              </ul>
+                            </div>
+                            <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: 14 }}>
+                              <div style={{ fontSize: 10, fontWeight: 800, color: "#2563eb", marginBottom: 8 }}>AI OPTIMIZED</div>
+                              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#1e3a8a", lineHeight: 1.75 }}>
+                                {item.optimizedBullets.map((bullet, index) => <li key={index} style={{ marginBottom: 6 }}>{bullet}</li>)}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {result.projects.length > 0 && (
+                <div>
+                  {sectionHeading("Project Bullets", `${result.projects.length} suggestion${result.projects.length > 1 ? "s" : ""}`)}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {result.projects.map((item) => {
+                      const key = getProjectKey(item);
+                      const isApplied = !!applied.projects[key];
+                      return (
+                        <div key={key} style={comparisonCardStyle(isApplied)}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+                            <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{item.name}</div>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              {!isApplied && (
+                                <button onClick={() => toggleSelected("projects", key)} style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${selected.projects[key] ? "#8b5cf6" : "#cbd5e1"}`, background: selected.projects[key] ? "#f5f3ff" : "#fff", color: selected.projects[key] ? "#6d28d9" : "#475569", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                                  {selected.projects[key] ? "Included in Preview" : "Include in Preview"}
+                                </button>
+                              )}
+                              <button onClick={() => applyProject(item)} disabled={isApplied} style={{ padding: "7px 12px", borderRadius: 10, border: "none", background: isApplied ? "#dcfce7" : "#2563eb", color: isApplied ? "#15803d" : "#fff", fontSize: 11, fontWeight: 800, cursor: isApplied ? "default" : "pointer" }}>
+                                {isApplied ? "Applied" : "Apply Bullets"}
+                              </button>
+                            </div>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+                            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 14 }}>
+                              <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", marginBottom: 8 }}>CURRENT</div>
+                              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#334155", lineHeight: 1.75 }}>
+                                {item.currentBullets.map((bullet, index) => <li key={index} style={{ marginBottom: 6 }}>{bullet}</li>)}
+                              </ul>
+                            </div>
+                            <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: 14 }}>
+                              <div style={{ fontSize: 10, fontWeight: 800, color: "#2563eb", marginBottom: 8 }}>AI OPTIMIZED</div>
+                              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#1e3a8a", lineHeight: 1.75 }}>
+                                {item.optimizedBullets.map((bullet, index) => <li key={index} style={{ marginBottom: 6 }}>{bullet}</li>)}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {result.achievements.length > 0 && (
+                <div>
+                  {sectionHeading("Awards & Achievements", `${result.achievements.length} suggestion${result.achievements.length > 1 ? "s" : ""}`)}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {result.achievements.map((item) => {
+                      const key = getAchievementKey(item);
+                      const isApplied = !!applied.achievements[key];
+                      return (
+                        <div key={key} style={comparisonCardStyle(isApplied)}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+                            <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>Achievement title refinement</div>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              {!isApplied && (
+                                <button onClick={() => toggleSelected("achievements", key)} style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${selected.achievements[key] ? "#8b5cf6" : "#cbd5e1"}`, background: selected.achievements[key] ? "#f5f3ff" : "#fff", color: selected.achievements[key] ? "#6d28d9" : "#475569", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                                  {selected.achievements[key] ? "Included in Preview" : "Include in Preview"}
+                                </button>
+                              )}
+                              <button onClick={() => applyAchievement(item)} disabled={isApplied} style={{ padding: "7px 12px", borderRadius: 10, border: "none", background: isApplied ? "#dcfce7" : "#2563eb", color: isApplied ? "#15803d" : "#fff", fontSize: 11, fontWeight: 800, cursor: isApplied ? "default" : "pointer" }}>
+                                {isApplied ? "Applied" : "Apply Title"}
+                              </button>
+                            </div>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+                            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 14 }}>
+                              <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", marginBottom: 8 }}>CURRENT</div>
+                              <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.7 }}>{item.currentTitle}</div>
+                            </div>
+                            <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: 14 }}>
+                              <div style={{ fontSize: 10, fontWeight: 800, color: "#2563eb", marginBottom: 8 }}>AI OPTIMIZED</div>
+                              <div style={{ fontSize: 12, color: "#1e3a8a", lineHeight: 1.7 }}>{item.optimizedTitle}</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 
 // (Old inline FontPickerPanel removed, using imported FontPickerPanel)
@@ -2900,6 +3608,7 @@ function ResumeBuilder() {
   const [showTips, setShowTips] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showOptimization, setShowOptimization] = useState(false);
   const [parseMeta, setParseMeta] = useState({ source: "builder", extractedTextLength: 0 });
   const [resumeAiReview, setResumeAiReview] = useState(null);
   const [resumeAiStatus, setResumeAiStatus] = useState("idle");
@@ -3449,6 +4158,7 @@ ${clJD}`
       `}</style>
 
       {showJD && <JDAnalyzerModal onClose={() => setShowJD(false)} data={data} setData={setData} jdState={jdState} setJdState={setJdState} jdScore={jdScore} resumeScore={resumeScore} />}
+      {showOptimization && <AIOptimizationModal onClose={() => setShowOptimization(false)} data={data} setData={setData} parseMeta={parseMeta} resumeAiReview={resumeAiReview} resumeScore={resumeScore} />}
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} onParsed={handleParsed} />}
       {showTemplateModal && <TemplateModal onClose={() => setShowTemplateModal(false)} activeTemplate={activeTemplate} onSelect={setActiveTemplate} />}
 
@@ -3562,13 +4272,38 @@ ${clJD}`
         {/* Header with Upload button */}
         <div style={{ padding: "16px 20px 14px", borderBottom: `1px solid ${C.border}`, fontFamily: "'Sora', sans-serif" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 6 }}>ATS<em style={{ color: C.accent, fontStyle: "normal" }}>Forge</em></div>
-            </div>
+            <button
+              onClick={() => setShowOptimization(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                justifyContent: "center",
+                minHeight: 34,
+                padding: "7px 12px",
+                background: "linear-gradient(135deg, #fdf4ff, #eef2ff)",
+                border: `1.5px solid ${C.accentBorder}`,
+                borderRadius: 12,
+                color: C.accent,
+                fontSize: 12,
+                fontWeight: 800,
+                cursor: "pointer",
+                boxShadow: "0 8px 20px rgba(107, 77, 176, 0.12)",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3l1.9 4.2L18 9l-4.1 1.8L12 15l-1.9-4.2L6 9l4.1-1.8L12 3z" />
+                <path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14z" />
+                <path d="M5 14l.9 2.1L8 17l-2.1.9L5 20l-.9-2.1L2 17l2.1-.9L5 14z" />
+              </svg>
+              AI Optimization
+            </button>
             <div style={{ display: "flex", gap: 6 }} className="rb-form-header-buttons">
               {/* Save Button */}
               <button onClick={handleSaveToDb} disabled={isSaving}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#fff", border: `1.5px solid ${C.inputBorder}`, borderRadius: 8, color: C.textMuted, fontSize: 11, fontWeight: 700, cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.7 : 1, transition: "all 0.2s" }}>
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 34, padding: "6px 12px", background: "#fff", border: `1.5px solid ${C.inputBorder}`, borderRadius: 8, color: C.textMuted, fontSize: 11, fontWeight: 700, cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.7 : 1, transition: "all 0.2s", whiteSpace: "nowrap", flexShrink: 0 }}>
                 {isSaving ? (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg>
                 ) : saveMessage === "Saved!" ? (
@@ -3581,13 +4316,13 @@ ${clJD}`
               </button>
               {/* Match JD button */}
               <button onClick={() => navigate("/jd-match")}
-                style={{ display: "flex", alignItems: "center", gap: 7, minHeight: 34, padding: "8px 14px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}>
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, minHeight: 34, padding: "6px 12px", background: "#fff", border: `1.5px solid ${C.accent}`, borderRadius: 8, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap", flexShrink: 0 }}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
                 Match JD
               </button>
               {/* Upload Resume button */}
               <button onClick={() => setShowUpload(true)}
-                style={{ display: "flex", alignItems: "center", gap: 7, minHeight: 34, padding: "8px 14px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)" }}>
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, minHeight: 34, padding: "6px 12px", background: "linear-gradient(135deg, #7c5cbf, #6b4db0)", border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(107, 77, 176, 0.2)", whiteSpace: "nowrap", flexShrink: 0 }}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d={icons.upload} /></svg>
                 Upload CV
               </button>

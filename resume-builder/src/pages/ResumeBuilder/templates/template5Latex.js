@@ -102,10 +102,10 @@ function buildExperience(experience = []) {
 ${rows.map((item) => `    \\resumeSubheading
       {${escapeLatex(item.company || "")}${buildExternalIcon(item.link)}}{${escapeLatex(item.duration || "")}}
       {\\underline{${escapeLatex(item.role || "")}}}{${escapeLatex(item.location || "")}}
-      \\vspace{-2pt}
-      ${buildBulletList(item.bullets) || "\\resumeItemListStart\n        \\resumeItem{Add impact-focused bullet points here.}\n      \\resumeItemListEnd"}`).join("\n\n")}
+      \\vspace{1pt}
+      ${buildBulletList(item.bullets) || "\\resumeItemListStart\n        \\resumeItem{Add impact-focused bullet points here.}\n      \\resumeItemListEnd"}`).join("\n\n    \\vspace{6pt}\n")}
   \\resumeSubHeadingListEnd
-\\vspace{-12pt}
+\\vspace{-8pt}
 `;
 }
 
@@ -118,9 +118,11 @@ function buildProjects(projects = []) {
     \\resumeSubHeadingListStart
 ${rows.map((item) => `      \\resumeProjectHeading
           {\\textbf{\\large{\\underline{${escapeLatex(item.name)}}}}${buildExternalIcon(item.link)}${hasText(item.tech) ? ` $|$ \\large{\\underline{${escapeLatex(item.tech)}}}` : ""}}{${escapeLatex(item.year || item.date || "")}}\\\\
+          \\vspace{1pt}
           ${buildBulletList(item.bullets)?.replace(/^/gm, "  ").trim() || "\\resumeItemListStart\n            \\resumeItem{\\normalsize{Describe the project impact here.}}\n          \\resumeItemListEnd"}
-          \\vspace{-13pt}`).join("\n\n")}
+          \\vspace{-8pt}`).join("\n\n      \\vspace{2pt}\n")}
     \\resumeSubHeadingListEnd
+\\vspace{-8pt}
 `;
 }
 
@@ -147,11 +149,9 @@ function buildAchievements(achievements = []) {
   if (!rows.length) return "";
 
   return `\\section{Awards \\& Achievements}
-  \\resumeSubHeadingListStart
-${rows.map((item) => `    \\resumeProjectHeading
-      {${escapeLatex(item.title)}${hasText(item.url) ? `\\ \\href{${escapeLatexUrl(item.url)}}{\\faExternalLink}` : ""}}{}
-`).join("\n")}
-  \\resumeSubHeadingListEnd
+  \\begin{itemize}[leftmargin=0.15in]
+${rows.map((item) => `    \\resumeItem{\\normalsize{${escapeLatex(item.title)}${hasText(item.url) ? ` \\href{${escapeLatexUrl(item.url)}}{\\faExternalLink}` : ""}}}`).join("\n")}
+  \\end{itemize}\\vspace{-5pt}
 `;
 }
 
@@ -233,7 +233,7 @@ export function buildTemplate5Latex(data) {
     \\item
     \\begin{tabular*}{1.001\\textwidth}{l@{\\extracolsep{\\fill}}r}
       \\small#1 & \\textbf{\\small #2}\\\\
-    \\end{tabular*}\\vspace{-7pt}
+    \\end{tabular*}\\vspace{-4pt}
 }
 
 \\newcommand{\\resumeSubItem}[1]{\\resumeItem{#1}\\vspace{-4pt}}

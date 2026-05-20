@@ -1,0 +1,48 @@
+--- ppt\slides\slide1.xml ---
+PROJECT PRESENTATION | Presented by: |  | 1. Anshu Prasad |  | 2. Deepak Yadav | 3. B.Tech CSE (AI), 8th Semester | Project Guide |  | Ajay Pratap Singh Yadav | Assistant Professor | ATSForge: AI-Powered Career Management Platform | Department of Computer Science and Engineering (Artificial Intelligence)
+
+--- ppt\slides\slide2.xml ---
+Overview | Abstract | Introduction | Problem Statement | Objectives | Technology Stack | Progress Report | Project Timeline | Results | Innovation | Sustainable Development Goals | ATS Hybrid Scoring Model | Conclusion | References
+
+--- ppt\slides\slide3.xml ---
+Abstract | ATSForge is a unified web platform for resume building, ATS readiness scoring, JD matching, cover-letter generation, and professional outreach. It uses a five-factor hybrid scoring model to improve resume quality before job applications are submitted.
+
+--- ppt\slides\slide4.xml ---
+What is ATSForge? | Introduction | Modern hiring workflows depend on Applicant Tracking Systems and role-specific screening. | Students often use different tools for resume writing, keyword checking, JD matching, and outreach. | ATSForge combines these tasks into one AI-assisted workflow built on a shared resume schema.
+
+--- ppt\slides\slide5.xml ---
+Why is this project required? | Problem | Many resumes fail because of weak formatting, missing keywords, poor evidence, or low relevance to the target role. | Most public tools return a single opaque score and do not connect ATS feedback with JD alignment or document generation. | Applicants need transparent, actionable guidance inside one end-to-end system.
+
+--- ppt\slides\slide6.xml ---
+Objectives | What does it do? | Build and parse resumes using a structured candidate profile. | Score resumes with transparent factor-level ATS feedback. | Analyze JD alignment and generate tailored cover letters and outreach drafts. | Support export-ready workflows through preview and formatting tools.
+
+--- ppt\slides\slide7.xml ---
+Innovation | Shared Resume Schema + Hybrid ATS Scoring + JD-Aware AI Content | Qualitative: Transparent factor-level feedback instead of one opaque keyword score. | Quantitative: ATS = 0.22SC + 0.26AE + 0.18KS + 0.18PS + 0.16LQ.
+
+--- ppt\slides\slide8.xml ---
+ATS Hybrid Scoring Model
+
+--- ppt\slides\slide9.xml ---
+Technology Stack | Frontend: React.js, Vite, JavaScript, CSS | Backend: Node.js, Express, API proxy | AI Layer: Groq-hosted LLaMA inference | Database: Supabase + PostgreSQL/JSONB | Resume Output: PDF and LaTeX preview workflow | Architecture: Modular web platform with shared schema
+
+--- ppt\slides\slide10.xml ---
+Progress Report | What has been completed so far: | Literature review and problem analysis | Hybrid scoring design and scoring weights finalized | Resume, JD Match, Cover Letter, and Outreach workflows integrated | Testing, documentation, and final presentation preparation
+
+--- ppt\slides\slide11.xml ---
+Project Timeline |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | Sep-Oct 2025: Problem identification and literature review | Nov 2025: Requirement analysis and shared resume schema design | Dec 2025: Resume Builder and hybrid ATS scoring engine | Jan 2026: JD Match, Cover Letter, and Outreach modules | Feb 2026: Testing, optimization, and report drafting | Mar-Apr 2026: Final documentation, demo, and viva preparation
+
+--- ppt\slides\slide12.xml ---
+Which Sustainable Development Goals are you committing to |  | SDG 4 | SDG 8 | SDG 9 | Which Sustainable Development Goals are you committing to? | SDG Goals | Quality Education: improves resume literacy and career readiness. | Decent Work and Economic Growth: supports employability and job access. | Industry, Innovation and Infrastructure: applies AI to practical hiring workflows.
+
+--- ppt\slides\slide13.xml ---
+Result | ATSForge integrates resume building, ATS scoring, JD matching, cover-letter writing, and outreach generation in one platform. | The five-factor hybrid model provides interpretable feedback on structure, evidence, keywords, parse safety, and language quality. | Internal validation showed better workflow reuse, faster document preparation, and clearer improvement guidance for users.
+
+--- ppt\slides\slide14.xml ---
+Conclusion | ATSForge demonstrates that resume optimization, role matching, and application drafting can be combined into one AI-assisted academic product. | Its hybrid scoring model is transparent, modular, and suitable for further refinement. | Future scope includes recruiter-side validation, multilingual support, and larger cross-industry benchmarking.
+
+--- ppt\slides\slide15.xml ---
+References |  | [1] J. Bersin, Talent Acquisition Systems 2023: Market Analysis, 2023. | [2] S. Bogen and A. Rieke, Help Wanted: Hiring Algorithms, Equity, and Bias, 2018. | [3] T. Naous et al., Transformer-based NER for Resume Parsing, IEEE ICTAI, 2023. | [4] A. Kumar et al., Automated Resume Parsing Using BERT, IJIT, 2023. | [5] Y. Chen and B. Liu, GPT-based Personalized Cover Letter Generation, 2022. | [6] D. Ciobanu, Resume Parsing Using Machine Learning, 2019. | [7] Jobscan, How ATS Resume Scanners Work, 2023. | [8] R. Shah et al., Resume Screening Optimization Using NLP, IEEE ICSCAN, 2021. | [9] P. Patel and A. Jain, Multi-factor Resume Scoring Using TF-IDF and BERT, 2022. | [10] Meta AI, LLaMA 3.3: An Open Foundation Language Model, 2024.
+
+--- ppt\slides\slide16.xml ---
+THANK YOU | Questions and discussion
+

@@ -12,6 +12,8 @@ export default function Template5Preview({ data, onPreviewChange }) {
   const [pdfUrl, setPdfUrl] = useState(null);
   const [isCompiling, setIsCompiling] = useState(false);
   const [errors, setErrors] = useState([]);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [previewImages, setPreviewImages] = useState([]);
   const [isRenderingMobilePreview, setIsRenderingMobilePreview] = useState(false);
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
@@ -20,6 +22,10 @@ export default function Template5Preview({ data, onPreviewChange }) {
   const compileRequestRef = useRef(0);
   const lastCompiledLatexRef = useRef("");
   const isMobileOrTablet = windowWidth <= 1024;
+
+  const beginCooldown = (seconds = 30) => {
+    setCooldownSeconds(seconds);
+  };
 
   const clearPreviewUrl = () => {
     if (latestUrlRef.current) {
@@ -37,6 +43,8 @@ export default function Template5Preview({ data, onPreviewChange }) {
   }, []);
 
   useEffect(() => {
+    if (cooldownSeconds > 0) return undefined;
+
     const timer = setTimeout(async () => {
       if (latexCode === lastCompiledLatexRef.current) return;
 
@@ -56,11 +64,15 @@ export default function Template5Preview({ data, onPreviewChange }) {
         lastCompiledLatexRef.current = latexCode;
         setPdfUrl(nextUrl);
         setErrors([]);
+        setCooldownSeconds(0);
         onPreviewChange?.({ pdfUrl: nextUrl, isCompiling: false, errors: [], latexCode });
       } else {
-        const nextErrors = result.errors || [{ message: "Template 5 compilation failed." }];
+        const nextErrors = result.retryableBusy
+          ? [{ message: "Server is too busy. Try again after 30 seconds." }]
+          : (result.errors || [{ message: "Template 5 compilation failed." }]);
         clearPreviewUrl();
         setErrors(nextErrors);
+        if (result.retryableBusy) beginCooldown(30);
         onPreviewChange?.({ pdfUrl: null, isCompiling: false, errors: nextErrors, latexCode });
       }
 
@@ -68,7 +80,15 @@ export default function Template5Preview({ data, onPreviewChange }) {
     }, 1400);
 
     return () => clearTimeout(timer);
-  }, [latexCode, onPreviewChange]);
+  }, [cooldownSeconds, latexCode, onPreviewChange, retryNonce]);
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return undefined;
+    const timer = setInterval(() => {
+      setCooldownSeconds((current) => (current <= 1 ? 0 : current - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
 
   useEffect(() => {
     return () => {
@@ -150,13 +170,37 @@ export default function Template5Preview({ data, onPreviewChange }) {
           <div style={{ fontSize: 14, fontWeight: 800, color: "#1f2937" }}>Tech friendly</div>
           <div style={{ fontSize: 11, color: "#6b7280" }}>Latex PDF preview generate for the same uploaded and editable bullet data.</div>
         </div>
-        {isCompiling && <div style={{ fontSize: 12, fontWeight: 700, color: "#6B4DB0" }}>Compiling Template 5...</div>}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {cooldownSeconds > 0 && (
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#b45309" }}>
+              Try after {cooldownSeconds}s
+            </div>
+          )}
+          {cooldownSeconds === 0 && errors.length > 0 && (
+            <button
+              onClick={() => {
+                setErrors([]);
+                setRetryNonce((value) => value + 1);
+              }}
+              disabled={isCompiling}
+              style={{ padding: "7px 12px", borderRadius: 999, border: "none", background: "#6B4DB0", color: "#fff", fontSize: 11, fontWeight: 700, cursor: isCompiling ? "default" : "pointer", opacity: isCompiling ? 0.7 : 1 }}
+            >
+              Reload
+            </button>
+          )}
+          {isCompiling && <div style={{ fontSize: 12, fontWeight: 700, color: "#6B4DB0" }}>Compiling Template 5...</div>}
+        </div>
       </div>
 
       {errors.length > 0 && (
         <div style={{ width: "100%", background: "#fff7ed", border: "1px solid #fdba74", borderRadius: 14, padding: "14px 16px", color: "#9a3412" }}>
           <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6 }}>Template 5 compile issue</div>
           <div style={{ fontSize: 11, whiteSpace: "pre-wrap" }}>{errors[0]?.message || "Unknown LaTeX compilation error."}</div>
+          {cooldownSeconds > 0 && (
+            <div style={{ fontSize: 11, marginTop: 8 }}>
+              Server is too busy. Please try again after {cooldownSeconds} seconds.
+            </div>
+          )}
         </div>
       )}
 
